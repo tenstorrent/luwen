@@ -1,0 +1,9 @@
+[package]
+name = "ttchip"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+kmdif = { path = "../kmdif" }
+
+thiserror = "1.0.40"
