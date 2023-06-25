@@ -1,5 +1,5 @@
 use std::{
-    os::fd::{AsRawFd, RawFd},
+    os::{fd::{AsRawFd, RawFd}, unix::prelude::FileTypeExt},
     sync::Arc,
 };
 
@@ -13,7 +13,7 @@ use ioctl::{
     query_mappings, AllocateDmaBuffer, GetDeviceInfo, GetDeviceInfoOut, Mapping, QueryMappings,
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Hash, Copy, Debug, PartialEq, Eq)]
 pub enum Arch {
     Grayskull,
     Wormhole,
@@ -72,17 +72,17 @@ pub struct DmaConfig {
 }
 
 pub struct PhysicalDevice {
-    vendor_id: u16,
-    device_id: u16,
-    subsystem_vendor_id: u16,
-    subsystem_id: u16,
+    pub vendor_id: u16,
+    pub device_id: u16,
+    pub subsystem_vendor_id: u16,
+    pub subsystem_id: u16,
 
-    pci_bus: u16,
-    pci_device: u16,
-    pci_function: u16,
+    pub pci_bus: u16,
+    pub pci_device: u16,
+    pub pci_function: u16,
 
-    bar_addr: u64,
-    bar_size_bytes: u64,
+    pub bar_addr: u64,
+    pub bar_size_bytes: u64,
 }
 
 pub struct PciDevice {
@@ -463,7 +463,7 @@ impl PciDevice {
             .filter_map(|entry| {
                 let entry = entry.ok()?;
 
-                if !entry.file_type().ok()?.is_file() {
+                if !entry.file_type().ok()?.is_char_device() {
                     return None;
                 }
 

@@ -1,10 +1,12 @@
+use kmdif::PciError;
+
 use crate::{
     common::{ArcMsg, Chip},
     TTError,
 };
 
 pub struct Grayskull {
-    chip: Chip,
+    pub chip: Chip,
 }
 
 impl Grayskull {

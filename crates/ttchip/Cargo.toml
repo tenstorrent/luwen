@@ -5,5 +5,6 @@ edition = "2021"
 
 [dependencies]
 kmdif = { path = "../kmdif" }
+bitfield-struct = "0.4.4"
 
 thiserror = "1.0.40"
