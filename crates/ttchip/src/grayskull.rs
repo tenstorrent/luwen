@@ -1,6 +1,5 @@
-use kmdif::PciError;
-
 use crate::{
+    axi::{Axi, AxiReadWrite},
     common::{ArcMsg, Chip},
     TTError,
 };
@@ -11,13 +10,16 @@ pub struct Grayskull {
 
 impl Grayskull {
     pub fn create(device_id: usize) -> Result<Self, TTError> {
-        let chip = Chip::create(device_id)?;
+        let mut chip = Chip::create(device_id)?;
+        chip.axi = Axi::new("grayskull-axi-pci.bin");
 
         Self::new(chip)
     }
 
-    pub fn new(chip: Chip) -> Result<Self, TTError> {
+    pub fn new(mut chip: Chip) -> Result<Self, TTError> {
         if let kmdif::Arch::Grayskull = chip.arch() {
+            chip.axi = Axi::new("grayskull-axi-pci.bin");
+
             Ok(Self { chip })
         } else {
             Err(TTError::ArchMismatch {
@@ -25,6 +27,10 @@ impl Grayskull {
                 actual: chip.arch(),
             })
         }
+    }
+
+    pub fn axi(&mut self) -> AxiReadWrite {
+        self.chip.axi()
     }
 
     pub fn arc_msg(

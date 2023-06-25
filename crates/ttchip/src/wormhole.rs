@@ -1,11 +1,11 @@
 mod tlb;
 
-use kmdif::{DmaBuffer, PciError};
+use kmdif::{DmaBuffer, PciError, PciDevice};
 
 use crate::{
     common::{ArcMsg, Chip},
     remote::{self, detect, EthCoord, IntoChip, RemoteWormholeChip},
-    TTError,
+    TTError, axi::{Axi, AxiReadWrite},
 };
 
 pub struct Noc<'a> {
@@ -126,13 +126,15 @@ pub struct Wormhole {
 
 impl Wormhole {
     pub fn create(device_id: usize) -> Result<Self, TTError> {
-        let chip = Chip::create(device_id)?;
+        let mut chip = Chip::create(device_id)?;
+        chip.axi = Axi::new("wormhole-axi-pci.bin");
 
         Self::new(chip)
     }
 
-    pub fn new(chip: Chip) -> Result<Self, TTError> {
+    pub fn new(mut chip: Chip) -> Result<Self, TTError> {
         if let kmdif::Arch::Wormhole = chip.arch() {
+            chip.axi = Axi::new("wormhole-axi-pci.bin");
             Ok(Self {
                 chip,
                 eth_dma: None,
@@ -145,11 +147,19 @@ impl Wormhole {
         }
     }
 
-    pub fn board_id(&mut self) -> Result<u64, PciError> {
-        Ok(
-            ((self.chip.transport.read32(0x1FE80000 + 0x78828 + 0x10C)? as u64) << 32)
-                | self.chip.transport.read32(0x1FE80000 + 0x78828 + 0x108)? as u64,
-        )
+    pub fn axi(&mut self) -> AxiReadWrite {
+        self.chip.axi()
+    }
+
+    pub fn board_id(&mut self) -> Result<u64, TTError> {
+        let lower = self.axi().read::<u32>("ARC_CSM.BOARD_INFO[0]")?;
+        let upper = self.axi().read::<u32>("ARC_CSM.BOARD_INFO[1]")?;
+
+        Ok((upper as u64) << 32 | lower as u64)
+        // Ok(
+        //     ((self.chip.transport.read32(0x1FE80000 + 0x78828 + 0x10C)? as u64) << 32)
+        //         | self.chip.transport.read32(0x1FE80000 + 0x78828 + 0x108)? as u64,
+        // )
     }
 
     pub fn coord(&mut self) -> Result<EthCoord, PciError> {

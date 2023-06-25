@@ -1,9 +1,11 @@
+use axi::AxiError;
 use thiserror::Error;
 
 mod common;
 mod grayskull;
 pub mod remote;
 mod wormhole;
+pub mod axi;
 
 use common::Chip;
 use kmdif::{PciError, PciOpenError};
@@ -21,6 +23,9 @@ pub enum TTError {
 
     #[error(transparent)]
     PciError(#[from] PciError),
+
+    #[error(transparent)]
+    AxiError(#[from] AxiError),
 
     #[error("Chip arch mismatch: expected {expected:?}, got {actual:?}")]
     ArchMismatch { expected: Arch, actual: Arch },

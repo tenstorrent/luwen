@@ -1,5 +1,9 @@
+use std::fmt::format;
+
 use kmdif::{Arch, PciDevice, PciError, PciOpenError};
 use thiserror::Error;
+
+use crate::{axi::{Axi, AxiReadWrite, AxiError}, TTError};
 
 pub trait DeviceTransport {
     fn read_mapping(&self, address: &str) -> u32;
@@ -52,6 +56,7 @@ impl DeviceTransport for PciTransport {
 
 pub struct Chip {
     pub transport: kmdif::PciDevice,
+    pub axi: Axi
 }
 
 impl Chip {
@@ -87,6 +92,9 @@ pub enum ArcMsgError {
 
     #[error(transparent)]
     PciError(#[from] PciError),
+
+    #[error(transparent)]
+    AxiError(#[from] AxiError),
 }
 
 pub enum ArcMsgOk {
@@ -98,14 +106,22 @@ impl Chip {
     pub fn create(device_id: usize) -> Result<Self, PciOpenError> {
         Ok(Self {
             transport: PciDevice::open(device_id)?,
+            axi: Axi::empty()
         })
+    }
+
+    pub fn axi(&mut self) -> AxiReadWrite {
+        AxiReadWrite {
+            axi: &self.axi,
+            transport: &mut self.transport,
+        }
     }
 
     /// Returns True if new interrupt triggered, or False if the
     /// FW is currently busy. The message IRQ handler should only take a couple
     /// dozen cycles, so if this returns False it probably means something went
     /// wrong.
-    fn trigger_fw_int(&mut self) -> Result<bool, PciError> {
+    fn trigger_fw_int(&mut self) -> Result<bool, AxiError> {
         // let misc = self.transport.read32("ARC_RESET.ARC_MISC_CNTL")?;
         let misc = self.transport.read32(0x1FF30000 + 0x0100)?;
 
@@ -114,10 +130,10 @@ impl Chip {
         }
 
         let misc_bit16_set = misc | (1 << 16);
+        self.axi()
+            .write("ARC_RESET.ARC_MISC_CNTL", &misc_bit16_set.to_le_bytes())?;
         // self.transport
-        //     .write32("ARC_RESET.ARC_MISC_CNTL", misc_bit16_set)?;
-        self.transport
-            .write32(0x1FF30000 + 0x0100, misc_bit16_set)?;
+        //     .write32(0x1FF30000 + 0x0100, misc_bit16_set)?;
 
         Ok(true)
     }
@@ -154,24 +170,23 @@ impl Chip {
             return Err(ArcMsgError::ArcAsleep);
         }
 
-        // self
-        //     .transport
-        //     .write32("ARC_RESET.SCRATCH[{return_reg}]", arg0 as u32 | ((arg1 as u32) << 16)):?
-        self.transport.write32(
-            0x1FF30000 + 0x0060 + 4 * return_reg,
-            arg0 as u32 | ((arg1 as u32) << 16),
-        )?;
-        // self.transport.write32("ARC_RESET.SCRATCH[{msg_reg}]", code as u32)?;
-        self.transport
-            .write32(0x1FF30000 + 0x0060 + 4 * msg_reg, code as u32)?;
+        // self.transport.write32(
+        //     0x1FF30000 + 0x0060 + 4 * return_reg,
+        //     arg0 as u32 | ((arg1 as u32) << 16),
+        // )?;
+        self.axi().write(&format!("ARC_RESET.SCRATCH[{return_reg}]"), &(arg0 as u32 | ((arg1 as u32) << 16)).to_le_bytes())?;
+
+        // self.transport
+        //     .write32(0x1FF30000 + 0x0060 + 4 * msg_reg, code as u32)?;
+        self.axi().write(&format!("ARC_RESET.SCRATCH[{msg_reg}]"), &(code as u32).to_le_bytes())?;
 
         assert!(self.trigger_fw_int()?);
 
         if wait_for_done {
             let start = std::time::Instant::now();
             loop {
-                // let status = self.transport.read32("ARC_RESET.SCRATCH[{msg_reg}]");
-                let status: u32 = self.transport.read32(0x1FF30000 + 0x0060 + 4 * msg_reg)?;
+                // let status: u32 = self.transport.read32(0x1FF30000 + 0x0060 + 4 * msg_reg)?;
+                let status: u32 = self.axi().read(&format!("ARC_RESET.SCRATCH[{msg_reg}]"))?;
                 if (status & 0xFFFF) as u16 == code & 0xFF {
                     let exit_code = (status >> 16) & 0xFFFF;
                     return Ok(ArcMsgOk::Ok(exit_code));

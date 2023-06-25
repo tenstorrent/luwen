@@ -6,5 +6,7 @@ edition = "2021"
 [dependencies]
 kmdif = { path = "../kmdif" }
 bitfield-struct = "0.4.4"
+serde = {version = "1.0.164", features = ["derive"]}
+bincode = "1.3.3"
 
 thiserror = "1.0.40"

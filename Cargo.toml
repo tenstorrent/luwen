@@ -8,6 +8,10 @@ edition = "2021"
 [dependencies]
 ttchip = {path = "crates/ttchip"}
 
+serde = {"version" = "1.0.164", features = ["derive"]}
+serde_yaml = "0.9.22"
+bincode = "1.3.3"
+
 [workspace]
 members = [
     "crates/*"

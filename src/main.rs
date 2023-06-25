@@ -19,11 +19,15 @@ pub fn scan() -> Result<(), Box<dyn std::error::Error>> {
 
                 assert_eq!(wh.noc(false).read32(1, 1, 0x0)?, 0x401e);
             }
-            ttchip::AllChips::Grayskull(gs) => {
+            ttchip::AllChips::Grayskull(mut gs) => {
                 println!(
                     "id {} {:X} is WH",
                     gs.chip.transport.id, gs.chip.transport.physical.device_id
                 );
+
+                gs.chip.arc_msg(&mut ArcMsg::TEST { arg: 0x1000 }, true, std::time::Duration::from_secs(1), false)?;
+                let result: u32 = gs.chip.axi().read("ARC_RESET.SCRATCH[3]")?;
+                assert_eq!(result, 0x1001);
             }
         }
     }
@@ -40,8 +44,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::time::Duration::from_secs(1),
         false,
     )?;
-    // let result = chip.ARC.read32("ARC_RESET.SCRATCH[5]");
-    let result = chip.chip.transport.read32(0x1FF30000 + 0x0060 + 4 * 3)?;
+    // let result = chip.chip.transport.read32(0x1FF30000 + 0x0060 + 4 * 3)?;
+    let result: u32 = chip.chip.axi().read("ARC_RESET.SCRATCH[3]")?;
     assert_eq!(result, 0x1001);
 
     chip.chip
