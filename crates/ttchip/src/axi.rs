@@ -1,10 +1,8 @@
-use std::{collections::HashMap, mem::forget};
+use std::collections::HashMap;
 
 use kmdif::{PciDevice, PciError};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-
-use crate::common::Chip;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MemorySlice {

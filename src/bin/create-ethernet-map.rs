@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
-use ttchip::{remote::RemoteWormholeChip, Arch, EthCoord};
+use luwen_core::Arch;
+use ttchip::{remote::RemoteWormholeChip, EthCoord};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct ChipIdent {

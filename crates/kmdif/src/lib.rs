@@ -1,5 +1,8 @@
 use std::{
-    os::{fd::{AsRawFd, RawFd}, unix::prelude::FileTypeExt},
+    os::{
+        fd::{AsRawFd, RawFd},
+        unix::prelude::FileTypeExt,
+    },
     sync::Arc,
 };
 
@@ -7,18 +10,14 @@ mod error;
 mod ioctl;
 mod kmdif;
 mod pci;
+pub mod tlb;
 
 pub use error::{PciError, PciOpenError};
 use ioctl::{
     query_mappings, AllocateDmaBuffer, GetDeviceInfo, GetDeviceInfoOut, Mapping, QueryMappings,
 };
-
-#[derive(Clone, Hash, Copy, Debug, PartialEq, Eq)]
-pub enum Arch {
-    Grayskull,
-    Wormhole,
-    Unknown(u16),
-}
+use luwen_core::Arch;
+pub use tlb::{get_wh_tlb, setup_wh_tlb, tlb_wh_info, DeviceTlbInfo, Tlb};
 
 impl From<&GetDeviceInfoOut> for Arch {
     fn from(value: &GetDeviceInfoOut) -> Self {
@@ -26,22 +25,6 @@ impl From<&GetDeviceInfoOut> for Arch {
             0xfaca => Arch::Grayskull,
             0x401e => Arch::Wormhole,
             id => Arch::Unknown(id),
-        }
-    }
-}
-
-impl Arch {
-    pub fn is_wormhole(&self) -> bool {
-        match self {
-            Arch::Wormhole => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_grayskull(&self) -> bool {
-        match self {
-            Arch::Grayskull => true,
-            _ => false,
         }
     }
 }
@@ -80,6 +63,7 @@ pub struct PhysicalDevice {
     pub pci_bus: u16,
     pub pci_device: u16,
     pub pci_function: u16,
+    pub pci_domain: u16,
 
     pub bar_addr: u64,
     pub bar_size_bytes: u64,
@@ -127,7 +111,8 @@ fn allocate_dma_buffer(
     size: u32,
 ) -> Result<DmaBuffer, PciError> {
     let mut allocate_dma_buf = AllocateDmaBuffer::default();
-    allocate_dma_buf.input.requested_size = (size.min(1 << max_dma_buf_size_log2)).max(kmdif::getpagesize().unwrap() as u32);
+    allocate_dma_buf.input.requested_size =
+        (size.min(1 << max_dma_buf_size_log2)).max(kmdif::getpagesize().unwrap() as u32);
     allocate_dma_buf.input.buf_index = buffer_index as u8;
 
     if let Err(err) = unsafe { ioctl::allocate_dma_buffer(device_fd, &mut allocate_dma_buf) } {
@@ -328,6 +313,7 @@ impl PciDevice {
         let pci_bus = device_info.output.bus_dev_fn >> 8;
         let pci_device = ((device_info.output.bus_dev_fn) >> 3) & 0x1f; // The definition of PCI_SLOT from include/uapi/linux/pci.h
         let pci_function = (device_info.output.bus_dev_fn) & 0x7; // The definition of PCI_FUNC from include/uapi/linux/pci.h
+        let pci_domain = device_info.output.pci_domain;
 
         let config_space = std::fs::OpenOptions::new()
             .read(true)
@@ -355,6 +341,7 @@ impl PciDevice {
                 pci_bus,
                 pci_device,
                 pci_function,
+                pci_domain,
                 bar_addr: pci::read_bar0_base(&config_space),
                 bar_size_bytes: bar0_uc_mapping.mapping_size,
             },

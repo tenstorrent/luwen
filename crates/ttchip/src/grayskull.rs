@@ -1,3 +1,5 @@
+use luwen_core::Arch;
+
 use crate::{
     axi::{Axi, AxiReadWrite},
     common::{ArcMsg, Chip},
@@ -17,13 +19,13 @@ impl Grayskull {
     }
 
     pub fn new(mut chip: Chip) -> Result<Self, TTError> {
-        if let kmdif::Arch::Grayskull = chip.arch() {
+        if let Arch::Grayskull = chip.arch() {
             chip.axi = Axi::new("grayskull-axi-pci.bin");
 
             Ok(Self { chip })
         } else {
             Err(TTError::ArchMismatch {
-                expected: kmdif::Arch::Grayskull,
+                expected: Arch::Grayskull,
                 actual: chip.arch(),
             })
         }

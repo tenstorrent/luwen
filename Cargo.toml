@@ -6,7 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+luwen-core = {path = "crates/luwen-core"}
 ttchip = {path = "crates/ttchip"}
+luwen-if = {path = "crates/luwen-if"}
+luwen-ref = {path = "crates/luwen-ref"}
 
 serde = {"version" = "1.0.164", features = ["derive"]}
 serde_yaml = "0.9.22"

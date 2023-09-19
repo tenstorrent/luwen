@@ -1,0 +1,3 @@
+[submodule "crates/luwen-umd/open-umd"]
+	path = crates/luwen-umd/open-umd
+	url = git@yyz-gitlab.local.tenstorrent.com:tenstorrent/open-umd.git

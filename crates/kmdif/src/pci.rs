@@ -1,7 +1,5 @@
 use std::os::fd::AsRawFd;
 
-use nix::libc::user;
-
 use crate::{error::PciError, kmdif, PciDevice};
 
 const ERROR_VALUE: u32 = 0xffffffff;

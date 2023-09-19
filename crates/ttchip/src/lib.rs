@@ -1,20 +1,21 @@
 use axi::AxiError;
+use luwen_core::Arch;
 use thiserror::Error;
 
+pub mod axi;
 mod common;
 mod grayskull;
 pub mod remote;
 mod wormhole;
-pub mod axi;
 
 use common::Chip;
 use kmdif::{PciError, PciOpenError};
 
 pub use common::ArcMsg;
 pub use grayskull::Grayskull;
-pub use kmdif::{DmaConfig, Arch};
+pub use kmdif::DmaConfig;
+pub use remote::{detect::run_on_all_chips, EthCoord};
 pub use wormhole::Wormhole;
-pub use remote::{EthCoord, detect::run_on_all_chips};
 
 #[derive(Error, Debug)]
 pub enum TTError {

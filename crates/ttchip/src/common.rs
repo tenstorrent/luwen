@@ -1,9 +1,8 @@
-use std::fmt::format;
-
-use kmdif::{Arch, PciDevice, PciError, PciOpenError};
+use kmdif::{PciDevice, PciError, PciOpenError};
+use luwen_core::Arch;
 use thiserror::Error;
 
-use crate::{axi::{Axi, AxiReadWrite, AxiError}, TTError};
+use crate::axi::{Axi, AxiError, AxiReadWrite};
 
 pub trait DeviceTransport {
     fn read_mapping(&self, address: &str) -> u32;
@@ -56,7 +55,7 @@ impl DeviceTransport for PciTransport {
 
 pub struct Chip {
     pub transport: kmdif::PciDevice,
-    pub axi: Axi
+    pub axi: Axi,
 }
 
 impl Chip {
@@ -106,7 +105,7 @@ impl Chip {
     pub fn create(device_id: usize) -> Result<Self, PciOpenError> {
         Ok(Self {
             transport: PciDevice::open(device_id)?,
-            axi: Axi::empty()
+            axi: Axi::empty(),
         })
     }
 
@@ -174,11 +173,17 @@ impl Chip {
         //     0x1FF30000 + 0x0060 + 4 * return_reg,
         //     arg0 as u32 | ((arg1 as u32) << 16),
         // )?;
-        self.axi().write(&format!("ARC_RESET.SCRATCH[{return_reg}]"), &(arg0 as u32 | ((arg1 as u32) << 16)).to_le_bytes())?;
+        self.axi().write(
+            &format!("ARC_RESET.SCRATCH[{return_reg}]"),
+            &(arg0 as u32 | ((arg1 as u32) << 16)).to_le_bytes(),
+        )?;
 
         // self.transport
         //     .write32(0x1FF30000 + 0x0060 + 4 * msg_reg, code as u32)?;
-        self.axi().write(&format!("ARC_RESET.SCRATCH[{msg_reg}]"), &(code as u32).to_le_bytes())?;
+        self.axi().write(
+            &format!("ARC_RESET.SCRATCH[{msg_reg}]"),
+            &(code as u32).to_le_bytes(),
+        )?;
 
         assert!(self.trigger_fw_int()?);
 

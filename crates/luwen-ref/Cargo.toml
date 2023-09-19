@@ -1,0 +1,10 @@
+[package]
+name = "luwen-ref"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+kmdif = {path = "../kmdif"}
+luwen-if = { path = "../luwen-if" }
+
+thiserror = "1.0.40"

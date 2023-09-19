@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
+use luwen_if::chip::{axi_translate, MemorySlice, MemorySlices};
 use serde::{
     de::{value::SeqAccessDeserializer, Visitor},
     Deserialize, Deserializer, Serialize,
 };
-use ttchip::axi::MemorySlice;
 
 #[derive(Debug, Serialize)]
 pub enum Fields {
@@ -18,7 +18,7 @@ pub enum Fields {
         mask: u32,
         upper_bits: u32,
         lower_bits: u32,
-        byte_offset: u32,
+        byte_offset: u64,
         description: String,
     },
 }
@@ -54,7 +54,7 @@ impl<'de> Deserialize<'de> for Fields {
                         description: value.3,
                     })
                 } else if size == 5 {
-                    let value: (u32, u32, u32, u32, String) =
+                    let value: (u32, u32, u32, u64, String) =
                         Deserialize::deserialize(SeqAccessDeserializer::new(seq))?;
 
                     Ok(Fields::Struct {
@@ -109,9 +109,9 @@ pub struct MemoryRegion {
     #[serde(rename = "Address")]
     pub address: u64,
     #[serde(rename = "ArraySize")]
-    pub array_size: Option<u32>,
+    pub array_size: Option<u64>,
     #[serde(rename = "AddressIncrement")]
-    pub address_increment: Option<u32>,
+    pub address_increment: Option<u64>,
     #[serde(rename = "Description")]
     pub description: Option<String>,
     #[serde(rename = "Fields", deserialize_with = "deserialize_fields")]
@@ -176,14 +176,14 @@ fn parse_translation_file(
             });
             assert!(all_array || all_struct);
 
-            let address_increment = def.address_increment.map(|v| v as u64).unwrap_or(defs.regsize / 8);
+            let address_increment = def.address_increment.unwrap_or(defs.regsize / 8);
 
             let mut slice = if all_array {
                 MemorySlice {
                     name: region_name.clone(),
                     offset: def.address,
                     size: address_increment,
-                    array_count: def.array_size.map(|v| v as u64),
+                    array_count: def.array_size,
                     bit_mask: None,
                     children: HashMap::with_capacity(def.fields.len()),
                 }
@@ -191,7 +191,7 @@ fn parse_translation_file(
                 MemorySlice {
                     name: region_name.clone(),
                     offset: def.address,
-                    size: address_increment * def.array_size.map(|v| v as u64).unwrap_or(1),
+                    size: address_increment * def.array_size.unwrap_or(1),
                     array_count: None,
                     bit_mask: None,
                     children: HashMap::with_capacity(def.fields.len()),
@@ -214,7 +214,7 @@ fn parse_translation_file(
                                 offset: 0,
                                 size: 0,
                                 array_count: None,
-                                bit_mask: Some((lower_bits as u64, upper_bits as u64)),
+                                bit_mask: Some((lower_bits, upper_bits)),
                                 children: HashMap::new(),
                             },
                         );
@@ -232,10 +232,10 @@ fn parse_translation_file(
                             field_name.clone(),
                             MemorySlice {
                                 name: field_name,
-                                offset: byte_offset as u64,
+                                offset: byte_offset,
                                 size: 0,
                                 array_count: None,
-                                bit_mask: Some((lower_bits as u64, upper_bits as u64)),
+                                bit_mask: Some((lower_bits, upper_bits)),
                                 children: HashMap::new(),
                             },
                         );
@@ -254,7 +254,26 @@ fn parse_and_serialize_translation(
     file: &str,
     output: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let data = bincode::serialize(&parse_translation_file(path, file)?)?;
+    let data = parse_translation_file(path, file)?;
+    std::fs::write(output, bincode::serialize(&MemorySlices::Tree(data))?)?;
+
+    Ok(())
+}
+
+fn parse_and_serialize_translation_singlelayer(
+    path: &str,
+    file: &str,
+    output: &str,
+    whitelist: &[&str],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let data = MemorySlices::Tree(parse_translation_file(path, file)?);
+
+    let mut output_data = HashMap::new();
+    for w in whitelist {
+        output_data.insert(w.to_string(), axi_translate(Some(&data), w)?);
+    }
+
+    let data = bincode::serialize(&MemorySlices::Flat(output_data))?;
     std::fs::write(output, data)?;
 
     Ok(())
@@ -263,6 +282,38 @@ fn parse_and_serialize_translation(
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     parse_and_serialize_translation("data/grayskull", "axi-pci.yaml", "grayskull-axi-pci.bin")?;
     parse_and_serialize_translation("data/wormhole", "axi-pci.yaml", "wormhole-axi-pci.bin")?;
+    parse_and_serialize_translation("data/wormhole", "axi-noc.yaml", "wormhole-axi-noc.bin")?;
+
+    let os_keys = [
+        "ARC_RESET.ARC_MISC_CNTL",
+        "ARC_RESET.SCRATCH[0]",
+        "ARC_RESET.SCRATCH[1]",
+        "ARC_RESET.SCRATCH[2]",
+        "ARC_RESET.SCRATCH[3]",
+        "ARC_RESET.SCRATCH[4]",
+        "ARC_RESET.SCRATCH[5]",
+        "ARC_RESET.POST_CODE",
+        "ARC_CSM.DATA[0]",
+        "ARC_CSM.ARC_PCIE_DMA_REQUEST.trigger",
+    ];
+    parse_and_serialize_translation_singlelayer(
+        "data/grayskull",
+        "axi-pci.yaml",
+        "axi-data/grayskull-axi-pci.bin",
+        &os_keys,
+    )?;
+    parse_and_serialize_translation_singlelayer(
+        "data/wormhole",
+        "axi-noc.yaml",
+        "axi-data/wormhole-axi-noc.bin",
+        &os_keys,
+    )?;
+    parse_and_serialize_translation_singlelayer(
+        "data/wormhole",
+        "axi-pci.yaml",
+        "axi-data/wormhole-axi-pci.bin",
+        &os_keys,
+    )?;
 
     Ok(())
 }

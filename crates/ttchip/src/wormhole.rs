@@ -1,11 +1,13 @@
 mod tlb;
 
-use kmdif::{DmaBuffer, PciError, PciDevice};
+use kmdif::{DmaBuffer, PciError};
+use luwen_core::Arch;
 
 use crate::{
+    axi::{Axi, AxiReadWrite},
     common::{ArcMsg, Chip},
-    remote::{self, detect, EthCoord, IntoChip, RemoteWormholeChip},
-    TTError, axi::{Axi, AxiReadWrite},
+    remote::{self, EthCoord, IntoChip, RemoteWormholeChip},
+    TTError,
 };
 
 pub struct Noc<'a> {
@@ -133,7 +135,7 @@ impl Wormhole {
     }
 
     pub fn new(mut chip: Chip) -> Result<Self, TTError> {
-        if let kmdif::Arch::Wormhole = chip.arch() {
+        if let Arch::Wormhole = chip.arch() {
             chip.axi = Axi::new("wormhole-axi-pci.bin");
             Ok(Self {
                 chip,
@@ -141,7 +143,7 @@ impl Wormhole {
             })
         } else {
             Err(TTError::ArchMismatch {
-                expected: kmdif::Arch::Wormhole,
+                expected: Arch::Wormhole,
                 actual: chip.arch(),
             })
         }
