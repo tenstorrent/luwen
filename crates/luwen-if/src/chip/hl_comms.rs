@@ -1,4 +1,4 @@
-use super::{AxiError, ChipComms, ChipInterface};
+use super::{AxiData, AxiError, ChipComms, ChipInterface};
 
 /// Convinence trait for high-level communication with an arbitrary chip.
 pub trait HlComms {
@@ -53,14 +53,78 @@ pub trait HlComms {
         let (arc_if, chip_if) = self.comms_obj();
         arc_if.axi_write32(chip_if, addr, value)
     }
+}
+
+/// These functions can' be stored as a fat pointer so they are split out here.
+/// There is a blanket implementation for all types that implement HlComms.
+pub trait HlCommsInterface: HlComms {
+    fn axi_translate(&self, addr: impl AsRef<str>) -> Result<AxiData, AxiError> {
+        let (arc_if, _) = self.comms_obj();
+
+        arc_if.axi_translate(addr.as_ref())
+    }
+
+    fn axi_sread<'a>(
+        &self,
+        addr: impl AsRef<str>,
+        value: &'a mut [u8],
+    ) -> Result<&'a [u8], AxiError> {
+        let (arc_if, chip_if) = self.comms_obj();
+
+        let addr = addr.as_ref();
+
+        let addr = arc_if.axi_translate(addr)?;
+
+        if value.len() < addr.size as usize {
+            return Err(AxiError::ReadBufferTooSmall);
+        }
+
+        arc_if.axi_read(chip_if, addr.addr, &mut value[..addr.size as usize]);
+
+        Ok(&value[..addr.size as usize])
+    }
+
+    fn axi_sread_to_vec(&self, addr: impl AsRef<str>) -> Result<Vec<u8>, AxiError> {
+        let (arc_if, chip_if) = self.comms_obj();
+
+        let addr = addr.as_ref();
+
+        let addr = arc_if.axi_translate(addr)?;
+
+        let mut output = Vec::with_capacity(addr.size as usize);
+
+        let value: &mut [u8] = unsafe { std::mem::transmute(output.spare_capacity_mut()) };
+
+        arc_if.axi_read(chip_if, addr.addr, &mut value[..addr.size as usize]);
+
+        Ok(output)
+    }
 
     fn axi_sread32(&self, addr: impl AsRef<str>) -> Result<u32, AxiError> {
+        let mut output = [0; 4];
+
+        self.axi_sread(addr, &mut output)?;
+
+        Ok(u32::from_le_bytes(output))
+    }
+
+    fn axi_swrite(&self, addr: impl AsRef<str>, value: &[u8]) -> Result<(), AxiError> {
         let (arc_if, chip_if) = self.comms_obj();
-        arc_if.axi_sread32(chip_if, addr.as_ref())
+
+        let addr = arc_if.axi_translate(addr.as_ref())?;
+
+        if value.len() != addr.size as usize {
+            return Err(AxiError::WriteBufferMismatch);
+        }
+
+        arc_if.axi_write(chip_if, addr.addr, &value[..addr.size as usize]);
+
+        Ok(())
     }
 
     fn axi_swrite32(&self, addr: impl AsRef<str>, value: u32) -> Result<(), AxiError> {
-        let (arc_if, chip_if) = self.comms_obj();
-        arc_if.axi_swrite32(chip_if, addr.as_ref(), value)
+        self.axi_swrite(addr, &value.to_le_bytes())
     }
 }
+
+impl<T: HlComms> HlCommsInterface for T {}

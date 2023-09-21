@@ -1,6 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
-use luwen_if::chip::HlComms;
+use luwen_if::chip::{HlComms, HlCommsInterface};
+use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 
 #[pyclass]
@@ -54,6 +55,101 @@ impl DerefMut for Grayskull {
     }
 }
 
+#[pyclass]
+pub struct AxiData {
+    #[pyo3(get)]
+    addr: u64,
+    #[pyo3(get)]
+    size: u64,
+}
+
+impl From<luwen_if::chip::AxiData> for AxiData {
+    fn from(value: luwen_if::chip::AxiData) -> Self {
+        Self {
+            addr: value.addr,
+            size: value.size,
+        }
+    }
+}
+
+macro_rules! common_chip_comms_impls {
+    ($name:ty) => {
+        #[pymethods]
+        impl $name {
+            pub fn noc_read(
+                &self,
+                noc_id: u8,
+                x: u8,
+                y: u8,
+                addr: u64,
+                data: pyo3::buffer::PyBuffer<u8>,
+            ) {
+                Python::with_gil(|_py| {
+                    let ptr: *mut u8 = data.buf_ptr().cast();
+                    let len = data.len_bytes();
+
+                    let data = unsafe { std::slice::from_raw_parts_mut(ptr, len) };
+                    self.0.noc_read(noc_id, x, y, addr, data);
+                })
+            }
+
+            pub fn noc_write(
+                &self,
+                noc_id: u8,
+                x: u8,
+                y: u8,
+                addr: u64,
+                data: pyo3::buffer::PyBuffer<u8>,
+            ) {
+                Python::with_gil(|_py| {
+                    let ptr: *mut u8 = data.buf_ptr().cast();
+                    let len = data.len_bytes();
+
+                    let data = unsafe { std::slice::from_raw_parts(ptr, len) };
+                    self.0.noc_write(noc_id, x, y, addr, data);
+                })
+            }
+
+            pub fn noc_broadcast(&self, noc_id: u8, addr: u64, data: pyo3::buffer::PyBuffer<u8>) {
+                Python::with_gil(|_py| {
+                    let ptr: *mut u8 = data.buf_ptr().cast();
+                    let len = data.len_bytes();
+
+                    let data = unsafe { std::slice::from_raw_parts(ptr, len) };
+                    self.0.noc_broadcast(noc_id, addr, data);
+                })
+            }
+
+            pub fn axi_translate(&self, addr: &str) -> PyResult<AxiData> {
+                match self.0.axi_translate(addr).map_err(|err| err.to_string()) {
+                    Ok(v) => Ok(v.into()),
+                    Err(err) => Err(PyException::new_err(err)),
+                }
+            }
+
+            pub fn axi_read(&self, addr: u64, data: pyo3::buffer::PyBuffer<u8>) {
+                Python::with_gil(|_py| {
+                    let ptr: *mut u8 = data.buf_ptr().cast();
+                    let len = data.len_bytes();
+
+                    let data = unsafe { std::slice::from_raw_parts_mut(ptr, len) };
+                    self.0.axi_read(addr, data);
+                })
+            }
+
+            pub fn axi_write(&self, addr: u64, data: pyo3::buffer::PyBuffer<u8>) {
+                Python::with_gil(|_py| {
+                    let ptr: *mut u8 = data.buf_ptr().cast();
+                    let len = data.len_bytes();
+
+                    let data = unsafe { std::slice::from_raw_parts_mut(ptr, len) };
+                    self.0.axi_write(addr, data);
+                })
+            }
+        }
+    };
+}
+
 #[pymethods]
 impl Chip {
     pub fn as_wh(&self) -> Option<Wormhole> {
@@ -88,38 +184,12 @@ impl Chip {
     }
 }
 
+common_chip_comms_impls!(Chip);
+
 #[pymethods]
-impl Grayskull {
-    pub fn noc_read(&self, noc_id: u8, x: u8, y: u8, addr: u64, data: pyo3::buffer::PyBuffer<u8>) {
-        Python::with_gil(|_py| {
-            let ptr: *mut u8 = data.buf_ptr().cast();
-            let len = data.len_bytes();
+impl Grayskull {}
 
-            let data = unsafe { std::slice::from_raw_parts_mut(ptr, len) };
-            self.0.noc_read(noc_id, x, y, addr, data);
-        })
-    }
-
-    pub fn noc_write(&self, noc_id: u8, x: u8, y: u8, addr: u64, data: pyo3::buffer::PyBuffer<u8>) {
-        Python::with_gil(|_py| {
-            let ptr: *mut u8 = data.buf_ptr().cast();
-            let len = data.len_bytes();
-
-            let data = unsafe { std::slice::from_raw_parts(ptr, len) };
-            self.0.noc_write(noc_id, x, y, addr, data);
-        })
-    }
-
-    pub fn noc_broadcast(&self, noc_id: u8, addr: u64, data: pyo3::buffer::PyBuffer<u8>) {
-        Python::with_gil(|_py| {
-            let ptr: *mut u8 = data.buf_ptr().cast();
-            let len = data.len_bytes();
-
-            let data = unsafe { std::slice::from_raw_parts(ptr, len) };
-            self.0.noc_broadcast(noc_id, addr, data);
-        })
-    }
-}
+common_chip_comms_impls!(Grayskull);
 
 #[pymethods]
 impl Wormhole {
@@ -136,37 +206,9 @@ impl Wormhole {
                 .unwrap(),
         )
     }
-
-    pub fn noc_read(&self, noc_id: u8, x: u8, y: u8, addr: u64, data: pyo3::buffer::PyBuffer<u8>) {
-        Python::with_gil(|_py| {
-            let ptr: *mut u8 = data.buf_ptr().cast();
-            let len = data.len_bytes();
-
-            let data = unsafe { std::slice::from_raw_parts_mut(ptr, len) };
-            self.0.noc_read(noc_id, x, y, addr, data);
-        })
-    }
-
-    pub fn noc_write(&self, noc_id: u8, x: u8, y: u8, addr: u64, data: pyo3::buffer::PyBuffer<u8>) {
-        Python::with_gil(|_py| {
-            let ptr: *mut u8 = data.buf_ptr().cast();
-            let len = data.len_bytes();
-
-            let data = unsafe { std::slice::from_raw_parts(ptr, len) };
-            self.0.noc_write(noc_id, x, y, addr, data);
-        })
-    }
-
-    pub fn noc_broadcast(&self, noc_id: u8, addr: u64, data: pyo3::buffer::PyBuffer<u8>) {
-        Python::with_gil(|_py| {
-            let ptr: *mut u8 = data.buf_ptr().cast();
-            let len = data.len_bytes();
-
-            let data = unsafe { std::slice::from_raw_parts(ptr, len) };
-            self.0.noc_broadcast(noc_id, addr, data);
-        })
-    }
 }
+
+common_chip_comms_impls!(Wormhole);
 
 #[pyfunction]
 pub fn detect_chips() -> Vec<Chip> {
@@ -182,6 +224,7 @@ fn pyluwen(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Chip>()?;
     m.add_class::<Wormhole>()?;
     m.add_class::<Grayskull>()?;
+    m.add_class::<AxiData>()?;
 
     m.add_wrapped(wrap_pyfunction!(detect_chips))?;
 

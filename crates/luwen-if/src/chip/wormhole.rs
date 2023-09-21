@@ -2,9 +2,12 @@ use std::sync::Arc;
 
 use crate::{
     arc_msg::{ArcMsgAddr, ArcMsgError, ArcMsgOk, ArcMsgProtocolError},
-    chip::communication::{
-        chip_comms::{load_axi_table, ChipComms},
-        chip_interface::ChipInterface,
+    chip::{
+        communication::{
+            chip_comms::{load_axi_table, ChipComms},
+            chip_interface::ChipInterface,
+        },
+        hl_comms::HlCommsInterface,
     },
     error::PlatformError,
     ArcMsg, ChipImpl, IntoChip,

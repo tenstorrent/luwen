@@ -16,6 +16,12 @@ pub enum AxiError {
 
     #[error("No AXI data table loaded")]
     NoAxiData,
+
+    #[error("The readbuffer is not large enough to hold the requested data")]
+    ReadBufferTooSmall,
+
+    #[error("The writebuffer is not the same size as the requested field")]
+    WriteBufferMismatch,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -11,7 +11,7 @@ pub use communication::chip_comms::{
 };
 pub use communication::chip_interface::ChipInterface;
 pub use grayskull::Grayskull;
-pub use hl_comms::HlComms;
+pub use hl_comms::{HlComms, HlCommsInterface};
 use luwen_core::Arch;
 pub use wormhole::Wormhole;
 
@@ -67,7 +67,7 @@ pub struct Telemetry {
 
 /// Defines common functionality for all chips.
 /// This is a convinence interface that allows chip type agnostic code to be written.
-pub trait ChipImpl: Send + Sync + 'static {
+pub trait ChipImpl: HlComms + Send + Sync + 'static {
     /// Check that the chip is initialized and ready for use.
     fn init(&self);
 
@@ -116,6 +116,12 @@ impl Chip {
     /// Downcast to a grayskull chip
     pub fn as_gs(&self) -> Option<&Grayskull> {
         self.inner.as_any().downcast_ref::<Grayskull>()
+    }
+}
+
+impl HlComms for Chip {
+    fn comms_obj(&self) -> (&dyn ChipComms, &dyn ChipInterface) {
+        self.inner.comms_obj()
     }
 }
 

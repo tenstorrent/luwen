@@ -11,4 +11,4 @@ luwen-core = {path = "../luwen-core"}
 luwen-if = {path = "../luwen-if"}
 luwen-ref = {path = "../luwen-ref"}
 
-pyo3 = { version = "0.19.2", features = ["extension-module"] }
+pyo3 = { version = "0.19.2", features = ["extension-module", "multiple-pymethods"] }

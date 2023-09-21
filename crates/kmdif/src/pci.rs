@@ -397,13 +397,14 @@ impl PciDevice {
         };
 
         let word_len = byte_len / std::mem::size_of::<CopyT>();
-        unsafe { (dest as *mut CopyT).copy_from_nonoverlapping(src, word_len) };
+        let dest = dest as *mut CopyT;
+        unsafe { dest.copy_from_nonoverlapping(src, word_len) };
 
         let trailing_len = byte_len % std::mem::size_of::<CopyT>();
         if trailing_len != 0 {
             let tmp = unsafe { src.add(word_len).read() };
             unsafe {
-                ((dest as *mut CopyT).add(word_len) as *mut u8)
+                (dest.add(word_len) as *mut u8)
                     .copy_from_nonoverlapping(&tmp as *const CopyT as *const u8, trailing_len)
             };
         }
