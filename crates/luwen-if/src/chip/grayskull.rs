@@ -7,9 +7,7 @@ use crate::{
     ArcMsg, ChipImpl,
 };
 
-use super::{
-    chip_comms::ChipComms, chip_interface::ChipInterface, ArcMsgOptions, HlComms, NeighbouringChip,
-};
+use super::{ArcMsgOptions, ChipComms, ChipInterface, HlComms, NeighbouringChip};
 
 #[derive(Clone)]
 pub struct Grayskull {
@@ -20,6 +18,12 @@ pub struct Grayskull {
 }
 
 impl HlComms for Grayskull {
+    fn comms_obj(&self) -> (&dyn ChipComms, &dyn ChipInterface) {
+        (self.arc_if.as_ref(), self.chip_if.as_ref())
+    }
+}
+
+impl HlComms for &Grayskull {
     fn comms_obj(&self) -> (&dyn ChipComms, &dyn ChipInterface) {
         (self.arc_if.as_ref(), self.chip_if.as_ref())
     }

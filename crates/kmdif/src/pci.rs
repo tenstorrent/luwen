@@ -270,7 +270,7 @@ impl PciDevice {
                         buffer.physical_address,
                         true,
                     )?;
-                    num_bytes -= chunk_size;
+                    num_bytes = num_bytes.saturating_sub(chunk_size);
                     offset += chunk_size;
                 }
 
@@ -305,7 +305,7 @@ impl PciDevice {
                     let buffer = &self.transfer_buffer;
                     (&mut data[offset..(offset + chunk_size)])
                         .copy_from_slice(&buffer.buffer[..chunk_size]);
-                    num_bytes -= chunk_size;
+                    num_bytes = num_bytes.saturating_sub(chunk_size);
                     offset += chunk_size;
                 }
 

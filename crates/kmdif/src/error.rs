@@ -6,38 +6,39 @@ pub enum CfgFailType {
     Nix(#[from] nix::Error),
 
     #[error("Size mismiatch: recieved {0} bytes")]
-    SizeMismatch(usize)
+    SizeMismatch(usize),
 }
 
 #[derive(Error, Debug)]
 pub enum PciOpenError {
     #[error("Failed to open device /dev/tenstorrent/{id}: {source}")]
-    DeviceOpenFailed{id: usize, source: std::io::Error},
+    DeviceOpenFailed { id: usize, source: std::io::Error },
 
     #[error("ioctl {name} failed for device {id} with: {source}")]
-    IoctlError{ name: String, id: usize, source: nix::Error},
+    IoctlError {
+        name: String,
+        id: usize,
+        source: nix::Error,
+    },
 
     #[error("Failed to map {name} from device {id}")]
-    BarMappingError {name: String, id: usize},
+    BarMappingError { name: String, id: usize },
 
     #[error("When creating anon buffer {buffer} for device {device_id} hit error {source}")]
     FakeMmapFailed {
         buffer: String,
         device_id: usize,
-        source: std::io::Error
+        source: std::io::Error,
     },
 
     #[error(transparent)]
-    PciError(#[from] PciError)
+    PciError(#[from] PciError),
 }
 
 #[derive(Error, Debug)]
 pub enum PciError {
     #[error("DMA buffer mapping failed for device {id} with error {source}")]
-    DmaBufferMappingFailed {
-        id: usize,
-        source: std::io::Error
-    },
+    DmaBufferMappingFailed { id: usize, source: std::io::Error },
 
     #[error("DMA for device {id} is not configured")]
     DmaNotConfigured { id: usize },
@@ -46,10 +47,7 @@ pub enum PciError {
     No64bitDma { id: usize },
 
     #[error("On device {id} tried to write {size} bytes, but DMA only allows a max of 28 bits")]
-    DmaTooLarge {
-        id: usize,
-        size: usize,
-    },
+    DmaTooLarge { id: usize, size: usize },
 
     #[error("Read 0xffffffff from ARC scratch[6]: you should reset the board.")]
     BrokenConnection,
@@ -69,5 +67,8 @@ pub enum PciError {
         size: usize,
 
         source: CfgFailType,
-    }
+    },
+
+    #[error("Tried to access tlb {id} which is out of range")]
+    TlbOutOfRange { id: usize },
 }

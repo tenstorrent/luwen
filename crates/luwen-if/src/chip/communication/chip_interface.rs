@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use crate::DeviceInfo;
-
-use super::eth_addr::EthAddr;
+use crate::{DeviceInfo, EthAddr};
 
 /// This trait is used to abstract the interface to the lowest level
 /// chip communication primatives. These primatives are defined to be a chip resource

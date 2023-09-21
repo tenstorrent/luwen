@@ -45,7 +45,7 @@ pub enum MemorySlices {
 #[folder = "../../axi-data"]
 struct WHPciData;
 
-pub fn load_axi_table(file: &str, version: u32) -> MemorySlices {
+pub fn load_axi_table(file: &str, _version: u32) -> MemorySlices {
     let data = WHPciData::get(file).unwrap();
     bincode::deserialize(&data.data).unwrap()
 }

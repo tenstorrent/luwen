@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
-use luwen_if::EthAddr;
+use luwen_if::chip::HlComms;
 use pyo3::prelude::*;
 
 #[pyclass]
@@ -89,6 +89,39 @@ impl Chip {
 }
 
 #[pymethods]
+impl Grayskull {
+    pub fn noc_read(&self, noc_id: u8, x: u8, y: u8, addr: u64, data: pyo3::buffer::PyBuffer<u8>) {
+        Python::with_gil(|_py| {
+            let ptr: *mut u8 = data.buf_ptr().cast();
+            let len = data.len_bytes();
+
+            let data = unsafe { std::slice::from_raw_parts_mut(ptr, len) };
+            self.0.noc_read(noc_id, x, y, addr, data);
+        })
+    }
+
+    pub fn noc_write(&self, noc_id: u8, x: u8, y: u8, addr: u64, data: pyo3::buffer::PyBuffer<u8>) {
+        Python::with_gil(|_py| {
+            let ptr: *mut u8 = data.buf_ptr().cast();
+            let len = data.len_bytes();
+
+            let data = unsafe { std::slice::from_raw_parts(ptr, len) };
+            self.0.noc_write(noc_id, x, y, addr, data);
+        })
+    }
+
+    pub fn noc_broadcast(&self, noc_id: u8, addr: u64, data: pyo3::buffer::PyBuffer<u8>) {
+        Python::with_gil(|_py| {
+            let ptr: *mut u8 = data.buf_ptr().cast();
+            let len = data.len_bytes();
+
+            let data = unsafe { std::slice::from_raw_parts(ptr, len) };
+            self.0.noc_broadcast(noc_id, addr, data);
+        })
+    }
+}
+
+#[pymethods]
 impl Wormhole {
     pub fn open_remote(
         &self,
@@ -102,6 +135,36 @@ impl Wormhole {
                 .open_remote((rack_x, rack_y, shelf_x, shelf_y))
                 .unwrap(),
         )
+    }
+
+    pub fn noc_read(&self, noc_id: u8, x: u8, y: u8, addr: u64, data: pyo3::buffer::PyBuffer<u8>) {
+        Python::with_gil(|_py| {
+            let ptr: *mut u8 = data.buf_ptr().cast();
+            let len = data.len_bytes();
+
+            let data = unsafe { std::slice::from_raw_parts_mut(ptr, len) };
+            self.0.noc_read(noc_id, x, y, addr, data);
+        })
+    }
+
+    pub fn noc_write(&self, noc_id: u8, x: u8, y: u8, addr: u64, data: pyo3::buffer::PyBuffer<u8>) {
+        Python::with_gil(|_py| {
+            let ptr: *mut u8 = data.buf_ptr().cast();
+            let len = data.len_bytes();
+
+            let data = unsafe { std::slice::from_raw_parts(ptr, len) };
+            self.0.noc_write(noc_id, x, y, addr, data);
+        })
+    }
+
+    pub fn noc_broadcast(&self, noc_id: u8, addr: u64, data: pyo3::buffer::PyBuffer<u8>) {
+        Python::with_gil(|_py| {
+            let ptr: *mut u8 = data.buf_ptr().cast();
+            let len = data.len_bytes();
+
+            let data = unsafe { std::slice::from_raw_parts(ptr, len) };
+            self.0.noc_broadcast(noc_id, addr, data);
+        })
     }
 }
 

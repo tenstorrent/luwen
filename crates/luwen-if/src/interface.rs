@@ -138,7 +138,7 @@ impl<T: Clone + Send> ChipInterface for CallbackStorage<T> {
                 noc_id,
                 x: x as u32,
                 y: y as u32,
-                addr: addr as u64,
+                addr,
                 data: data.as_ptr(),
                 len: data.len() as u64,
             }),

@@ -1,49 +1,9 @@
-use crate::{PciDevice, PciError};
+use crate::{
+    tlb::{MemoryType, TlbInfo},
+    DeviceTlbInfo, PciDevice, PciError, Tlb,
+};
 
-#[derive(Default)]
-#[repr(u8)]
-pub enum Ordering {
-    RELAXED = 0,
-    STRICT = 1,
-    #[default]
-    POSTED = 2,
-    UNKNOWN(u8),
-}
-
-impl From<u8> for Ordering {
-    fn from(value: u8) -> Self {
-        match value {
-            0 => Self::RELAXED,
-            1 => Self::STRICT,
-            2 => Self::POSTED,
-            val => Self::UNKNOWN(val),
-        }
-    }
-}
-
-impl From<Ordering> for u8 {
-    fn from(value: Ordering) -> Self {
-        match value {
-            Ordering::RELAXED => 0,
-            Ordering::STRICT => 1,
-            Ordering::POSTED => 2,
-            Ordering::UNKNOWN(val) => val,
-        }
-    }
-}
-
-#[derive(Default)]
-pub struct Tlb {
-    pub local_offset: u64,
-    pub x_end: u8,
-    pub y_end: u8,
-    pub x_start: u8,
-    pub y_start: u8,
-    pub noc_sel: bool,
-    pub mcast: bool,
-    pub ordering: Ordering,
-    pub linked: bool,
-}
+use super::Ordering;
 
 #[bitfield_struct::bitfield(u64)]
 pub struct Tlb1M {
@@ -56,7 +16,8 @@ pub struct Tlb1M {
     x_start: u8,
     #[bits(6)]
     y_start: u8,
-    noc_sel: bool,
+    #[bits(1)]
+    noc_sel: u8,
     mcast: bool,
     #[bits(2)]
     ordering: u8,
@@ -108,7 +69,8 @@ pub struct Tlb2M {
     x_start: u8,
     #[bits(6)]
     y_start: u8,
-    noc_sel: bool,
+    #[bits(1)]
+    noc_sel: u8,
     mcast: bool,
     #[bits(2)]
     ordering: u8,
@@ -160,7 +122,8 @@ pub struct Tlb16M {
     x_start: u8,
     #[bits(6)]
     y_start: u8,
-    noc_sel: bool,
+    #[bits(1)]
+    noc_sel: u8,
     mcast: bool,
     #[bits(2)]
     ordering: u8,
@@ -202,7 +165,7 @@ impl From<Tlb> for Tlb16M {
 
 // For WH we have 156 1MB TLBS, 10 2MB TLBS and 20 16 MB TLBs
 // For now I'll allow all to be programmed, but I'll only use tlb 20
-pub fn setup_wh_tlb(
+pub fn setup_tlb(
     device: &mut PciDevice,
     tlb_index: u32,
     mut tlb: Tlb,
@@ -211,11 +174,11 @@ pub fn setup_wh_tlb(
 
     const TLB_COUNT_1M: u64 = 156;
     const TLB_COUNT_2M: u64 = 10;
-    const TLB_COUNT_16M: u64 = 20;
+    const _TLB_COUNT_16M: u64 = 20;
 
-    const TLB_INDEX_1M: u64 = 0;
-    const TLB_INDEX_2M: u64 = TLB_COUNT_1M;
-    const TLB_INDEX_16M: u64 = TLB_COUNT_1M + TLB_COUNT_2M;
+    const _TLB_INDEX_1M: u64 = 0;
+    const _TLB_INDEX_2M: u64 = TLB_COUNT_1M;
+    const _TLB_INDEX_16M: u64 = TLB_COUNT_1M + TLB_COUNT_2M;
 
     const TLB_BASE_1M: u64 = 0;
     const TLB_BASE_2M: u64 = TLB_COUNT_1M * (1 << 20);
@@ -277,7 +240,7 @@ pub fn setup_wh_tlb(
     Ok((mmio_addr + addr_offset, size - addr_offset))
 }
 
-pub fn get_wh_tlb(device: &mut PciDevice, tlb_index: u32) -> Result<Tlb, PciError> {
+pub fn get_tlb(device: &mut PciDevice, tlb_index: u32) -> Result<Tlb, PciError> {
     const TLB_CONFIG_BASE: u32 = 0x1FC00000;
     let tlb_config_addr = TLB_CONFIG_BASE + (tlb_index * 8);
 
@@ -296,24 +259,7 @@ pub fn get_wh_tlb(device: &mut PciDevice, tlb_index: u32) -> Result<Tlb, PciErro
     Ok(output)
 }
 
-pub enum MemoryType {
-    Uc,
-    Wc,
-}
-
-pub struct TlbInfo {
-    pub count: u64,
-    pub size: u32,
-    pub memory_type: MemoryType,
-}
-
-pub struct DeviceTlbInfo {
-    pub device_id: u32,
-    pub total_count: u32,
-    pub tlb_config: Vec<TlbInfo>,
-}
-
-pub fn tlb_wh_info(device: &PciDevice) -> DeviceTlbInfo {
+pub fn tlb_info(device: &PciDevice) -> DeviceTlbInfo {
     const TLB_COUNT_1M: u64 = 156;
     const TLB_COUNT_2M: u64 = 10;
     const TLB_COUNT_16M: u64 = 20;
@@ -338,35 +284,5 @@ pub fn tlb_wh_info(device: &PciDevice) -> DeviceTlbInfo {
                 memory_type: MemoryType::Uc,
             },
         ],
-    }
-}
-
-pub fn get_tlb(device: &mut PciDevice, index: u32) -> Result<Tlb, PciError> {
-    match device.arch {
-        crate::Arch::Grayskull => {
-            todo!()
-        }
-        crate::Arch::Wormhole => get_wh_tlb(device, index),
-        crate::Arch::Unknown(_) => todo!(),
-    }
-}
-
-pub fn setup_tlb(device: &mut PciDevice, index: u32, tlb: Tlb) -> Result<(u64, u64), PciError> {
-    match device.arch {
-        crate::Arch::Grayskull => {
-            todo!()
-        }
-        crate::Arch::Wormhole => setup_wh_tlb(device, index, tlb),
-        crate::Arch::Unknown(_) => todo!(),
-    }
-}
-
-pub fn get_tlb_info(device: &PciDevice) -> DeviceTlbInfo {
-    match device.arch {
-        crate::Arch::Grayskull => {
-            todo!()
-        }
-        crate::Arch::Wormhole => tlb_wh_info(device),
-        crate::Arch::Unknown(_) => todo!(),
     }
 }

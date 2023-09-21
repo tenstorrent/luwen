@@ -1,8 +1,7 @@
-use super::{
+use super::{eth_addr::EthAddr, HlComms, MemorySlices, Wormhole};
+use crate::chip::communication::{
     chip_comms::{axi_translate, AxiData, AxiError, ChipComms},
     chip_interface::ChipInterface,
-    eth_addr::EthAddr,
-    HlComms, MemorySlices, Wormhole,
 };
 
 pub struct RemoteArcIf {

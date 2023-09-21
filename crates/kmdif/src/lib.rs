@@ -17,7 +17,7 @@ use ioctl::{
     query_mappings, AllocateDmaBuffer, GetDeviceInfo, GetDeviceInfoOut, Mapping, QueryMappings,
 };
 use luwen_core::Arch;
-pub use tlb::{get_wh_tlb, setup_wh_tlb, tlb_wh_info, DeviceTlbInfo, Tlb};
+pub use tlb::{DeviceTlbInfo, Tlb};
 
 impl From<&GetDeviceInfoOut> for Arch {
     fn from(value: &GetDeviceInfoOut) -> Self {
@@ -81,6 +81,7 @@ pub struct PciDevice {
 
     device_fd: std::fs::File,
     bar0_uc: memmap2::MmapMut,
+    #[allow(dead_code)]
     bar0_uc_size: usize,
     bar0_uc_offset: u64,
 
@@ -92,10 +93,12 @@ pub struct PciDevice {
     max_dma_buf_size_log2: u16,
 
     system_reg_mapping: Option<memmap2::MmapMut>,
+    #[allow(dead_code)]
     system_reg_mapping_size: usize,
     system_reg_start_offset: u32, // Registers >= this are system regs, use the mapping.
     system_reg_offset_adjust: u32, // This is the offset of the first reg in the system reg mapping.
 
+    #[allow(dead_code)]
     dma_buffer_mappings: Vec<Arc<DmaBuffer>>,
     completion_flag_buffer: DmaBuffer,
     transfer_buffer: DmaBuffer,
@@ -189,7 +192,7 @@ impl PciDevice {
         let mut bar0_uc_mapping = Mapping::default();
         let mut bar0_wc_mapping = Mapping::default();
         let mut bar2_uc_mapping = Mapping::default();
-        let mut bar2_wc_mapping = Mapping::default();
+        let mut _bar2_wc_mapping = Mapping::default();
 
         for i in 0..mappings.input.output_mapping_count as usize {
             match kmdif::MappingId::from_u32(mappings.output.mappings[i].mapping_id) {
@@ -205,7 +208,7 @@ impl PciDevice {
                     bar2_uc_mapping = mappings.output.mappings[i];
                 }
                 kmdif::MappingId::Resource2Wc => {
-                    bar2_wc_mapping = mappings.output.mappings[i];
+                    _bar2_wc_mapping = mappings.output.mappings[i];
                 }
                 kmdif::MappingId::Unused => {
                     // println!("WARNING: recieved unused mapping id");

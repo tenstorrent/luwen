@@ -2,13 +2,15 @@ use std::sync::Arc;
 
 use crate::{
     arc_msg::{ArcMsgAddr, ArcMsgError, ArcMsgOk, ArcMsgProtocolError},
+    chip::communication::{
+        chip_comms::{load_axi_table, ChipComms},
+        chip_interface::ChipInterface,
+    },
     error::PlatformError,
     ArcMsg, ChipImpl, IntoChip,
 };
 
 use super::{
-    chip_comms::{load_axi_table, ChipComms},
-    chip_interface::ChipInterface,
     eth_addr::EthAddr,
     hl_comms::HlComms,
     remote::{EthAddresses, RemoteArcIf},
@@ -30,6 +32,12 @@ pub struct Wormhole {
 }
 
 impl HlComms for Wormhole {
+    fn comms_obj(&self) -> (&dyn ChipComms, &dyn ChipInterface) {
+        (self.arc_if.as_ref(), self.chip_if.as_ref())
+    }
+}
+
+impl HlComms for &Wormhole {
     fn comms_obj(&self) -> (&dyn ChipComms, &dyn ChipInterface) {
         (self.arc_if.as_ref(), self.chip_if.as_ref())
     }
@@ -94,6 +102,12 @@ impl Wormhole {
 
         Self::init(true, arc_if, self.chip_if.clone())
     }
+
+    // fn check_dram_trained(&self) {
+    //     let pc = self.axi_sread32("ARC_RESET.POST_CODE")?;
+
+    //     0x29
+    // }
 
     fn check_arg_msg_safe(&self, msg_reg: u64, _return_reg: u64) -> Result<(), ArcMsgError> {
         const POST_CODE_INIT_DONE: u32 = 0xC0DE0001;

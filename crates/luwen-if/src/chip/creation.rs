@@ -9,7 +9,8 @@ use crate::{
 };
 
 use super::{
-    chip_comms::load_axi_table, ArcIf, Chip, ChipComms, ChipInterface, Grayskull, Wormhole,
+    communication::chip_comms::load_axi_table, ArcIf, Chip, ChipComms, ChipInterface, Grayskull,
+    Wormhole,
 };
 
 impl Chip {

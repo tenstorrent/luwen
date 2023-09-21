@@ -7,13 +7,13 @@ edition = "2021"
 
 [dependencies]
 luwen-core = {path = "crates/luwen-core"}
-ttchip = {path = "crates/ttchip"}
 luwen-if = {path = "crates/luwen-if"}
 luwen-ref = {path = "crates/luwen-ref"}
 
 serde = {"version" = "1.0.164", features = ["derive"]}
 serde_yaml = "0.9.22"
 bincode = "1.3.3"
+rand = "0.8.5"
 
 [workspace]
 members = [

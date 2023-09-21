@@ -1,5 +1,4 @@
-mod chip_comms;
-mod chip_interface;
+mod communication;
 mod creation;
 pub mod eth_addr;
 mod grayskull;
@@ -7,10 +6,10 @@ mod hl_comms;
 mod remote;
 mod wormhole;
 
-pub use chip_comms::{
+pub use communication::chip_comms::{
     axi_translate, ArcIf, AxiData, AxiError, ChipComms, MemorySlice, MemorySlices,
 };
-pub use chip_interface::ChipInterface;
+pub use communication::chip_interface::ChipInterface;
 pub use grayskull::Grayskull;
 pub use hl_comms::HlComms;
 use luwen_core::Arch;
@@ -51,6 +50,17 @@ pub struct NeighbouringChip {
     pub eth_addr: crate::EthAddr,
 }
 
+pub enum ArcStatus {
+    ArcError(String),
+    DramTraining,
+    ArcOk,
+}
+
+pub struct InitStatus {
+    pub is_ethernet_traning: bool,
+    pub arc_status: ArcStatus,
+}
+
 pub struct Telemetry {
     pub board_id: u64,
 }
@@ -58,17 +68,29 @@ pub struct Telemetry {
 /// Defines common functionality for all chips.
 /// This is a convinence interface that allows chip type agnostic code to be written.
 pub trait ChipImpl: Send + Sync + 'static {
+    /// Check that the chip is initialized and ready for use.
     fn init(&self);
 
+    /// Returns the current arch of the chip, can be used to avoid
+    /// needing to ducktype when downcasting.
     fn get_arch(&self) -> Arch;
 
+    /// Get telemetry information from the chip.
+    /// The information is not cached, so should not be called repeatedly.
     fn get_telemetry(&self) -> Result<Telemetry, PlatformError>;
 
+    /// Send an arc_msg to the underlying chip.
     fn arc_msg(&self, msg: ArcMsgOptions) -> Result<ArcMsgOk, ArcMsgError>;
+
+    /// Get a list of neighbouring chips.
+    /// Will return an empty list for gs and up to four chips for wh.
     fn get_neighbouring_chips(&self) -> Vec<NeighbouringChip>;
 
+    /// Convinence function to downcast to a concrete type.
     fn as_any(&self) -> &dyn std::any::Any;
 
+    /// Get information about the underlying chip transport.
+    /// This is a hack to get the physical id of the chip.
     fn get_device_info(&self) -> Option<DeviceInfo>;
 }
 

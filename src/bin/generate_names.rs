@@ -205,7 +205,7 @@ fn parse_translation_file(
                         lower_bits,
                         description: _,
                     } => {
-                        // assert_eq!(mask, 0);
+                        assert_eq!(mask, 0);
 
                         slice.children.insert(
                             field_name.clone(),
@@ -226,7 +226,7 @@ fn parse_translation_file(
                         byte_offset,
                         description: _,
                     } => {
-                        // assert_eq!(mask, 0);
+                        assert_eq!(mask, 0);
 
                         slice.children.insert(
                             field_name.clone(),
