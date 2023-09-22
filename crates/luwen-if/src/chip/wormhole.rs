@@ -97,6 +97,10 @@ impl Wormhole {
         Ok(output)
     }
 
+    pub fn get_if<T: ChipInterface>(&self) -> Option<&T> {
+        (&self.chip_if as &dyn std::any::Any).downcast_ref::<T>()
+    }
+
     pub fn open_remote(&self, addr: impl IntoChip<EthAddr>) -> Result<Wormhole, AxiError> {
         let arc_if = RemoteArcIf {
             addr: addr.cinto(&self.arc_if, &self.chip_if).unwrap(),

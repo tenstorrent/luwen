@@ -240,7 +240,7 @@ pub fn setup_tlb(
     Ok((mmio_addr + addr_offset, size - addr_offset))
 }
 
-pub fn get_tlb(device: &mut PciDevice, tlb_index: u32) -> Result<Tlb, PciError> {
+pub fn get_tlb(device: &PciDevice, tlb_index: u32) -> Result<Tlb, PciError> {
     const TLB_CONFIG_BASE: u32 = 0x1FC00000;
     let tlb_config_addr = TLB_CONFIG_BASE + (tlb_index * 8);
 

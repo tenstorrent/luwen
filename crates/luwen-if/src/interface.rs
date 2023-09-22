@@ -52,7 +52,7 @@ pub struct DeviceInfo {
 
     pub domain: u16,
     pub bus: u16,
-    pub device: u16,
+    pub slot: u16,
     pub function: u16,
 
     pub vendor: u16,
@@ -88,7 +88,7 @@ impl<T: Clone + Send> CallbackStorage<T> {
     }
 }
 
-impl<T: Clone + Send> ChipInterface for CallbackStorage<T> {
+impl<T: Clone + Send + 'static> ChipInterface for CallbackStorage<T> {
     fn get_device_info(&self) -> Option<DeviceInfo> {
         let mut driver_info = None;
         (self.callback)(

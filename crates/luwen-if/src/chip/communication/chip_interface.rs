@@ -8,7 +8,7 @@ use crate::{DeviceInfo, EthAddr};
 ///
 /// The implementation makes no attempt to use the borrow checker to enforce this exclusive access rule
 /// because the primary implementors of this trait will be C++ and Python code.
-pub trait ChipInterface {
+pub trait ChipInterface: 'static {
     /// Access information about the underlying chip.
     fn get_device_info(&self) -> Option<DeviceInfo>;
 

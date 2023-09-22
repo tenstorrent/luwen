@@ -34,7 +34,7 @@ pub struct DeviceInfo {
 
     pub domain: u16,
     pub bus: u16,
-    pub device: u16,
+    pub slot: u16,
     pub function: u16,
 
     pub vendor: u16,
@@ -48,7 +48,7 @@ impl From<DeviceInfo> for luwen_if::DeviceInfo {
             interface_id: value.interface_id,
             domain: value.domain,
             bus: value.bus,
-            device: value.device,
+            slot: value.slot,
             function: value.function,
             vendor: value.vendor,
             device_id: value.device_id,

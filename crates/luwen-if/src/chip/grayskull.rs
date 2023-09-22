@@ -17,6 +17,12 @@ pub struct Grayskull {
     pub arc_addrs: ArcMsgAddr,
 }
 
+impl Grayskull {
+    pub fn get_if<T: ChipInterface>(&self) -> Option<&T> {
+        (&self.chip_if as &dyn std::any::Any).downcast_ref::<T>()
+    }
+}
+
 impl HlComms for Grayskull {
     fn comms_obj(&self) -> (&dyn ChipComms, &dyn ChipInterface) {
         (self.arc_if.as_ref(), self.chip_if.as_ref())

@@ -61,7 +61,7 @@ pub struct PhysicalDevice {
     pub subsystem_id: u16,
 
     pub pci_bus: u16,
-    pub pci_device: u16,
+    pub slot: u16,
     pub pci_function: u16,
     pub pci_domain: u16,
 
@@ -314,7 +314,7 @@ impl PciDevice {
         }
 
         let pci_bus = device_info.output.bus_dev_fn >> 8;
-        let pci_device = ((device_info.output.bus_dev_fn) >> 3) & 0x1f; // The definition of PCI_SLOT from include/uapi/linux/pci.h
+        let slot = ((device_info.output.bus_dev_fn) >> 3) & 0x1f; // The definition of PCI_SLOT from include/uapi/linux/pci.h
         let pci_function = (device_info.output.bus_dev_fn) & 0x7; // The definition of PCI_FUNC from include/uapi/linux/pci.h
         let pci_domain = device_info.output.pci_domain;
 
@@ -323,7 +323,7 @@ impl PciDevice {
             .write(false)
             .open(format!(
                 "/sys/bus/pci/devices/0000:{:02x}:{:02x}.{:01x}/config",
-                pci_bus, pci_device, pci_function
+                pci_bus, slot, pci_function
             ));
         let config_space = match config_space {
             Ok(file) => file,
@@ -342,7 +342,7 @@ impl PciDevice {
                 subsystem_vendor_id: device_info.output.subsystem_vendor_id,
                 subsystem_id: device_info.output.subsystem_id,
                 pci_bus,
-                pci_device,
+                slot,
                 pci_function,
                 pci_domain,
                 bar_addr: pci::read_bar0_base(&config_space),

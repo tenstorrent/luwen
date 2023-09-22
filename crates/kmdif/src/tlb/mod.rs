@@ -3,7 +3,7 @@ use crate::{PciDevice, PciError};
 mod grayskull;
 mod wormhole;
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 #[repr(u8)]
 pub enum Ordering {
     RELAXED = 0,
@@ -35,7 +35,7 @@ impl From<Ordering> for u8 {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Tlb {
     pub local_offset: u64,
     pub x_end: u8,
@@ -65,7 +65,7 @@ pub struct DeviceTlbInfo {
     pub tlb_config: Vec<TlbInfo>,
 }
 
-pub fn get_tlb(device: &mut PciDevice, index: u32) -> Result<Tlb, PciError> {
+pub fn get_tlb(device: &PciDevice, index: u32) -> Result<Tlb, PciError> {
     match device.arch {
         crate::Arch::Grayskull => grayskull::get_tlb(device, index),
         crate::Arch::Wormhole => wormhole::get_tlb(device, index),

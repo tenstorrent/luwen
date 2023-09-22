@@ -1,6 +1,8 @@
 use std::ops::{Deref, DerefMut};
 
 use luwen_if::chip::{HlComms, HlCommsInterface};
+use luwen_if::CallbackStorage;
+use luwen_ref::{ExtendedPciDevice, ExtendedPciDeviceWrapper};
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 
@@ -93,6 +95,13 @@ macro_rules! common_chip_comms_impls {
                 })
             }
 
+            pub fn noc_read32(&self, noc_id: u8, x: u8, y: u8, addr: u64) -> u32 {
+                let mut data = [0u8; 4];
+                self.0.noc_read(noc_id, x, y, addr, &mut data);
+
+                u32::from_le_bytes(data)
+            }
+
             pub fn noc_write(
                 &self,
                 noc_id: u8,
@@ -110,6 +119,10 @@ macro_rules! common_chip_comms_impls {
                 })
             }
 
+            pub fn noc_write32(&self, noc_id: u8, x: u8, y: u8, addr: u64, data: u32) {
+                self.0.noc_write(noc_id, x, y, addr, &data.to_le_bytes());
+            }
+
             pub fn noc_broadcast(&self, noc_id: u8, addr: u64, data: pyo3::buffer::PyBuffer<u8>) {
                 Python::with_gil(|_py| {
                     let ptr: *mut u8 = data.buf_ptr().cast();
@@ -118,6 +131,10 @@ macro_rules! common_chip_comms_impls {
                     let data = unsafe { std::slice::from_raw_parts(ptr, len) };
                     self.0.noc_broadcast(noc_id, addr, data);
                 })
+            }
+
+            pub fn noc_broadcast32(&self, noc_id: u8, addr: u64, data: u32) {
+                self.0.noc_broadcast(noc_id, addr, &data.to_le_bytes());
             }
 
             pub fn axi_translate(&self, addr: &str) -> PyResult<AxiData> {
@@ -137,6 +154,13 @@ macro_rules! common_chip_comms_impls {
                 })
             }
 
+            pub fn axi_read32(&self, addr: u64) -> u32 {
+                let mut data = [0u8; 4];
+                self.0.axi_read(addr, &mut data);
+
+                u32::from_le_bytes(data)
+            }
+
             pub fn axi_write(&self, addr: u64, data: pyo3::buffer::PyBuffer<u8>) {
                 Python::with_gil(|_py| {
                     let ptr: *mut u8 = data.buf_ptr().cast();
@@ -145,6 +169,10 @@ macro_rules! common_chip_comms_impls {
                     let data = unsafe { std::slice::from_raw_parts_mut(ptr, len) };
                     self.0.axi_write(addr, data);
                 })
+            }
+
+            pub fn axi_write32(&self, addr: u64, data: u32) {
+                self.0.axi_write(addr, &data.to_le_bytes());
             }
         }
     };
@@ -185,7 +213,7 @@ impl Chip {
 
     pub fn device_id(&self) -> u32 {
         let info = self.0.inner.get_device_info().unwrap();
-        ((info.vendor as u32) << 16) | info.device as u32
+        ((info.vendor as u32) << 16) | info.slot as u32
     }
 
     pub fn bar_size(&self) -> u64 {
@@ -200,6 +228,72 @@ common_chip_comms_impls!(Chip);
 impl Grayskull {}
 
 common_chip_comms_impls!(Grayskull);
+
+pub struct PciInterface<'a> {
+    pub pci_interface: &'a ExtendedPciDeviceWrapper,
+}
+
+impl PciInterface<'_> {
+    pub fn from_wh<'a>(wh: &'a Wormhole) -> Option<PciInterface<'a>> {
+        wh.0.get_if::<CallbackStorage<ExtendedPciDeviceWrapper>>()
+            .map(|v| PciInterface {
+                pci_interface: &v.user_data,
+            })
+    }
+
+    pub fn from_gs<'a>(wh: &'a Grayskull) -> Option<PciInterface<'a>> {
+        wh.0.get_if::<CallbackStorage<ExtendedPciDeviceWrapper>>()
+            .map(|v| PciInterface {
+                pci_interface: &v.user_data,
+            })
+    }
+
+    pub fn setup_tlb(
+        &self,
+        index: u32,
+        addr: u64,
+        x_start: u8,
+        y_start: u8,
+        x_end: u8,
+        y_end: u8,
+        noc_sel: u8,
+        mcast: bool,
+        ordering: kmdif::tlb::Ordering,
+        linked: bool,
+    ) -> (u64, u64) {
+        self.pci_interface
+            .borrow_mut()
+            .setup_tlb(
+                index,
+                kmdif::Tlb {
+                    local_offset: addr,
+                    x_end,
+                    y_end,
+                    x_start,
+                    y_start,
+                    noc_sel,
+                    mcast,
+                    ordering,
+                    linked,
+                },
+            )
+            .unwrap()
+    }
+
+    pub fn noc_read(&self, tlb_index: u32, addr: u64, data: &mut [u8]) {
+        self.pci_interface
+            .borrow_mut()
+            .noc_read(tlb_index, addr, data)
+            .unwrap();
+    }
+
+    pub fn noc_write(&self, tlb_index: u32, addr: u64, data: &[u8]) {
+        self.pci_interface
+            .borrow_mut()
+            .noc_write(tlb_index, addr, data)
+            .unwrap();
+    }
+}
 
 #[pymethods]
 impl Wormhole {

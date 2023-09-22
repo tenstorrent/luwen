@@ -42,7 +42,114 @@ pub struct ExtendedPciDevice {
     pub command_q_addr: u32,
     pub fake_block: bool,
 
+    pub default_tlb: u32,
+
     pub ethernet_dma_buffer: HashMap<(u8, u8), DmaBuffer>,
+}
+
+impl ExtendedPciDevice {
+    pub fn setup_tlb(&mut self, index: u32, tlb: Tlb) -> Result<(u64, u64), PciError> {
+        kmdif::tlb::setup_tlb(&mut self.device, index, tlb)
+    }
+
+    pub fn get_tlb(&self, index: u32) -> Result<Tlb, PciError> {
+        kmdif::tlb::get_tlb(&self.device, index)
+    }
+
+    pub fn noc_write(&mut self, tlb_index: u32, addr: u64, data: &[u8]) -> Result<(), PciError> {
+        let mut written = 0;
+
+        let mut starting_tlb = self.get_tlb(tlb_index)?;
+
+        let len = data.len() as u64;
+
+        while written < len {
+            starting_tlb.local_offset = addr + written as u64;
+            let (bar_addr, slice_len) = self.setup_tlb(tlb_index, starting_tlb.clone())?;
+
+            let to_write = std::cmp::min(slice_len, len.saturating_sub(written));
+            self.write_block(
+                bar_addr as u32,
+                &data[written as usize..(written as usize + to_write as usize)],
+            )?;
+
+            written += to_write;
+        }
+
+        Ok(())
+    }
+
+    pub fn noc_read(&mut self, tlb_index: u32, addr: u64, data: &mut [u8]) -> Result<(), PciError> {
+        let mut read = 0;
+
+        let mut starting_tlb = self.get_tlb(tlb_index)?;
+
+        let len = data.len() as u64;
+
+        while read < len {
+            starting_tlb.local_offset = addr + read as u64;
+            let (bar_addr, slice_len) = self.setup_tlb(tlb_index, starting_tlb.clone())?;
+
+            let to_read = std::cmp::min(slice_len, len.saturating_sub(read));
+            self.read_block(
+                bar_addr as u32,
+                &mut data[read as usize..(read as usize + to_read as usize)],
+            )?;
+
+            read += to_read;
+        }
+
+        Ok(())
+    }
+
+    pub fn noc_write32(
+        &mut self,
+        tlb_index: u32,
+        noc_id: u8,
+        x: u8,
+        y: u8,
+        addr: u64,
+        data: u32,
+    ) -> Result<(), PciError> {
+        self.setup_tlb(
+            tlb_index,
+            Tlb {
+                x_end: x,
+                y_end: y,
+                noc_sel: noc_id,
+                ..Default::default()
+            },
+        )?;
+
+        self.noc_write(tlb_index, addr, &data.to_le_bytes())?;
+
+        Ok(())
+    }
+
+    pub fn noc_read32(
+        &mut self,
+        tlb_index: u32,
+        noc_id: u8,
+        x: u8,
+        y: u8,
+        addr: u64,
+    ) -> Result<u32, PciError> {
+        self.setup_tlb(
+            tlb_index,
+            Tlb {
+                x_end: x,
+                y_end: y,
+                noc_sel: noc_id,
+                ..Default::default()
+            },
+        )?;
+
+        let mut output = [0u8; 4];
+
+        self.noc_read(tlb_index, addr, &mut output)?;
+
+        Ok(u32::from_le_bytes(output))
+    }
 }
 
 impl ExtendedPciDevice {
@@ -58,6 +165,8 @@ impl ExtendedPciDevice {
                 eth_y: 6,
                 command_q_addr: 0,
                 fake_block: false,
+
+                default_tlb: 168,
 
                 ethernet_dma_buffer: HashMap::with_capacity(16),
             })),
@@ -75,6 +184,7 @@ impl ExtendedPciDevice {
 
 fn noc_write32(
     device: &mut PciDevice,
+    tlb_index: u32,
     noc_id: u8,
     x: u8,
     y: u8,
@@ -83,7 +193,7 @@ fn noc_write32(
 ) -> Result<(), PciError> {
     let (bar_addr, _slice_len) = kmdif::tlb::setup_tlb(
         device,
-        170,
+        tlb_index,
         Tlb {
             local_offset: addr as u64,
             x_end: x as u8,
@@ -92,14 +202,14 @@ fn noc_write32(
             mcast: false,
             ..Default::default()
         },
-    )
-    .unwrap();
+    )?;
 
     device.write_block(bar_addr as u32, data.to_le_bytes().as_slice())
 }
 
 fn noc_read32(
     device: &mut PciDevice,
+    tlb_index: u32,
     noc_id: u8,
     x: u8,
     y: u8,
@@ -107,7 +217,7 @@ fn noc_read32(
 ) -> Result<u32, PciError> {
     let (bar_addr, _slice_len) = kmdif::tlb::setup_tlb(
         device,
-        170,
+        tlb_index,
         Tlb {
             local_offset: addr as u64,
             x_end: x as u8,
@@ -116,8 +226,7 @@ fn noc_read32(
             mcast: false,
             ..Default::default()
         },
-    )
-    .unwrap();
+    )?;
 
     let mut data = [0u8; 4];
     device.read_block(bar_addr as u32, &mut data)?;
@@ -139,7 +248,7 @@ pub fn comms_callback_inner(ud: &ExtendedPciDeviceWrapper, op: FnOptions) -> Res
                     unsafe {
                         *info = Some(luwen_if::DeviceInfo {
                             bus: borrow.device.physical.pci_bus,
-                            device: borrow.device.physical.pci_device,
+                            slot: borrow.device.physical.slot,
                             function: borrow.device.physical.pci_function,
                             domain: borrow.device.physical.pci_domain,
 
@@ -177,29 +286,23 @@ pub fn comms_callback_inner(ud: &ExtendedPciDeviceWrapper, op: FnOptions) -> Res
                 len,
             } => {
                 let mut reader = ud.borrow_mut();
+                let reader: &mut ExtendedPciDevice = &mut reader;
 
-                let mut read = 0;
-                while read < len {
-                    let (bar_addr, slice_len) = kmdif::tlb::setup_tlb(
-                        &mut reader.device,
-                        168,
-                        Tlb {
-                            local_offset: addr + read,
-                            x_end: x as u8,
-                            y_end: y as u8,
-                            noc_sel: noc_id,
-                            mcast: false,
-                            ..Default::default()
-                        },
-                    )?;
+                reader.setup_tlb(
+                    reader.default_tlb,
+                    Tlb {
+                        local_offset: addr,
+                        x_end: x as u8,
+                        y_end: y as u8,
+                        noc_sel: noc_id,
+                        mcast: false,
+                        ..Default::default()
+                    },
+                )?;
 
-                    let to_read = std::cmp::min(slice_len, len.saturating_sub(read));
-                    reader.read_block(bar_addr as u32, unsafe {
-                        std::slice::from_raw_parts_mut(data.add(read as usize), to_read as usize)
-                    })?;
-
-                    read += to_read;
-                }
+                reader.noc_read(reader.default_tlb, addr, unsafe {
+                    std::slice::from_raw_parts_mut(data, len as usize)
+                })?;
             }
             luwen_if::FnNoc::Write {
                 noc_id,
@@ -210,29 +313,23 @@ pub fn comms_callback_inner(ud: &ExtendedPciDeviceWrapper, op: FnOptions) -> Res
                 len,
             } => {
                 let mut writer = ud.borrow_mut();
+                let writer: &mut ExtendedPciDevice = &mut writer;
 
-                let mut written = 0;
-                while written < len {
-                    let (bar_addr, slice_len) = kmdif::tlb::setup_tlb(
-                        &mut writer.device,
-                        184,
-                        Tlb {
-                            local_offset: addr + written,
-                            x_end: x as u8,
-                            y_end: y as u8,
-                            noc_sel: noc_id,
-                            mcast: false,
-                            ..Default::default()
-                        },
-                    )?;
+                writer.setup_tlb(
+                    writer.default_tlb,
+                    Tlb {
+                        local_offset: addr,
+                        x_end: x as u8,
+                        y_end: y as u8,
+                        noc_sel: noc_id,
+                        mcast: false,
+                        ..Default::default()
+                    },
+                )?;
 
-                    let to_write = std::cmp::min(slice_len, len.saturating_sub(written));
-                    writer.write_block(bar_addr as u32, unsafe {
-                        std::slice::from_raw_parts(data.add(written as usize), to_write as usize)
-                    })?;
-
-                    written += to_write;
-                }
+                writer.noc_write(writer.default_tlb, addr, unsafe {
+                    std::slice::from_raw_parts(data, len as usize)
+                })?;
             }
             luwen_if::FnNoc::Broadcast {
                 noc_id,
@@ -241,32 +338,25 @@ pub fn comms_callback_inner(ud: &ExtendedPciDeviceWrapper, op: FnOptions) -> Res
                 len,
             } => {
                 let mut writer = ud.borrow_mut();
+                let writer: &mut ExtendedPciDevice = &mut writer;
 
-                let mut written = 0;
-                while written < len {
-                    let (bar_addr, slice_len) = kmdif::tlb::setup_tlb(
-                        &mut writer.device,
-                        170,
-                        Tlb {
-                            local_offset: addr + written,
-                            x_start: 0,
-                            y_start: 0,
-                            x_end: ud.borrow().grid_size_x,
-                            y_end: ud.borrow().grid_size_y,
-                            noc_sel: noc_id,
-                            mcast: true,
-                            ..Default::default()
-                        },
-                    )
-                    .unwrap();
+                writer.setup_tlb(
+                    writer.default_tlb,
+                    Tlb {
+                        local_offset: addr,
+                        x_start: 0,
+                        y_start: 0,
+                        x_end: writer.grid_size_x - 1,
+                        y_end: writer.grid_size_y - 1,
+                        noc_sel: noc_id,
+                        mcast: false,
+                        ..Default::default()
+                    },
+                )?;
 
-                    let to_write = std::cmp::min(slice_len, len.saturating_sub(written));
-                    writer.write_block(bar_addr as u32, unsafe {
-                        std::slice::from_raw_parts(data.add(written as usize), to_write as usize)
-                    })?;
-
-                    written += to_write;
-                }
+                writer.noc_write(writer.default_tlb, addr, unsafe {
+                    std::slice::from_raw_parts(data, len as usize)
+                })?;
             }
         },
         FnOptions::Eth(op) => match op.rw {
@@ -278,19 +368,29 @@ pub fn comms_callback_inner(ud: &ExtendedPciDeviceWrapper, op: FnOptions) -> Res
                 data,
                 len,
             } => {
-                let eth_x = ud.borrow().eth_x;
-                let eth_y = ud.borrow().eth_y;
-
                 let mut borrow = ud.borrow_mut();
                 let borrow: &mut ExtendedPciDevice = &mut borrow;
 
-                let command_q_addr = noc_read32(&mut borrow.device, 0, eth_x, eth_y, 0x170)?;
+                let eth_x = borrow.eth_x;
+                let eth_y = borrow.eth_y;
+
+                let command_q_addr = noc_read32(
+                    &mut borrow.device,
+                    borrow.default_tlb,
+                    0,
+                    eth_x,
+                    eth_y,
+                    0x170,
+                )?;
                 let fake_block = borrow.fake_block;
 
-                let read32 = |borrow: &mut _, addr| noc_read32(borrow, 0, eth_x, eth_y, addr);
+                let default_tlb = borrow.default_tlb;
+                let read32 =
+                    |borrow: &mut _, addr| noc_read32(borrow, default_tlb, 0, eth_x, eth_y, addr);
 
-                let write32 =
-                    |borrow: &mut _, addr, data| noc_write32(borrow, 0, eth_x, eth_y, addr, data);
+                let write32 = |borrow: &mut _, addr, data| {
+                    noc_write32(borrow, default_tlb, 0, eth_x, eth_y, addr, data)
+                };
 
                 let dma_buffer = {
                     let key = (eth_x, eth_y);
@@ -357,20 +457,23 @@ pub fn comms_callback_inner(ud: &ExtendedPciDeviceWrapper, op: FnOptions) -> Res
                 data,
                 len,
             } => {
-                let eth_x = ud.borrow().eth_x;
-                let eth_y = ud.borrow().eth_y;
-
-                let command_q_addr =
-                    noc_read32(&mut ud.borrow_mut().device, 0, eth_x, eth_y, 0x170)?;
-                let fake_block = ud.borrow().fake_block;
-
                 let mut borrow = ud.borrow_mut();
                 let borrow: &mut ExtendedPciDevice = &mut borrow;
 
-                let read32 = |borrow: &mut _, addr| noc_read32(borrow, 0, eth_x, eth_y, addr);
+                let eth_x = borrow.eth_x;
+                let eth_y = borrow.eth_y;
 
-                let write32 =
-                    |borrow: &mut _, addr, data| noc_write32(borrow, 0, eth_x, eth_y, addr, data);
+                let command_q_addr =
+                    borrow.noc_read32(borrow.default_tlb, 0, eth_x, eth_y, 0x170)?;
+                let fake_block = borrow.fake_block;
+
+                let default_tlb = borrow.default_tlb;
+                let read32 =
+                    |borrow: &mut _, addr| noc_read32(borrow, default_tlb, 0, eth_x, eth_y, addr);
+
+                let write32 = |borrow: &mut _, addr, data| {
+                    noc_write32(borrow, default_tlb, 0, eth_x, eth_y, addr, data)
+                };
 
                 let dma_buffer = {
                     let key = (eth_x, eth_y);
