@@ -54,6 +54,9 @@ pub struct DeviceInfo {
     pub bus: u16,
     pub device: u16,
     pub function: u16,
+
+    pub vendor: u16,
+    pub bar_size: u64,
 }
 
 #[derive(Debug)]

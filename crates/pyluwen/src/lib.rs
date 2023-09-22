@@ -182,6 +182,16 @@ impl Chip {
     pub fn board_id(&self) -> u64 {
         self.0.inner.get_telemetry().unwrap().board_id
     }
+
+    pub fn device_id(&self) -> u32 {
+        let info = self.0.inner.get_device_info().unwrap();
+        ((info.vendor as u32) << 16) | info.device as u32
+    }
+
+    pub fn bar_size(&self) -> u64 {
+        let info = self.0.inner.get_device_info().unwrap();
+        info.bar_size
+    }
 }
 
 common_chip_comms_impls!(Chip);

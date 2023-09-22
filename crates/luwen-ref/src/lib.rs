@@ -144,6 +144,9 @@ pub fn comms_callback_inner(ud: &ExtendedPciDeviceWrapper, op: FnOptions) -> Res
                             domain: borrow.device.physical.pci_domain,
 
                             interface_id: borrow.device.id as u32,
+
+                            vendor: borrow.device.physical.vendor_id,
+                            bar_size: borrow.device.physical.bar_size_bytes,
                         });
                     }
                 }
