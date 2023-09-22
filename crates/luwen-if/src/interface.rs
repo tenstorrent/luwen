@@ -56,6 +56,7 @@ pub struct DeviceInfo {
     pub function: u16,
 
     pub vendor: u16,
+    pub device_id: u16,
     pub bar_size: u64,
 }
 

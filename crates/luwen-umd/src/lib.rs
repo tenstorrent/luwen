@@ -38,6 +38,7 @@ pub struct DeviceInfo {
     pub function: u16,
 
     pub vendor: u16,
+    pub device_id: u16,
     pub bar_size: u64,
 }
 
@@ -50,6 +51,7 @@ impl From<DeviceInfo> for luwen_if::DeviceInfo {
             device: value.device,
             function: value.function,
             vendor: value.vendor,
+            device_id: value.device_id,
             bar_size: value.bar_size,
         }
     }
