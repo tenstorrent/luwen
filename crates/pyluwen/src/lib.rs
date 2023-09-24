@@ -2,14 +2,14 @@ use std::ops::{Deref, DerefMut};
 
 use luwen_if::chip::{HlComms, HlCommsInterface};
 use luwen_if::CallbackStorage;
-use luwen_ref::{ExtendedPciDevice, ExtendedPciDeviceWrapper};
+use luwen_ref::ExtendedPciDeviceWrapper;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 
 #[pyclass]
-pub struct Chip(luwen_if::chip::Chip);
+pub struct PciChip(luwen_if::chip::Chip);
 
-impl Deref for Chip {
+impl Deref for PciChip {
     type Target = luwen_if::chip::Chip;
 
     fn deref(&self) -> &Self::Target {
@@ -17,16 +17,16 @@ impl Deref for Chip {
     }
 }
 
-impl DerefMut for Chip {
+impl DerefMut for PciChip {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
 #[pyclass]
-pub struct Wormhole(luwen_if::chip::Wormhole);
+pub struct PciWormhole(luwen_if::chip::Wormhole);
 
-impl Deref for Wormhole {
+impl Deref for PciWormhole {
     type Target = luwen_if::chip::Wormhole;
 
     fn deref(&self) -> &Self::Target {
@@ -34,16 +34,16 @@ impl Deref for Wormhole {
     }
 }
 
-impl DerefMut for Wormhole {
+impl DerefMut for PciWormhole {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
 #[pyclass]
-pub struct Grayskull(luwen_if::chip::Grayskull);
+pub struct PciGrayskull(luwen_if::chip::Grayskull);
 
-impl Deref for Grayskull {
+impl Deref for PciGrayskull {
     type Target = luwen_if::chip::Grayskull;
 
     fn deref(&self) -> &Self::Target {
@@ -51,7 +51,7 @@ impl Deref for Grayskull {
     }
 }
 
-impl DerefMut for Grayskull {
+impl DerefMut for PciGrayskull {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
@@ -179,13 +179,13 @@ macro_rules! common_chip_comms_impls {
 }
 
 #[pymethods]
-impl Chip {
-    pub fn as_wh(&self) -> Option<Wormhole> {
-        self.0.as_wh().map(|v| Wormhole(v.clone()))
+impl PciChip {
+    pub fn as_wh(&self) -> Option<PciWormhole> {
+        self.0.as_wh().map(|v| PciWormhole(v.clone()))
     }
 
-    pub fn as_gs(&self) -> Option<Grayskull> {
-        self.0.as_gs().map(|v| Grayskull(v.clone()))
+    pub fn as_gs(&self) -> Option<PciGrayskull> {
+        self.0.as_gs().map(|v| PciGrayskull(v.clone()))
     }
 
     #[new]
@@ -194,7 +194,7 @@ impl Chip {
 
         let arch = chip.borrow().device.arch;
 
-        Chip(luwen_if::chip::Chip::open(
+        PciChip(luwen_if::chip::Chip::open(
             arch,
             luwen_if::CallbackStorage {
                 callback: luwen_ref::comms_callback,
@@ -222,26 +222,70 @@ impl Chip {
     }
 }
 
-common_chip_comms_impls!(Chip);
+common_chip_comms_impls!(PciChip);
 
 #[pymethods]
-impl Grayskull {}
+impl PciGrayskull {
+    pub fn setup_tlb(
+        &mut self,
+        index: u32,
+        addr: u64,
+        x_start: u8,
+        y_start: u8,
+        x_end: u8,
+        y_end: u8,
+        noc_sel: u8,
+        mcast: bool,
+        ordering: u8,
+        linked: bool,
+    ) -> PyResult<(u64, u64)> {
+        let value = PciInterface::from_gs(self);
 
-common_chip_comms_impls!(Grayskull);
+        if let Some(value) = value {
+            match kmdif::tlb::Ordering::from(ordering) {
+                kmdif::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
+                    "Invalid ordering {ordering}."
+                ))),
+                ordering => Ok(value.setup_tlb(
+                    index, addr, x_start, y_start, x_end, y_end, noc_sel, mcast, ordering, linked,
+                )),
+            }
+        } else {
+            return Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ));
+        }
+    }
+
+    pub fn set_default_tlb(&self, index: u32) -> PyResult<()> {
+        let value = PciInterface::from_gs(self);
+
+        if let Some(value) = value {
+            value.pci_interface.borrow_mut().default_tlb = index;
+            Ok(())
+        } else {
+            return Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ));
+        }
+    }
+}
+
+common_chip_comms_impls!(PciGrayskull);
 
 pub struct PciInterface<'a> {
     pub pci_interface: &'a ExtendedPciDeviceWrapper,
 }
 
 impl PciInterface<'_> {
-    pub fn from_wh<'a>(wh: &'a Wormhole) -> Option<PciInterface<'a>> {
+    pub fn from_wh<'a>(wh: &'a PciWormhole) -> Option<PciInterface<'a>> {
         wh.0.get_if::<CallbackStorage<ExtendedPciDeviceWrapper>>()
             .map(|v| PciInterface {
                 pci_interface: &v.user_data,
             })
     }
 
-    pub fn from_gs<'a>(wh: &'a Grayskull) -> Option<PciInterface<'a>> {
+    pub fn from_gs<'a>(wh: &'a PciGrayskull) -> Option<PciInterface<'a>> {
         wh.0.get_if::<CallbackStorage<ExtendedPciDeviceWrapper>>()
             .map(|v| PciInterface {
                 pci_interface: &v.user_data,
@@ -296,38 +340,88 @@ impl PciInterface<'_> {
 }
 
 #[pymethods]
-impl Wormhole {
+impl PciWormhole {
     pub fn open_remote(
         &self,
         rack_x: Option<u8>,
         rack_y: Option<u8>,
         shelf_x: Option<u8>,
         shelf_y: Option<u8>,
-    ) -> Self {
-        Wormhole(
+    ) -> RemoteWormhole {
+        RemoteWormhole(
             self.0
                 .open_remote((rack_x, rack_y, shelf_x, shelf_y))
                 .unwrap(),
         )
     }
+
+    pub fn setup_tlb(
+        &mut self,
+        index: u32,
+        addr: u64,
+        x_start: u8,
+        y_start: u8,
+        x_end: u8,
+        y_end: u8,
+        noc_sel: u8,
+        mcast: bool,
+        ordering: u8,
+        linked: bool,
+    ) -> PyResult<(u64, u64)> {
+        let value = PciInterface::from_wh(self);
+
+        if let Some(value) = value {
+            match kmdif::tlb::Ordering::from(ordering) {
+                kmdif::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
+                    "Invalid ordering {ordering}."
+                ))),
+                ordering => Ok(value.setup_tlb(
+                    index, addr, x_start, y_start, x_end, y_end, noc_sel, mcast, ordering, linked,
+                )),
+            }
+        } else {
+            return Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ));
+        }
+    }
+
+    pub fn set_default_tlb(&self, index: u32) -> PyResult<()> {
+        let value = PciInterface::from_wh(self);
+
+        if let Some(value) = value {
+            value.pci_interface.borrow_mut().default_tlb = index;
+            Ok(())
+        } else {
+            return Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ));
+        }
+    }
 }
 
-common_chip_comms_impls!(Wormhole);
+common_chip_comms_impls!(PciWormhole);
+
+#[pyclass]
+pub struct RemoteWormhole(luwen_if::chip::Wormhole);
+
+common_chip_comms_impls!(RemoteWormhole);
 
 #[pyfunction]
-pub fn detect_chips() -> Vec<Chip> {
+pub fn detect_chips() -> Vec<PciChip> {
     luwen_ref::detect_chips()
         .unwrap()
         .into_iter()
-        .map(|chip| Chip(chip))
+        .map(|chip| PciChip(chip))
         .collect()
 }
 
 #[pymodule]
 fn pyluwen(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_class::<Chip>()?;
-    m.add_class::<Wormhole>()?;
-    m.add_class::<Grayskull>()?;
+    m.add_class::<PciChip>()?;
+    m.add_class::<PciWormhole>()?;
+    m.add_class::<RemoteWormhole>()?;
+    m.add_class::<PciGrayskull>()?;
     m.add_class::<AxiData>()?;
 
     m.add_wrapped(wrap_pyfunction!(detect_chips))?;
