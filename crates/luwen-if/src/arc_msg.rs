@@ -1,6 +1,9 @@
 use thiserror::Error;
 
-use crate::chip::{AxiError, ChipComms, HlComms};
+use crate::{
+    chip::{AxiError, ChipComms, HlComms},
+    error::PlatformError,
+};
 
 #[derive(Debug, Clone, Copy)]
 pub enum PowerState {
@@ -126,17 +129,17 @@ pub enum ArcMsgOk {
 /// FW is currently busy. The message IRQ handler should only take a couple
 /// dozen cycles, so if this returns False it probably means something went
 /// wrong.
-fn trigger_fw_int<T: HlComms>(comms: &T, addrs: &ArcMsgAddr) -> bool {
-    let misc = comms.axi_read32(addrs.arc_misc_cntl);
+fn trigger_fw_int<T: HlComms>(comms: &T, addrs: &ArcMsgAddr) -> Result<bool, PlatformError> {
+    let misc = comms.axi_read32(addrs.arc_misc_cntl)?;
 
     if misc & (1 << 16) != 0 {
-        return false;
+        return Ok(false);
     }
 
     let misc_bit16_set = misc | (1 << 16);
-    comms.axi_write32(addrs.arc_misc_cntl, misc_bit16_set);
+    comms.axi_write32(addrs.arc_misc_cntl, misc_bit16_set)?;
 
-    true
+    Ok(true)
 }
 
 #[derive(Clone, Debug)]
@@ -164,45 +167,45 @@ pub fn arc_msg<T: HlComms>(
     msg_reg: u64,
     return_reg: u64,
     addrs: &ArcMsgAddr,
-) -> Result<ArcMsgOk, ArcMsgError> {
+) -> Result<ArcMsgOk, PlatformError> {
     const MSG_ERROR_REPLY: u32 = 0xffffffff;
 
     let (arg0, arg1) = msg.args();
 
     let code = msg.msg_code();
 
-    let current_code = comms.axi_read32(addrs.scratch_base + (msg_reg * 4));
+    let current_code = comms.axi_read32(addrs.scratch_base + (msg_reg * 4))?;
     if (current_code & 0xFFFF) as u16 == ArcMsg::ArcGoToSleep.msg_code() {
-        return Err(ArcMsgProtocolError::ArcAsleep.into_error());
+        Err(ArcMsgProtocolError::ArcAsleep.into_error())?;
     }
 
     comms.axi_write32(
         addrs.scratch_base + (return_reg * 4),
         arg0 as u32 | ((arg1 as u32) << 16),
-    );
+    )?;
 
-    comms.axi_write32(addrs.scratch_base + (msg_reg * 4), code as u32);
+    comms.axi_write32(addrs.scratch_base + (msg_reg * 4), code as u32)?;
 
-    if !trigger_fw_int(comms, addrs) {
-        return Err(ArcMsgProtocolError::FwIntFailed.into_error());
+    if !trigger_fw_int(comms, addrs)? {
+        Err(ArcMsgProtocolError::FwIntFailed.into_error())?;
     }
 
     if wait_for_done {
         let start = std::time::Instant::now();
         loop {
-            let status = comms.axi_read32(addrs.scratch_base + (msg_reg * 4));
+            let status = comms.axi_read32(addrs.scratch_base + (msg_reg * 4))?;
             if (status & 0xFFFF) as u16 == code & 0xFF {
                 let exit_code = (status >> 16) & 0xFFFF;
-                let arg = comms.axi_read32(addrs.scratch_base + (return_reg * 4));
+                let arg = comms.axi_read32(addrs.scratch_base + (return_reg * 4))?;
 
                 return Ok(ArcMsgOk::Ok { rc: exit_code, arg });
             } else if status == MSG_ERROR_REPLY {
-                return Err(ArcMsgProtocolError::MsgNotRecognized(code).into_error());
+                Err(ArcMsgProtocolError::MsgNotRecognized(code).into_error())?;
             }
 
             std::thread::sleep(std::time::Duration::from_millis(1));
             if start.elapsed() > timeout {
-                return Err(ArcMsgProtocolError::Timeout(timeout).into_error());
+                Err(ArcMsgProtocolError::Timeout(timeout).into_error())?;
             }
         }
     }

@@ -1,7 +1,10 @@
 use super::{eth_addr::EthAddr, HlComms, MemorySlices, Wormhole};
-use crate::chip::communication::{
-    chip_comms::{axi_translate, AxiData, AxiError, ChipComms},
-    chip_interface::ChipInterface,
+use crate::{
+    chip::communication::{
+        chip_comms::{axi_translate, AxiData, AxiError, ChipComms},
+        chip_interface::ChipInterface,
+    },
+    error::PlatformError,
 };
 
 pub struct RemoteArcIf {
@@ -14,11 +17,21 @@ impl ChipComms for RemoteArcIf {
         axi_translate(self.axi_data.as_ref(), addr)
     }
 
-    fn axi_read(&self, chip_if: &dyn ChipInterface, addr: u64, data: &mut [u8]) {
+    fn axi_read(
+        &self,
+        chip_if: &dyn ChipInterface,
+        addr: u64,
+        data: &mut [u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         chip_if.eth_noc_read(self.addr, 0, 0, 10, addr, data)
     }
 
-    fn axi_write(&self, chip_if: &dyn ChipInterface, addr: u64, data: &[u8]) {
+    fn axi_write(
+        &self,
+        chip_if: &dyn ChipInterface,
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         chip_if.eth_noc_write(self.addr, 0, 0, 10, addr, data)
     }
 
@@ -30,8 +43,8 @@ impl ChipComms for RemoteArcIf {
         y: u8,
         addr: u64,
         data: &mut [u8],
-    ) {
-        chip_if.eth_noc_read(self.addr, noc_id, x, y, addr, data);
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        chip_if.eth_noc_read(self.addr, noc_id, x, y, addr, data)
     }
 
     fn noc_write(
@@ -42,11 +55,17 @@ impl ChipComms for RemoteArcIf {
         y: u8,
         addr: u64,
         data: &[u8],
-    ) {
-        chip_if.eth_noc_write(self.addr, noc_id, x, y, addr, data);
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        chip_if.eth_noc_write(self.addr, noc_id, x, y, addr, data)
     }
 
-    fn noc_broadcast(&self, chip_if: &dyn ChipInterface, noc_id: u8, addr: u64, data: &[u8]) {
+    fn noc_broadcast(
+        &self,
+        chip_if: &dyn ChipInterface,
+        noc_id: u8,
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         chip_if.eth_noc_broadcast(self.addr, noc_id, addr, data)
     }
 }
@@ -126,48 +145,46 @@ impl EthAddresses {
 }
 
 impl Wormhole {
-    pub fn get_local_chip_coord(&self) -> EthAddr {
-        let coord = self.noc_read32(0, 9, 0, 0x1108);
+    pub fn get_local_chip_coord(&self) -> Result<EthAddr, PlatformError> {
+        let coord = self.noc_read32(0, 9, 0, 0x1108)?;
 
-        EthAddr {
+        Ok(EthAddr {
             rack_x: (coord & 0xFF) as u8,
             rack_y: ((coord >> 8) & 0xFF) as u8,
             shelf_x: ((coord >> 16) & 0xFF) as u8,
             shelf_y: ((coord >> 24) & 0xFF) as u8,
-        }
+        })
     }
 
-    fn check_training_complete(&self) {
-        let fw_version = self.noc_read32(0, 1, 0, 0x210);
+    fn check_training_complete(&self) -> Result<(), PlatformError> {
+        let fw_version = self.noc_read32(0, 1, 0, 0x210)?;
 
         let eth_addrs = EthAddresses::new(fw_version);
 
-        let initial_heartbeat = self
-            .eth_locations
-            .iter()
-            .copied()
-            .map(|(x, y)| self.noc_read32(0, x, y, self.eth_addres.heartbeat))
-            .collect::<Vec<_>>();
+        let mut initial_heartbeat = Vec::with_capacity(self.eth_locations.len());
+        for (x, y) in self.eth_locations.iter().copied() {
+            initial_heartbeat.push(self.noc_read32(0, x, y, self.eth_addres.heartbeat)?);
+        }
 
         let start_time = std::time::Instant::now();
 
+        let mut heartbeat = Vec::with_capacity(self.eth_locations.len());
         loop {
-            let heartbeat = self
-                .eth_locations
-                .iter()
-                .copied()
-                .map(|(x, y)| self.noc_read32(0, x, y, self.eth_addres.heartbeat));
+            heartbeat.clear();
+            for (x, y) in self.eth_locations.iter().copied() {
+                heartbeat.push(self.noc_read32(0, x, y, self.eth_addres.heartbeat)?);
+            }
 
             let valid_heartbeat = initial_heartbeat
                 .iter()
                 .copied()
-                .zip(heartbeat)
+                .zip(heartbeat.iter().copied())
                 .map(|(h1, h2)| h1 != h2)
                 .collect::<Vec<_>>();
 
             let init_finished = valid_heartbeat.iter().all(|&x| x);
             if init_finished {
-                return;
+                return Ok(());
             }
 
             let status_list = valid_heartbeat;
@@ -175,10 +192,13 @@ impl Wormhole {
             let current_time = std::time::Instant::now();
 
             if current_time - start_time > std::time::Duration::from_secs(300) {
-                panic!(
-                    "Timed out after {:?} seconds while waiting for ethernet links to train.",
-                    current_time - start_time
-                );
+                return Err(PlatformError::Generic(
+                    format!(
+                        "Timed out after {:?} seconds while waiting for ethernet links to train.",
+                        current_time - start_time,
+                    ),
+                    crate::error::BtWrapper::capture(),
+                ));
             }
         }
     }

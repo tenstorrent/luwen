@@ -21,7 +21,7 @@ fn main() -> Result<(), LuwenError> {
         let telemetry = chip.get_telemetry()?;
 
         let ident = if let Some(wh) = chip.as_wh() {
-            let coord = wh.get_local_chip_coord();
+            let coord = wh.get_local_chip_coord()?;
 
             let ident = ChipIdent {
                 arch: Arch::Wormhole,
@@ -32,9 +32,9 @@ fn main() -> Result<(), LuwenError> {
             };
 
             if !wh.is_remote {
-                mmio_chips.push((ident.clone(), wh.get_device_info().map(|v| v.interface_id)));
+                mmio_chips.push((ident.clone(), wh.get_device_info()?.map(|v| v.interface_id)));
             } else {
-                let neighbours = chip.get_neighbouring_chips();
+                let neighbours = chip.get_neighbouring_chips()?;
 
                 let mut connection_info: HashMap<_, Vec<_>> = HashMap::new();
                 for NeighbouringChip {
@@ -66,12 +66,12 @@ fn main() -> Result<(), LuwenError> {
             let ident = ChipIdent {
                 arch: Arch::Grayskull,
                 board_id: None,
-                interface: gs.get_device_info().map(|v| v.interface_id),
+                interface: gs.get_device_info()?.map(|v| v.interface_id),
                 coord: None,
             };
 
             chips.insert(ident.clone(), chips.len());
-            mmio_chips.push((ident.clone(), gs.get_device_info().map(|v| v.interface_id)));
+            mmio_chips.push((ident.clone(), gs.get_device_info()?.map(|v| v.interface_id)));
 
             ident
         } else {

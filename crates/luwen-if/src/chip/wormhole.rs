@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    arc_msg::{ArcMsgAddr, ArcMsgError, ArcMsgOk, ArcMsgProtocolError},
+    arc_msg::{ArcMsgAddr, ArcMsgOk, ArcMsgProtocolError},
     chip::{
         communication::{
             chip_comms::{load_axi_table, ChipComms},
@@ -17,7 +17,7 @@ use super::{
     eth_addr::EthAddr,
     hl_comms::HlComms,
     remote::{EthAddresses, RemoteArcIf},
-    ArcMsgOptions, AxiError, NeighbouringChip,
+    ArcMsgOptions, NeighbouringChip,
 };
 
 /// Implementation of the interface for a Wormhole
@@ -54,14 +54,14 @@ impl Wormhole {
         is_remote: bool,
         arc_if: CC,
         chip_if: CI,
-    ) -> Result<Self, AxiError> {
+    ) -> Result<Self, PlatformError> {
         // let mut version = [0; 4];
         // arc_if.axi_read(&chip_if, 0x0, &mut version);
         // let version = u32::from_le_bytes(version);
         let _version = 0x0;
 
         let mut fw_version = [0; 4];
-        arc_if.noc_read(&chip_if, 0, 1, 0, 0x210, &mut fw_version);
+        arc_if.noc_read(&chip_if, 0, 1, 0, 0x210, &mut fw_version)?;
         let fw_version = u32::from_le_bytes(fw_version);
 
         let output = Wormhole {
@@ -101,7 +101,7 @@ impl Wormhole {
         (&self.chip_if as &dyn std::any::Any).downcast_ref::<T>()
     }
 
-    pub fn open_remote(&self, addr: impl IntoChip<EthAddr>) -> Result<Wormhole, AxiError> {
+    pub fn open_remote(&self, addr: impl IntoChip<EthAddr>) -> Result<Wormhole, PlatformError> {
         let arc_if = RemoteArcIf {
             addr: addr.cinto(&self.arc_if, &self.chip_if).unwrap(),
             axi_data: Some(load_axi_table("wormhole-axi-noc.bin", 0)),
@@ -116,7 +116,7 @@ impl Wormhole {
     //     0x29
     // }
 
-    fn check_arg_msg_safe(&self, msg_reg: u64, _return_reg: u64) -> Result<(), ArcMsgError> {
+    fn check_arg_msg_safe(&self, msg_reg: u64, _return_reg: u64) -> Result<(), PlatformError> {
         const POST_CODE_INIT_DONE: u32 = 0xC0DE0001;
         const _POST_CODE_ARC_MSG_HANDLE_START: u32 = 0xC0DE0030;
         const POST_CODE_ARC_MSG_HANDLE_DONE: u32 = 0xC0DE003F;
@@ -130,14 +130,14 @@ impl Wormhole {
             return Err(ArcMsgProtocolError::UnsafeToSendArcMsg(
                 "scratch register access failed".to_string(),
             )
-            .into_error());
+            .into_error())?;
         }
 
         if s5 == 0xDEADC0DE {
             return Err(ArcMsgProtocolError::UnsafeToSendArcMsg(
                 "ARC watchdog has triggered".to_string(),
             )
-            .into_error());
+            .into_error())?;
         }
 
         // Still booting and it will later wipe SCRATCH[5/2].
@@ -145,13 +145,13 @@ impl Wormhole {
             return Err(ArcMsgProtocolError::UnsafeToSendArcMsg(
                 "ARC FW has not yet booted".to_string(),
             )
-            .into_error());
+            .into_error())?;
         }
 
         if s5 == 0x0000AA00 || s5 == ArcMsg::ArcGoToSleep.msg_code() as u32 {
             return Err(
                 ArcMsgProtocolError::UnsafeToSendArcMsg("ARC is asleep".to_string()).into_error(),
-            );
+            )?;
         }
 
         // PCIE DMA writes SCRATCH[5] on exit, so it's not safe.
@@ -161,7 +161,7 @@ impl Wormhole {
             return Err(ArcMsgProtocolError::UnsafeToSendArcMsg(
                 "there is an outstanding PCIE DMA request".to_string(),
             )
-            .into_error());
+            .into_error())?;
         }
 
         if s5 & 0xFFFFFF00 == 0x0000AA00 {
@@ -169,7 +169,7 @@ impl Wormhole {
             return Err(ArcMsgProtocolError::UnsafeToSendArcMsg(format!(
                 "another message is queued (0x{message_id:02x})"
             ))
-            .into_error());
+            .into_error())?;
         }
 
         if s5 & 0xFF00FFFF == 0xAA000000 {
@@ -177,7 +177,7 @@ impl Wormhole {
             return Err(ArcMsgProtocolError::UnsafeToSendArcMsg(format!(
                 "another message is being procesed (0x{message_id:02x})"
             ))
-            .into_error());
+            .into_error())?;
         }
 
         // Boot complete (new FW only), message not recognized,
@@ -205,7 +205,7 @@ impl Wormhole {
                 return Err(ArcMsgProtocolError::UnsafeToSendArcMsg(format!(
                     "post code 0x{pc:08x} indicates ARC is not ready"
                 ))
-                .into_error());
+                .into_error())?;
             }
         }
 
@@ -225,7 +225,7 @@ impl ChipImpl for Wormhole {
         luwen_core::Arch::Wormhole
     }
 
-    fn arc_msg(&self, msg: ArcMsgOptions) -> Result<ArcMsgOk, ArcMsgError> {
+    fn arc_msg(&self, msg: ArcMsgOptions) -> Result<ArcMsgOk, PlatformError> {
         let (msg_reg, return_reg) = if msg.use_second_mailbox {
             (2, 4)
         } else {
@@ -245,7 +245,7 @@ impl ChipImpl for Wormhole {
         )
     }
 
-    fn get_neighbouring_chips(&self) -> Vec<NeighbouringChip> {
+    fn get_neighbouring_chips(&self) -> Result<Vec<NeighbouringChip>, crate::error::PlatformError> {
         const ETH_UNKNOWN: u32 = 0;
         const ETH_UNCONNECTED: u32 = 1;
 
@@ -261,7 +261,7 @@ impl ChipImpl for Wormhole {
                 eth_x,
                 eth_y,
                 self.eth_addres.eth_conn_info + (eth_id as u64 * 4),
-            );
+            )?;
 
             if port_status == ETH_UNCONNECTED || port_status == ETH_UNKNOWN {
                 continue;
@@ -274,7 +274,7 @@ impl ChipImpl for Wormhole {
                 eth_x,
                 eth_y,
                 self.eth_addres.node_info + (4 * RACK_OFFSET),
-            );
+            )?;
             let remote_rack_x = remote_id & 0xFF;
             let remote_rack_y = (remote_id >> 8) & 0xFF;
 
@@ -283,7 +283,7 @@ impl ChipImpl for Wormhole {
                 eth_x,
                 eth_y,
                 self.eth_addres.node_info + (4 * SHELF_OFFSET),
-            );
+            )?;
             let remote_shelf_x = (remote_id >> 16) & 0x3F;
             let remote_shelf_y = (remote_id >> 22) & 0x3F;
 
@@ -302,7 +302,7 @@ impl ChipImpl for Wormhole {
             });
         }
 
-        output
+        Ok(output)
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -326,21 +326,21 @@ impl ChipImpl for Wormhole {
 
         let board_id_high =
             self.arc_if
-                .axi_read32(&self.chip_if, telemetry_struct_offset + (4 * 4)) as u64;
+                .axi_read32(&self.chip_if, telemetry_struct_offset + (4 * 4))? as u64;
         let board_id_low =
             self.arc_if
-                .axi_read32(&self.chip_if, telemetry_struct_offset + (5 * 4)) as u64;
+                .axi_read32(&self.chip_if, telemetry_struct_offset + (5 * 4))? as u64;
 
         Ok(super::Telemetry {
             board_id: (board_id_high << 32) | board_id_low,
         })
     }
 
-    fn get_device_info(&self) -> Option<crate::DeviceInfo> {
+    fn get_device_info(&self) -> Result<Option<crate::DeviceInfo>, PlatformError> {
         if self.is_remote {
-            None
+            Ok(None)
         } else {
-            self.chip_if.get_device_info()
+            Ok(self.chip_if.get_device_info()?)
         }
     }
 }

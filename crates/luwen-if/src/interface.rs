@@ -75,12 +75,15 @@ pub enum FnOptions {
 
 #[derive(Clone)]
 pub struct CallbackStorage<T: Clone + Send> {
-    pub callback: fn(&T, FnOptions),
+    pub callback: fn(&T, FnOptions) -> Result<(), Box<dyn std::error::Error>>,
     pub user_data: T,
 }
 
 impl<T: Clone + Send> CallbackStorage<T> {
-    pub fn new(callback: fn(&T, FnOptions), user_data: T) -> Self {
+    pub fn new(
+        callback: fn(&T, FnOptions) -> Result<(), Box<dyn std::error::Error>>,
+        user_data: T,
+    ) -> Self {
         Self {
             callback,
             user_data,
@@ -89,17 +92,17 @@ impl<T: Clone + Send> CallbackStorage<T> {
 }
 
 impl<T: Clone + Send + 'static> ChipInterface for CallbackStorage<T> {
-    fn get_device_info(&self) -> Option<DeviceInfo> {
+    fn get_device_info(&self) -> Result<Option<DeviceInfo>, Box<dyn std::error::Error>> {
         let mut driver_info = None;
         (self.callback)(
             &self.user_data,
             FnOptions::Driver(FnDriver::DeviceInfo((&mut driver_info) as *mut _)),
-        );
+        )?;
 
-        driver_info
+        Ok(driver_info)
     }
 
-    fn axi_read(&self, addr: u32, data: &mut [u8]) {
+    fn axi_read(&self, addr: u32, data: &mut [u8]) -> Result<(), Box<dyn std::error::Error>> {
         (self.callback)(
             &self.user_data,
             FnOptions::Axi(FnAxi::Read {
@@ -107,10 +110,10 @@ impl<T: Clone + Send + 'static> ChipInterface for CallbackStorage<T> {
                 data: data.as_mut_ptr(),
                 len: data.len() as u32,
             }),
-        );
+        )
     }
 
-    fn axi_write(&self, addr: u32, data: &[u8]) {
+    fn axi_write(&self, addr: u32, data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
         (self.callback)(
             &self.user_data,
             FnOptions::Axi(FnAxi::Write {
@@ -118,10 +121,17 @@ impl<T: Clone + Send + 'static> ChipInterface for CallbackStorage<T> {
                 data: data.as_ptr(),
                 len: data.len() as u32,
             }),
-        );
+        )
     }
 
-    fn noc_read(&self, noc_id: u8, x: u8, y: u8, addr: u64, data: &mut [u8]) {
+    fn noc_read(
+        &self,
+        noc_id: u8,
+        x: u8,
+        y: u8,
+        addr: u64,
+        data: &mut [u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         (self.callback)(
             &self.user_data,
             FnOptions::Noc(FnNoc::Read {
@@ -132,10 +142,17 @@ impl<T: Clone + Send + 'static> ChipInterface for CallbackStorage<T> {
                 data: data.as_mut_ptr(),
                 len: data.len() as u64,
             }),
-        );
+        )
     }
 
-    fn noc_write(&self, noc_id: u8, x: u8, y: u8, addr: u64, data: &[u8]) {
+    fn noc_write(
+        &self,
+        noc_id: u8,
+        x: u8,
+        y: u8,
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         (self.callback)(
             &self.user_data,
             FnOptions::Noc(FnNoc::Write {
@@ -146,10 +163,15 @@ impl<T: Clone + Send + 'static> ChipInterface for CallbackStorage<T> {
                 data: data.as_ptr(),
                 len: data.len() as u64,
             }),
-        );
+        )
     }
 
-    fn noc_broadcast(&self, noc_id: u8, addr: u64, data: &[u8]) {
+    fn noc_broadcast(
+        &self,
+        noc_id: u8,
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         (self.callback)(
             &self.user_data,
             FnOptions::Noc(FnNoc::Broadcast {
@@ -158,7 +180,7 @@ impl<T: Clone + Send + 'static> ChipInterface for CallbackStorage<T> {
                 data: data.as_ptr(),
                 len: data.len() as u64,
             }),
-        );
+        )
     }
 
     fn eth_noc_read(
@@ -169,7 +191,7 @@ impl<T: Clone + Send + 'static> ChipInterface for CallbackStorage<T> {
         y: u8,
         addr: u64,
         data: &mut [u8],
-    ) {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         (self.callback)(
             &self.user_data,
             FnOptions::Eth(FnRemote {
@@ -186,7 +208,15 @@ impl<T: Clone + Send + 'static> ChipInterface for CallbackStorage<T> {
         )
     }
 
-    fn eth_noc_write(&self, eth_addr: EthAddr, noc_id: u8, x: u8, y: u8, addr: u64, data: &[u8]) {
+    fn eth_noc_write(
+        &self,
+        eth_addr: EthAddr,
+        noc_id: u8,
+        x: u8,
+        y: u8,
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         (self.callback)(
             &self.user_data,
             FnOptions::Eth(FnRemote {
@@ -203,7 +233,13 @@ impl<T: Clone + Send + 'static> ChipInterface for CallbackStorage<T> {
         )
     }
 
-    fn eth_noc_broadcast(&self, eth_addr: EthAddr, noc_id: u8, addr: u64, data: &[u8]) {
+    fn eth_noc_broadcast(
+        &self,
+        eth_addr: EthAddr,
+        noc_id: u8,
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         (self.callback)(
             &self.user_data,
             FnOptions::Eth(FnRemote {

@@ -1,6 +1,8 @@
 use kmdif::PciError;
 use luwen_if::EthAddr;
 
+use crate::error::LuwenError;
+
 #[derive(Clone, Debug)]
 pub struct EthCommCoord {
     pub coord: EthAddr,
@@ -70,7 +72,7 @@ fn wait_for_idle<D>(
     mut read32: impl FnMut(&mut D, u32) -> Result<u32, PciError>,
     command_q_addr: u32,
     timeout: std::time::Duration,
-) -> Result<u32, PciError> {
+) -> Result<u32, LuwenError> {
     let mut curr_wptr = read32(user_data, command_q_addr + REQ_Q_ADDR + 4 * WR_PTR_OFFSET)?;
 
     let start = std::time::Instant::now();
@@ -85,7 +87,9 @@ fn wait_for_idle<D>(
         }
 
         if start.elapsed() > timeout {
-            panic!("TIMEOUT")
+            return Err(LuwenError::Custom(
+                "Ethernet timeout while waiting for command queue to be idle".to_string(),
+            ));
         }
         curr_wptr = read32(user_data, command_q_addr + REQ_Q_ADDR + 4 * WR_PTR_OFFSET)?;
     }
@@ -100,7 +104,7 @@ pub fn eth_read32<D>(
     command_q_addr: u32,
     coord: EthCommCoord,
     timeout: std::time::Duration,
-) -> Result<u32, PciError> {
+) -> Result<u32, LuwenError> {
     let curr_wptr = wait_for_idle(user_data, &mut read32, command_q_addr, timeout)?;
 
     let cmd_addr =
@@ -131,7 +135,9 @@ pub fn eth_read32<D>(
     while curr_wptr == curr_rptr {
         curr_wptr = read32(user_data, command_q_addr + RESP_Q_ADDR + 4 * WR_PTR_OFFSET)?;
         if start_time.elapsed() > timeout {
-            panic!("TIMEOUT");
+            return Err(LuwenError::Custom(
+                "Ethernet timeout while waiting for read queue to be cleared".to_string(),
+            ));
         }
     }
 
@@ -143,7 +149,9 @@ pub fn eth_read32<D>(
     while flags == 0 {
         flags = read32(user_data, cmd_addr + 12)?;
         if start_time.elapsed() > timeout {
-            panic!("TIMEOUT");
+            return Err(LuwenError::Custom(
+                "Ethernet timeout while waiting for flags to come back".to_string(),
+            ));
         }
     }
 
@@ -177,7 +185,7 @@ pub fn eth_read32<D>(
     )?;
 
     if let Some(error) = error {
-        panic!("{}", error);
+        return Err(LuwenError::Custom(error.to_string()));
     }
 
     Ok(data)
@@ -193,7 +201,7 @@ pub fn block_read<D>(
     fake_it: bool,
     mut coord: EthCommCoord,
     data: &mut [u8],
-) -> Result<(), PciError> {
+) -> Result<(), LuwenError> {
     if fake_it {
         assert_eq!(data.len() % 4, 0);
 
@@ -259,7 +267,9 @@ pub fn block_read<D>(
         while curr_wptr == curr_rptr {
             curr_wptr = read32(user_data, command_q_addr + RESP_Q_ADDR + 4 * WR_PTR_OFFSET)?;
             if start_time.elapsed() > timeout {
-                panic!("TIMEOUT");
+                return Err(LuwenError::Custom(
+                    "Ethernet timeout while waiting for read queue to be cleared".to_string(),
+                ));
             }
         }
 
@@ -273,17 +283,21 @@ pub fn block_read<D>(
         while flags == 0 {
             flags = read32(user_data, cmd_addr + 12)?;
             if start_time.elapsed() > timeout {
-                panic!("TIMEOUT");
+                return Err(LuwenError::Custom(
+                    "Ethernet timeout while waiting for flags to come back".to_string(),
+                ));
             }
         }
 
         let is_block = (flags & CMD_DATA_BLOCK) == 64;
 
         if flags & CMD_DEST_UNREACHABLE != 0 {
-            panic!("Destination Unreachable.")
+            return Err(LuwenError::Custom("Destination Unreachable.".to_string()));
         }
         if flags & CMD_DATA_BLOCK_UNAVAILABLE != 0 {
-            panic!("Unable to reserve data block on destination route.")
+            return Err(LuwenError::Custom(
+                "Unable to reserve data block on destination route.".to_string(),
+            ));
         }
 
         let mut flag_block_read = false;
@@ -294,7 +308,9 @@ pub fn block_read<D>(
         }
 
         if !flag_block_read {
-            panic!("Found non block read response expected something else")
+            return Err(LuwenError::Custom(
+                "Found non block read response expected something else".to_string(),
+            ));
         }
 
         let next_rptr = (curr_rptr + 1) % (2 * CMD_BUF_SIZE);
@@ -322,7 +338,7 @@ pub fn eth_write32<D>(
     coord: EthCommCoord,
     timeout: std::time::Duration,
     value: u32,
-) -> Result<(), PciError> {
+) -> Result<(), LuwenError> {
     let curr_wptr = wait_for_idle(user_data, &mut read32, command_q_addr, timeout)?;
 
     let cmd_addr =
@@ -360,7 +376,7 @@ pub fn block_write<D>(
     fake_it: bool,
     mut coord: EthCommCoord,
     data: &[u8],
-) -> Result<(), PciError> {
+) -> Result<(), LuwenError> {
     if fake_it {
         assert_eq!(data.len() % 4, 0);
 

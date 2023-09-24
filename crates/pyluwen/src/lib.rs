@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use luwen_if::chip::{HlComms, HlCommsInterface};
-use luwen_if::CallbackStorage;
+use luwen_if::{CallbackStorage, DeviceInfo};
 use luwen_ref::ExtendedPciDeviceWrapper;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
@@ -85,21 +85,25 @@ macro_rules! common_chip_comms_impls {
                 y: u8,
                 addr: u64,
                 data: pyo3::buffer::PyBuffer<u8>,
-            ) {
+            ) -> PyResult<()> {
                 Python::with_gil(|_py| {
                     let ptr: *mut u8 = data.buf_ptr().cast();
                     let len = data.len_bytes();
 
                     let data = unsafe { std::slice::from_raw_parts_mut(ptr, len) };
-                    self.0.noc_read(noc_id, x, y, addr, data);
+                    self.0
+                        .noc_read(noc_id, x, y, addr, data)
+                        .map_err(|v| PyException::new_err(v.to_string()))
                 })
             }
 
-            pub fn noc_read32(&self, noc_id: u8, x: u8, y: u8, addr: u64) -> u32 {
+            pub fn noc_read32(&self, noc_id: u8, x: u8, y: u8, addr: u64) -> PyResult<u32> {
                 let mut data = [0u8; 4];
-                self.0.noc_read(noc_id, x, y, addr, &mut data);
+                self.0
+                    .noc_read(noc_id, x, y, addr, &mut data)
+                    .map_err(|v| PyException::new_err(v.to_string()))?;
 
-                u32::from_le_bytes(data)
+                Ok(u32::from_le_bytes(data))
             }
 
             pub fn noc_write(
@@ -109,32 +113,52 @@ macro_rules! common_chip_comms_impls {
                 y: u8,
                 addr: u64,
                 data: pyo3::buffer::PyBuffer<u8>,
-            ) {
+            ) -> PyResult<()> {
                 Python::with_gil(|_py| {
                     let ptr: *mut u8 = data.buf_ptr().cast();
                     let len = data.len_bytes();
 
                     let data = unsafe { std::slice::from_raw_parts(ptr, len) };
-                    self.0.noc_write(noc_id, x, y, addr, data);
+                    self.0
+                        .noc_write(noc_id, x, y, addr, data)
+                        .map_err(|v| PyException::new_err(v.to_string()))
                 })
             }
 
-            pub fn noc_write32(&self, noc_id: u8, x: u8, y: u8, addr: u64, data: u32) {
-                self.0.noc_write(noc_id, x, y, addr, &data.to_le_bytes());
+            pub fn noc_write32(
+                &self,
+                noc_id: u8,
+                x: u8,
+                y: u8,
+                addr: u64,
+                data: u32,
+            ) -> PyResult<()> {
+                self.0
+                    .noc_write(noc_id, x, y, addr, &data.to_le_bytes())
+                    .map_err(|v| PyException::new_err(v.to_string()))
             }
 
-            pub fn noc_broadcast(&self, noc_id: u8, addr: u64, data: pyo3::buffer::PyBuffer<u8>) {
+            pub fn noc_broadcast(
+                &self,
+                noc_id: u8,
+                addr: u64,
+                data: pyo3::buffer::PyBuffer<u8>,
+            ) -> PyResult<()> {
                 Python::with_gil(|_py| {
                     let ptr: *mut u8 = data.buf_ptr().cast();
                     let len = data.len_bytes();
 
                     let data = unsafe { std::slice::from_raw_parts(ptr, len) };
-                    self.0.noc_broadcast(noc_id, addr, data);
+                    self.0
+                        .noc_broadcast(noc_id, addr, data)
+                        .map_err(|v| PyException::new_err(v.to_string()))
                 })
             }
 
-            pub fn noc_broadcast32(&self, noc_id: u8, addr: u64, data: u32) {
-                self.0.noc_broadcast(noc_id, addr, &data.to_le_bytes());
+            pub fn noc_broadcast32(&self, noc_id: u8, addr: u64, data: u32) -> PyResult<()> {
+                self.0
+                    .noc_broadcast(noc_id, addr, &data.to_le_bytes())
+                    .map_err(|v| PyException::new_err(v.to_string()))
             }
 
             pub fn axi_translate(&self, addr: &str) -> PyResult<AxiData> {
@@ -144,38 +168,68 @@ macro_rules! common_chip_comms_impls {
                 }
             }
 
-            pub fn axi_read(&self, addr: u64, data: pyo3::buffer::PyBuffer<u8>) {
+            pub fn axi_read(&self, addr: u64, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
                 Python::with_gil(|_py| {
                     let ptr: *mut u8 = data.buf_ptr().cast();
                     let len = data.len_bytes();
 
                     let data = unsafe { std::slice::from_raw_parts_mut(ptr, len) };
-                    self.0.axi_read(addr, data);
+                    self.0
+                        .axi_read(addr, data)
+                        .map_err(|v| PyException::new_err(v.to_string()))
                 })
             }
 
-            pub fn axi_read32(&self, addr: u64) -> u32 {
+            pub fn axi_read32(&self, addr: u64) -> PyResult<u32> {
                 let mut data = [0u8; 4];
-                self.0.axi_read(addr, &mut data);
+                self.0
+                    .axi_read(addr, &mut data)
+                    .map_err(|v| PyException::new_err(v.to_string()))?;
 
-                u32::from_le_bytes(data)
+                Ok(u32::from_le_bytes(data))
             }
 
-            pub fn axi_write(&self, addr: u64, data: pyo3::buffer::PyBuffer<u8>) {
+            pub fn axi_write(&self, addr: u64, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
                 Python::with_gil(|_py| {
                     let ptr: *mut u8 = data.buf_ptr().cast();
                     let len = data.len_bytes();
 
                     let data = unsafe { std::slice::from_raw_parts_mut(ptr, len) };
-                    self.0.axi_write(addr, data);
+                    self.0
+                        .axi_write(addr, data)
+                        .map_err(|v| PyException::new_err(v.to_string()))
                 })
             }
 
-            pub fn axi_write32(&self, addr: u64, data: u32) {
-                self.0.axi_write(addr, &data.to_le_bytes());
+            pub fn axi_write32(&self, addr: u64, data: u32) -> PyResult<()> {
+                self.0
+                    .axi_write(addr, &data.to_le_bytes())
+                    .map_err(|v| PyException::new_err(v.to_string()))
             }
         }
     };
+}
+
+impl PciChip {
+    fn device_info(&self) -> PyResult<DeviceInfo> {
+        match self.0.inner.get_device_info() {
+            Ok(info) => {
+                if let Some(info) = info {
+                    Ok(info)
+                } else {
+                    return Err(PyException::new_err(
+                        "Could not get device info: info unavailable",
+                    ));
+                }
+            }
+            Err(err) => {
+                return Err(PyException::new_err(format!(
+                    "Could not get device info: {}",
+                    err
+                )));
+            }
+        }
+    }
 }
 
 #[pymethods]
@@ -211,14 +265,14 @@ impl PciChip {
         self.0.inner.get_telemetry().unwrap().board_id
     }
 
-    pub fn device_id(&self) -> u32 {
-        let info = self.0.inner.get_device_info().unwrap();
-        ((info.vendor as u32) << 16) | info.slot as u32
+    pub fn device_id(&self) -> PyResult<u32> {
+        let info = self.device_info()?;
+        Ok(((info.vendor as u32) << 16) | info.slot as u32)
     }
 
-    pub fn bar_size(&self) -> u64 {
-        let info = self.0.inner.get_device_info().unwrap();
-        info.bar_size
+    pub fn bar_size(&self) -> PyResult<u64> {
+        let info = self.device_info()?;
+        Ok(info.bar_size)
     }
 }
 

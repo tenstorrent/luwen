@@ -66,8 +66,18 @@ pub trait ChipComms {
     /// Translate a String path into the corresponding AXI address.
     fn axi_translate(&self, addr: &str) -> Result<AxiData, AxiError>;
     /// Read and write to the NOC using AXI address gotten from `axi_translate`.
-    fn axi_read(&self, chip_if: &dyn ChipInterface, addr: u64, data: &mut [u8]);
-    fn axi_write(&self, chip_if: &dyn ChipInterface, addr: u64, data: &[u8]);
+    fn axi_read(
+        &self,
+        chip_if: &dyn ChipInterface,
+        addr: u64,
+        data: &mut [u8],
+    ) -> Result<(), Box<dyn std::error::Error>>;
+    fn axi_write(
+        &self,
+        chip_if: &dyn ChipInterface,
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>>;
 
     /// Read and write to a noc endpoint, this could be a local or remote chip.
     fn noc_read(
@@ -78,7 +88,7 @@ pub trait ChipComms {
         y: u8,
         addr: u64,
         data: &mut [u8],
-    );
+    ) -> Result<(), Box<dyn std::error::Error>>;
     fn noc_write(
         &self,
         chip_if: &dyn ChipInterface,
@@ -87,14 +97,27 @@ pub trait ChipComms {
         y: u8,
         addr: u64,
         data: &[u8],
-    );
-    fn noc_broadcast(&self, chip_if: &dyn ChipInterface, noc_id: u8, addr: u64, data: &[u8]);
+    ) -> Result<(), Box<dyn std::error::Error>>;
+    fn noc_broadcast(
+        &self,
+        chip_if: &dyn ChipInterface,
+        noc_id: u8,
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>>;
 
     /// Convenience functions for reading and writing 32 bit values.
-    fn noc_read32(&self, chip_if: &dyn ChipInterface, noc_id: u8, x: u8, y: u8, addr: u64) -> u32 {
+    fn noc_read32(
+        &self,
+        chip_if: &dyn ChipInterface,
+        noc_id: u8,
+        x: u8,
+        y: u8,
+        addr: u64,
+    ) -> Result<u32, Box<dyn std::error::Error>> {
         let mut value = [0; 4];
-        self.noc_read(chip_if, noc_id, x, y, addr, &mut value);
-        u32::from_le_bytes(value)
+        self.noc_read(chip_if, noc_id, x, y, addr, &mut value)?;
+        Ok(u32::from_le_bytes(value))
     }
 
     fn noc_write32(
@@ -105,29 +128,48 @@ pub trait ChipComms {
         y: u8,
         addr: u64,
         value: u32,
-    ) {
-        self.noc_write(chip_if, noc_id, x, y, addr, value.to_le_bytes().as_slice());
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.noc_write(chip_if, noc_id, x, y, addr, value.to_le_bytes().as_slice())
     }
 
-    fn noc_broadcast32(&self, chip_if: &dyn ChipInterface, noc_id: u8, addr: u64, value: u32) {
-        self.noc_broadcast(chip_if, noc_id, addr, value.to_le_bytes().as_slice());
+    fn noc_broadcast32(
+        &self,
+        chip_if: &dyn ChipInterface,
+        noc_id: u8,
+        addr: u64,
+        value: u32,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.noc_broadcast(chip_if, noc_id, addr, value.to_le_bytes().as_slice())
     }
 
-    fn axi_read32(&self, chip_if: &dyn ChipInterface, addr: u64) -> u32 {
+    fn axi_read32(
+        &self,
+        chip_if: &dyn ChipInterface,
+        addr: u64,
+    ) -> Result<u32, Box<dyn std::error::Error>> {
         let mut value = [0; 4];
-        self.axi_read(chip_if, addr, &mut value);
-        u32::from_le_bytes(value)
+        self.axi_read(chip_if, addr, &mut value)?;
+        Ok(u32::from_le_bytes(value))
     }
 
-    fn axi_write32(&self, chip_if: &dyn ChipInterface, addr: u64, value: u32) {
-        self.axi_write(chip_if, addr, value.to_le_bytes().as_slice());
+    fn axi_write32(
+        &self,
+        chip_if: &dyn ChipInterface,
+        addr: u64,
+        value: u32,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.axi_write(chip_if, addr, value.to_le_bytes().as_slice())
     }
 
-    fn axi_sread32(&self, chip_if: &dyn ChipInterface, addr: &str) -> Result<u32, AxiError> {
+    fn axi_sread32(
+        &self,
+        chip_if: &dyn ChipInterface,
+        addr: &str,
+    ) -> Result<u32, Box<dyn std::error::Error>> {
         let addr = self.axi_translate(addr.as_ref())?.addr;
 
         let mut value = [0; 4];
-        self.axi_read(chip_if, addr, &mut value);
+        self.axi_read(chip_if, addr, &mut value)?;
         Ok(u32::from_le_bytes(value))
     }
 
@@ -136,10 +178,10 @@ pub trait ChipComms {
         chip_if: &dyn ChipInterface,
         addr: &str,
         value: u32,
-    ) -> Result<(), AxiError> {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let addr = self.axi_translate(addr.as_ref())?.addr;
 
-        self.axi_write(chip_if, addr, &value.to_le_bytes());
+        self.axi_write(chip_if, addr, &value.to_le_bytes())?;
         Ok(())
     }
 }
@@ -230,11 +272,21 @@ impl ChipComms for ArcIf {
         axi_translate(Some(&self.axi_data), addr)
     }
 
-    fn axi_read(&self, chip_if: &dyn ChipInterface, addr: u64, data: &mut [u8]) {
+    fn axi_read(
+        &self,
+        chip_if: &dyn ChipInterface,
+        addr: u64,
+        data: &mut [u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         chip_if.axi_read(addr as u32, data)
     }
 
-    fn axi_write(&self, chip_if: &dyn ChipInterface, addr: u64, data: &[u8]) {
+    fn axi_write(
+        &self,
+        chip_if: &dyn ChipInterface,
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         chip_if.axi_write(addr as u32, data)
     }
 
@@ -246,7 +298,7 @@ impl ChipComms for ArcIf {
         y: u8,
         addr: u64,
         data: &mut [u8],
-    ) {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         chip_if.noc_read(noc_id, x, y, addr, data)
     }
 
@@ -258,11 +310,17 @@ impl ChipComms for ArcIf {
         y: u8,
         addr: u64,
         data: &[u8],
-    ) {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         chip_if.noc_write(noc_id, x, y, addr, data)
     }
 
-    fn noc_broadcast(&self, chip_if: &dyn ChipInterface, noc_id: u8, addr: u64, data: &[u8]) {
+    fn noc_broadcast(
+        &self,
+        chip_if: &dyn ChipInterface,
+        noc_id: u8,
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         chip_if.noc_broadcast(noc_id, addr, data)
     }
 }
@@ -272,11 +330,21 @@ impl ChipComms for Arc<dyn ChipComms> {
         self.as_ref().axi_translate(addr)
     }
 
-    fn axi_read(&self, chip_if: &dyn ChipInterface, addr: u64, data: &mut [u8]) {
+    fn axi_read(
+        &self,
+        chip_if: &dyn ChipInterface,
+        addr: u64,
+        data: &mut [u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         self.as_ref().axi_read(chip_if, addr, data)
     }
 
-    fn axi_write(&self, chip_if: &dyn ChipInterface, addr: u64, data: &[u8]) {
+    fn axi_write(
+        &self,
+        chip_if: &dyn ChipInterface,
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         self.as_ref().axi_write(chip_if, addr, data)
     }
 
@@ -288,7 +356,7 @@ impl ChipComms for Arc<dyn ChipComms> {
         y: u8,
         addr: u64,
         data: &mut [u8],
-    ) {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         self.as_ref().noc_read(chip_if, noc_id, x, y, addr, data)
     }
 
@@ -300,11 +368,17 @@ impl ChipComms for Arc<dyn ChipComms> {
         y: u8,
         addr: u64,
         data: &[u8],
-    ) {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         self.as_ref().noc_write(chip_if, noc_id, x, y, addr, data)
     }
 
-    fn noc_broadcast(&self, chip_if: &dyn ChipInterface, noc_id: u8, addr: u64, data: &[u8]) {
+    fn noc_broadcast(
+        &self,
+        chip_if: &dyn ChipInterface,
+        noc_id: u8,
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         self.as_ref().noc_broadcast(chip_if, noc_id, addr, data)
     }
 }
@@ -314,11 +388,21 @@ impl ChipComms for Arc<dyn ChipComms + Send + Sync> {
         self.as_ref().axi_translate(addr)
     }
 
-    fn axi_read(&self, chip_if: &dyn ChipInterface, addr: u64, data: &mut [u8]) {
+    fn axi_read(
+        &self,
+        chip_if: &dyn ChipInterface,
+        addr: u64,
+        data: &mut [u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         self.as_ref().axi_read(chip_if, addr, data)
     }
 
-    fn axi_write(&self, chip_if: &dyn ChipInterface, addr: u64, data: &[u8]) {
+    fn axi_write(
+        &self,
+        chip_if: &dyn ChipInterface,
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         self.as_ref().axi_write(chip_if, addr, data)
     }
 
@@ -330,7 +414,7 @@ impl ChipComms for Arc<dyn ChipComms + Send + Sync> {
         y: u8,
         addr: u64,
         data: &mut [u8],
-    ) {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         self.as_ref().noc_read(chip_if, noc_id, x, y, addr, data)
     }
 
@@ -342,11 +426,17 @@ impl ChipComms for Arc<dyn ChipComms + Send + Sync> {
         y: u8,
         addr: u64,
         data: &[u8],
-    ) {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         self.as_ref().noc_write(chip_if, noc_id, x, y, addr, data)
     }
 
-    fn noc_broadcast(&self, chip_if: &dyn ChipInterface, noc_id: u8, addr: u64, data: &[u8]) {
+    fn noc_broadcast(
+        &self,
+        chip_if: &dyn ChipInterface,
+        noc_id: u8,
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         self.as_ref().noc_broadcast(chip_if, noc_id, addr, data)
     }
 }

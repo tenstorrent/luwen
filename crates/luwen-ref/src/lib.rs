@@ -3,6 +3,7 @@ use std::{
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
+use error::LuwenError;
 use kmdif::{DmaBuffer, PciError, Tlb};
 use luwen_if::{FnDriver, FnOptions};
 
@@ -233,13 +234,17 @@ fn noc_read32(
     Ok(u32::from_le_bytes(data))
 }
 
-pub fn comms_callback(ud: &ExtendedPciDeviceWrapper, op: FnOptions) {
-    if let Err(output) = comms_callback_inner(ud, op) {
-        panic!("Error: {}", output);
-    }
+pub fn comms_callback(
+    ud: &ExtendedPciDeviceWrapper,
+    op: FnOptions,
+) -> Result<(), Box<dyn std::error::Error>> {
+    Ok(comms_callback_inner(ud, op)?)
 }
 
-pub fn comms_callback_inner(ud: &ExtendedPciDeviceWrapper, op: FnOptions) -> Result<(), PciError> {
+pub fn comms_callback_inner(
+    ud: &ExtendedPciDeviceWrapper,
+    op: FnOptions,
+) -> Result<(), LuwenError> {
     match op {
         FnOptions::Driver(op) => match op {
             FnDriver::DeviceInfo(info) => {

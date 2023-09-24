@@ -2,7 +2,12 @@ use luwen_if::{chip::HlComms, ChipImpl};
 use luwen_ref::error::LuwenError;
 use rand::Rng;
 
-fn read_write_test(chip: impl HlComms, x: u8, y: u8, size: usize) -> (f64, f64) {
+fn read_write_test(
+    chip: impl HlComms,
+    x: u8,
+    y: u8,
+    size: usize,
+) -> Result<(f64, f64), Box<dyn std::error::Error>> {
     let mut rng = rand::thread_rng();
 
     let mut write_data = Vec::with_capacity(size);
@@ -11,13 +16,13 @@ fn read_write_test(chip: impl HlComms, x: u8, y: u8, size: usize) -> (f64, f64) 
     }
 
     let write_time = std::time::Instant::now();
-    chip.noc_write(0, x, y, 0x0, &write_data);
+    chip.noc_write(0, x, y, 0x0, &write_data)?;
     let write_time = write_time.elapsed().as_secs_f64();
 
     let mut readback_data = vec![0; size];
 
     let read_time = std::time::Instant::now();
-    chip.noc_read(0, x, y, 0x0, &mut readback_data);
+    chip.noc_read(0, x, y, 0x0, &mut readback_data)?;
     let read_time = read_time.elapsed().as_secs_f64();
 
     for (index, (d, r)) in write_data
@@ -40,7 +45,7 @@ fn read_write_test(chip: impl HlComms, x: u8, y: u8, size: usize) -> (f64, f64) 
         }
     }
 
-    (write_time, read_time)
+    Ok((write_time, read_time))
 }
 
 pub fn main() -> Result<(), LuwenError> {
@@ -51,9 +56,9 @@ pub fn main() -> Result<(), LuwenError> {
         // let size = 1 << 19;
         // let size = 1000;
         let (write_time, read_time) = if let Some(wh) = chip.as_wh() {
-            read_write_test(wh, 0, 0, size)
+            read_write_test(wh, 0, 0, size).unwrap()
         } else if let Some(gs) = chip.as_gs() {
-            read_write_test(gs, 1, 0, size)
+            read_write_test(gs, 1, 0, size).unwrap()
         } else {
             unimplemented!("Chip of arch {:?} not supported", chip.get_arch());
         };

@@ -20,7 +20,7 @@ impl Chip {
     ) -> Result<Grayskull, PlatformError> {
         if let Arch::Grayskull = arch {
             let mut version = [0u8; 4];
-            backend.axi_read(0x0000_0000, &mut version);
+            backend.axi_read(0x0000_0000, &mut version)?;
             let version = u32::from_le_bytes(version);
 
             let arc_if = Arc::new(ArcIf {
@@ -49,7 +49,7 @@ impl Chip {
     ) -> Result<Wormhole, PlatformError> {
         if let Arch::Wormhole = arch {
             let mut version = [0u8; 4];
-            backend.axi_read(0x0000_0000, &mut version);
+            backend.axi_read(0x0000_0000, &mut version)?;
             let version = u32::from_le_bytes(version);
 
             let arc_if = ArcIf {

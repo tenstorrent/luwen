@@ -42,4 +42,14 @@ pub enum PlatformError {
 
     #[error("{0}\n{1}")]
     Generic(String, BtWrapper),
+
+    #[error("{0}\n{1}")]
+    GenericError(Box<dyn std::error::Error>, BtWrapper),
+}
+
+impl From<Box<dyn std::error::Error>> for PlatformError {
+    #[inline]
+    fn from(e: Box<dyn std::error::Error>) -> Self {
+        Self::GenericError(e, BtWrapper::capture())
+    }
 }

@@ -3,7 +3,8 @@ use std::sync::Arc;
 use luwen_core::Arch;
 
 use crate::{
-    arc_msg::{ArcMsgAddr, ArcMsgError, ArcMsgOk, ArcMsgProtocolError},
+    arc_msg::{ArcMsgAddr, ArcMsgOk, ArcMsgProtocolError},
+    error::PlatformError,
     ArcMsg, ChipImpl,
 };
 
@@ -42,9 +43,9 @@ impl ChipImpl for Grayskull {
         Arch::Grayskull
     }
 
-    fn arc_msg(&self, msg: ArcMsgOptions) -> Result<ArcMsgOk, ArcMsgError> {
+    fn arc_msg(&self, msg: ArcMsgOptions) -> Result<ArcMsgOk, PlatformError> {
         let (msg_reg, return_reg) = if msg.use_second_mailbox {
-            return Err(ArcMsgProtocolError::InvalidMailbox(2).into_error());
+            return Err(ArcMsgProtocolError::InvalidMailbox(2).into_error())?;
         } else {
             (5, 3)
         };
@@ -60,8 +61,8 @@ impl ChipImpl for Grayskull {
         )
     }
 
-    fn get_neighbouring_chips(&self) -> Vec<NeighbouringChip> {
-        vec![]
+    fn get_neighbouring_chips(&self) -> Result<Vec<NeighbouringChip>, PlatformError> {
+        Ok(vec![])
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -105,17 +106,17 @@ impl ChipImpl for Grayskull {
 
         let board_id_high =
             self.arc_if
-                .axi_read32(&self.chip_if, telemetry_struct_offset + (4 * 4)) as u64;
+                .axi_read32(&self.chip_if, telemetry_struct_offset + (4 * 4))? as u64;
         let board_id_low =
             self.arc_if
-                .axi_read32(&self.chip_if, telemetry_struct_offset + (5 * 4)) as u64;
+                .axi_read32(&self.chip_if, telemetry_struct_offset + (5 * 4))? as u64;
 
         Ok(super::Telemetry {
             board_id: (board_id_high << 32) | board_id_low,
         })
     }
 
-    fn get_device_info(&self) -> Option<crate::DeviceInfo> {
-        self.chip_if.get_device_info()
+    fn get_device_info(&self) -> Result<Option<crate::DeviceInfo>, PlatformError> {
+        Ok(self.chip_if.get_device_info()?)
     }
 }

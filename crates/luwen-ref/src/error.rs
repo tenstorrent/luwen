@@ -12,6 +12,9 @@ pub enum LuwenError {
 
     #[error(transparent)]
     PciError(#[from] PciError),
+
+    #[error("{0}")]
+    Custom(String),
 }
 
 impl From<ArcMsgError> for LuwenError {

@@ -34,13 +34,13 @@ pub fn detect_chips(mut root_chips: Vec<Chip>) -> Result<Vec<Chip>, PlatformErro
             remotes_to_investigate.push(root_index);
             (
                 telem.board_id,
-                Some(InterfaceIdOrCoord::Coord(wh.get_local_chip_coord())),
+                Some(InterfaceIdOrCoord::Coord(wh.get_local_chip_coord()?)),
             )
         } else {
             (
                 telem.board_id,
                 root_chip
-                    .get_device_info()
+                    .get_device_info()?
                     .map(|v| InterfaceIdOrCoord::Id(v.interface_id)),
             )
         };
@@ -54,7 +54,7 @@ pub fn detect_chips(mut root_chips: Vec<Chip>) -> Result<Vec<Chip>, PlatformErro
     for root_index in remotes_to_investigate {
         let root_chip = &root_chips[root_index];
 
-        let mut to_check = root_chip.get_neighbouring_chips();
+        let mut to_check = root_chip.get_neighbouring_chips()?;
 
         let mut seen_coords = HashSet::new();
         while let Some(nchip) = to_check.pop() {
@@ -65,7 +65,7 @@ pub fn detect_chips(mut root_chips: Vec<Chip>) -> Result<Vec<Chip>, PlatformErro
             if let Some(wh) = root_chip.as_wh() {
                 let wh = wh.open_remote(nchip.eth_addr)?;
 
-                let local_coord = wh.get_local_chip_coord();
+                let local_coord = wh.get_local_chip_coord()?;
 
                 if local_coord != nchip.eth_addr {
                     return Err(PlatformError::Generic(
@@ -84,7 +84,7 @@ pub fn detect_chips(mut root_chips: Vec<Chip>) -> Result<Vec<Chip>, PlatformErro
 
                 wh.init();
 
-                for nchip in wh.get_neighbouring_chips() {
+                for nchip in wh.get_neighbouring_chips()? {
                     if !seen_coords.contains(&nchip.eth_addr) {
                         continue;
                     }

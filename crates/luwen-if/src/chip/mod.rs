@@ -16,7 +16,7 @@ use luwen_core::Arch;
 pub use wormhole::Wormhole;
 
 use crate::{
-    arc_msg::{ArcMsg, ArcMsgAddr, ArcMsgError, ArcMsgOk},
+    arc_msg::{ArcMsg, ArcMsgAddr, ArcMsgOk},
     error::PlatformError,
     DeviceInfo,
 };
@@ -80,18 +80,18 @@ pub trait ChipImpl: HlComms + Send + Sync + 'static {
     fn get_telemetry(&self) -> Result<Telemetry, PlatformError>;
 
     /// Send an arc_msg to the underlying chip.
-    fn arc_msg(&self, msg: ArcMsgOptions) -> Result<ArcMsgOk, ArcMsgError>;
+    fn arc_msg(&self, msg: ArcMsgOptions) -> Result<ArcMsgOk, PlatformError>;
 
     /// Get a list of neighbouring chips.
     /// Will return an empty list for gs and up to four chips for wh.
-    fn get_neighbouring_chips(&self) -> Vec<NeighbouringChip>;
+    fn get_neighbouring_chips(&self) -> Result<Vec<NeighbouringChip>, PlatformError>;
 
     /// Convinence function to downcast to a concrete type.
     fn as_any(&self) -> &dyn std::any::Any;
 
     /// Get information about the underlying chip transport.
     /// This is a hack to get the physical id of the chip.
-    fn get_device_info(&self) -> Option<DeviceInfo>;
+    fn get_device_info(&self) -> Result<Option<DeviceInfo>, PlatformError>;
 }
 
 /// A wrapper around a chip that implements `ChipImpl`.
@@ -134,11 +134,11 @@ impl ChipImpl for Chip {
         self.inner.get_arch()
     }
 
-    fn arc_msg(&self, msg: ArcMsgOptions) -> Result<ArcMsgOk, ArcMsgError> {
+    fn arc_msg(&self, msg: ArcMsgOptions) -> Result<ArcMsgOk, PlatformError> {
         self.inner.arc_msg(msg)
     }
 
-    fn get_neighbouring_chips(&self) -> Vec<NeighbouringChip> {
+    fn get_neighbouring_chips(&self) -> Result<Vec<NeighbouringChip>, PlatformError> {
         self.inner.get_neighbouring_chips()
     }
 
@@ -150,7 +150,7 @@ impl ChipImpl for Chip {
         self.inner.get_telemetry()
     }
 
-    fn get_device_info(&self) -> Option<DeviceInfo> {
+    fn get_device_info(&self) -> Result<Option<DeviceInfo>, PlatformError> {
         self.inner.get_device_info()
     }
 }

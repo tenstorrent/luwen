@@ -21,7 +21,7 @@ pub fn get_local_chip_coord(
     cif: &dyn ChipInterface,
 ) -> Result<EthAddr, PlatformError> {
     let mut coord = [0; 4];
-    chip.noc_read(cif, 0, 9, 0, 0x1108, &mut coord);
+    chip.noc_read(cif, 0, 9, 0, 0x1108, &mut coord)?;
     let coord = u32::from_le_bytes(coord);
 
     Ok(EthAddr {

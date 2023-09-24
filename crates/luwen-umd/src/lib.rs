@@ -1,5 +1,6 @@
 use luwen_if::{
     chip::{ArcMsgOptions, Chip},
+    error::PlatformError,
     ArcMsg, ArcMsgError, ArcMsgProtocolError, CallbackStorage, ChipImpl, FnOptions,
 };
 
@@ -135,22 +136,25 @@ pub struct LuwenGlue {
 unsafe impl Send for LuwenGlue {}
 unsafe impl Sync for LuwenGlue {}
 
-pub fn callback_glue(glue_data: &LuwenGlue, options: FnOptions) {
+pub fn callback_glue(
+    glue_data: &LuwenGlue,
+    options: FnOptions,
+) -> Result<(), Box<dyn std::error::Error>> {
     match options {
         FnOptions::Driver(op) => match op {
             luwen_if::FnDriver::DeviceInfo(info) => {
                 let option = (glue_data.device_info)(glue_data.user_data);
-                unsafe {
+                Ok(unsafe {
                     *info = Some(option.into());
-                }
+                })
             }
         },
         FnOptions::Axi(op) => match op {
             luwen_if::FnAxi::Read { addr, data, len } => {
-                (glue_data.axi_read)(addr, data, len, glue_data.user_data);
+                Ok((glue_data.axi_read)(addr, data, len, glue_data.user_data))
             }
             luwen_if::FnAxi::Write { addr, data, len } => {
-                (glue_data.axi_write)(addr, data, len, glue_data.user_data);
+                Ok((glue_data.axi_write)(addr, data, len, glue_data.user_data))
             }
         },
         FnOptions::Noc(op) => match op {
@@ -161,9 +165,15 @@ pub fn callback_glue(glue_data: &LuwenGlue, options: FnOptions) {
                 addr,
                 data,
                 len,
-            } => {
-                (glue_data.noc_read)(noc_id, x, y, addr, data, len, glue_data.user_data);
-            }
+            } => Ok((glue_data.noc_read)(
+                noc_id,
+                x,
+                y,
+                addr,
+                data,
+                len,
+                glue_data.user_data,
+            )),
             luwen_if::FnNoc::Write {
                 noc_id,
                 x,
@@ -171,17 +181,27 @@ pub fn callback_glue(glue_data: &LuwenGlue, options: FnOptions) {
                 addr,
                 data,
                 len,
-            } => {
-                (glue_data.noc_write)(noc_id, x, y, addr, data, len, glue_data.user_data);
-            }
+            } => Ok((glue_data.noc_write)(
+                noc_id,
+                x,
+                y,
+                addr,
+                data,
+                len,
+                glue_data.user_data,
+            )),
             luwen_if::FnNoc::Broadcast {
                 noc_id,
                 addr,
                 data,
                 len,
-            } => {
-                (glue_data.noc_broadcast)(noc_id, addr, data, len, glue_data.user_data);
-            }
+            } => Ok((glue_data.noc_broadcast)(
+                noc_id,
+                addr,
+                data,
+                len,
+                glue_data.user_data,
+            )),
         },
         FnOptions::Eth(op) => match op.rw {
             luwen_if::FnNoc::Read {
@@ -191,23 +211,21 @@ pub fn callback_glue(glue_data: &LuwenGlue, options: FnOptions) {
                 addr,
                 data,
                 len,
-            } => {
-                (glue_data.eth_read)(
-                    EthAddr {
-                        shelf_x: op.addr.shelf_x,
-                        shelf_y: op.addr.shelf_y,
-                        rack_x: op.addr.rack_x,
-                        rack_y: op.addr.rack_y,
-                    },
-                    noc_id,
-                    x,
-                    y,
-                    addr,
-                    data,
-                    len,
-                    glue_data.user_data,
-                );
-            }
+            } => Ok((glue_data.eth_read)(
+                EthAddr {
+                    shelf_x: op.addr.shelf_x,
+                    shelf_y: op.addr.shelf_y,
+                    rack_x: op.addr.rack_x,
+                    rack_y: op.addr.rack_y,
+                },
+                noc_id,
+                x,
+                y,
+                addr,
+                data,
+                len,
+                glue_data.user_data,
+            )),
             luwen_if::FnNoc::Write {
                 noc_id,
                 x,
@@ -215,43 +233,39 @@ pub fn callback_glue(glue_data: &LuwenGlue, options: FnOptions) {
                 addr,
                 data,
                 len,
-            } => {
-                (glue_data.eth_write)(
-                    EthAddr {
-                        shelf_x: op.addr.shelf_x,
-                        shelf_y: op.addr.shelf_y,
-                        rack_x: op.addr.rack_x,
-                        rack_y: op.addr.rack_y,
-                    },
-                    noc_id,
-                    x,
-                    y,
-                    addr,
-                    data,
-                    len,
-                    glue_data.user_data,
-                );
-            }
+            } => Ok((glue_data.eth_write)(
+                EthAddr {
+                    shelf_x: op.addr.shelf_x,
+                    shelf_y: op.addr.shelf_y,
+                    rack_x: op.addr.rack_x,
+                    rack_y: op.addr.rack_y,
+                },
+                noc_id,
+                x,
+                y,
+                addr,
+                data,
+                len,
+                glue_data.user_data,
+            )),
             luwen_if::FnNoc::Broadcast {
                 noc_id,
                 addr,
                 data,
                 len,
-            } => {
-                (glue_data.eth_broadcast)(
-                    EthAddr {
-                        shelf_x: op.addr.shelf_x,
-                        shelf_y: op.addr.shelf_y,
-                        rack_x: op.addr.rack_x,
-                        rack_y: op.addr.rack_y,
-                    },
-                    noc_id,
-                    addr,
-                    data,
-                    len,
-                    glue_data.user_data,
-                );
-            }
+            } => Ok((glue_data.eth_broadcast)(
+                EthAddr {
+                    shelf_x: op.addr.shelf_x,
+                    shelf_y: op.addr.shelf_y,
+                    rack_x: op.addr.rack_x,
+                    rack_y: op.addr.rack_y,
+                },
+                noc_id,
+                addr,
+                data,
+                len,
+                glue_data.user_data,
+            )),
         },
     }
 }
@@ -355,10 +369,10 @@ pub extern "C" fn chip_arc_msg(
             luwen_if::ArcMsgOk::OkNoWait => CResult::ok(0),
         },
         Err(err) => {
-            if let ArcMsgError::ProtocolError {
+            if let PlatformError::ArcMsgError(ArcMsgError::ProtocolError {
                 source: ArcMsgProtocolError::MsgNotRecognized(arc),
                 ..
-            } = err
+            }) = err
             {
                 CResult::ok(arc as u32)
             } else {
