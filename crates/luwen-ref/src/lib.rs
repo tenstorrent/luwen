@@ -14,7 +14,7 @@ mod wormhole;
 use wormhole::ethernet::{self, EthCommCoord};
 
 pub use detect::detect_chips;
-pub use kmdif::PciDevice;
+pub use kmdif::{PciDevice, DmaConfig};
 
 #[derive(Clone)]
 pub struct ExtendedPciDeviceWrapper {
@@ -160,8 +160,8 @@ impl ExtendedPciDevice {
             inner: Arc::new(RwLock::new(ExtendedPciDevice {
                 device,
                 harvested_rows: 0,
-                grid_size_x: 0,
-                grid_size_y: 0,
+                grid_size_x: 10,
+                grid_size_y: 12,
                 eth_x: 4,
                 eth_y: 6,
                 command_q_addr: 0,
@@ -354,7 +354,7 @@ pub fn comms_callback_inner(
                         x_end: writer.grid_size_x - 1,
                         y_end: writer.grid_size_y - 1,
                         noc_sel: noc_id,
-                        mcast: false,
+                        mcast: true,
                         ..Default::default()
                     },
                 )?;

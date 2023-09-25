@@ -8,4 +8,4 @@ whl: .py03-env
 
 .PHONY: dev-whl
 dev-whl: .py03-env
-	. .py03-env/bin/activate && maturin develop
+	. .py03-env/bin/activate && maturin build

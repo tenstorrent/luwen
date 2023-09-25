@@ -50,8 +50,8 @@ pub struct DmaConfig {
 
     pub use_msi_for_dma: bool,
 
-    pub read_theshold: u32,
-    pub write_theshold: u32,
+    pub read_threshold: u32,
+    pub write_threshold: u32,
 }
 
 pub struct PhysicalDevice {

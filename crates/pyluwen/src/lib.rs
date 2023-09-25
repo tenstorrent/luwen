@@ -2,7 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use luwen_if::chip::{HlComms, HlCommsInterface};
 use luwen_if::{CallbackStorage, DeviceInfo};
-use luwen_ref::ExtendedPciDeviceWrapper;
+use luwen_ref::{ExtendedPciDeviceWrapper, DmaConfig};
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 
@@ -243,7 +243,9 @@ impl PciChip {
     }
 
     #[new]
-    pub fn new(pci_interface: usize) -> Self {
+    pub fn new(pci_interface: Option<usize>) -> Self {
+        let pci_interface = pci_interface.unwrap();
+
         let chip = luwen_ref::ExtendedPciDevice::open(pci_interface).unwrap();
 
         let arch = chip.borrow().device.arch;
@@ -273,6 +275,11 @@ impl PciChip {
     pub fn bar_size(&self) -> PyResult<u64> {
         let info = self.device_info()?;
         Ok(info.bar_size)
+    }
+
+    pub fn get_pci_bdf(&self) -> PyResult<String> {
+        let info = self.device_info()?;
+        Ok(format!("{:02x}:{:02x}.{:x}", info.bus, info.slot, info.function))
     }
 }
 
@@ -391,6 +398,38 @@ impl PciInterface<'_> {
             .noc_write(tlb_index, addr, data)
             .unwrap();
     }
+
+    pub fn allocate_dma_buffer(&self, size: u32) -> Result<(u64, u64), String> {
+        let buffer = self
+            .pci_interface
+            .borrow_mut()
+            .device
+            .allocate_dma_buffer(size)
+            .map_err(|v| v.to_string())?;
+        Ok((buffer.buffer.as_ptr() as u64, buffer.physical_address))
+    }
+
+    pub fn config_dma(&self, csm_pcie_ctrl_dma_request_offset: u32, arc_misc_cntl_addr: u32, msi: bool, read_threshold: u32, write_threshold: u32) -> Result<(), String> {
+        let borrow: &mut _ = &mut self.pci_interface.borrow_mut();
+        borrow.device.dma_config = Some(DmaConfig {
+            csm_pcie_ctrl_dma_request_offset,
+            arc_misc_cntl_addr,
+            dma_host_phys_addr_high: 0,
+            support_64_bit_dma: false,
+            use_msi_for_dma: msi,
+            read_threshold,
+            write_threshold,
+        });
+
+        Ok(())
+    }
+
+    pub fn dma_transfer_turbo(&self, addr: u32, physical_address: u64, size: u32, write: bool) -> Result<(), String> {
+        let borrow: &mut _ = &mut self.pci_interface.borrow_mut();
+        borrow.device
+            .pcie_dma_transfer_turbo(addr, physical_address, size, write)
+            .map_err(|v| v.to_string())
+    }
 }
 
 #[pymethods]
@@ -446,6 +485,48 @@ impl PciWormhole {
         if let Some(value) = value {
             value.pci_interface.borrow_mut().default_tlb = index;
             Ok(())
+        } else {
+            return Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ));
+        }
+    }
+
+    pub fn allocate_dma_buffer(&self, size: u32) -> PyResult<(u64, u64)> {
+        let value = PciInterface::from_wh(self);
+
+        if let Some(value) = value {
+            Ok(value.allocate_dma_buffer(size).map_err(|v| {
+                PyException::new_err(format!("Could not allocate DMA buffer: {}", v))
+            })?)
+        } else {
+            return Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ));
+        }
+    }
+
+    pub fn config_dma(&self, csm_pcie_ctrl_dma_request_offset: u32, arc_misc_cntl_addr: u32, msi: bool, read_threshold: u32, write_threshold: u32) -> PyResult<()> {
+        let value = PciInterface::from_wh(self);
+
+        if let Some(value) = value {
+            Ok(value.config_dma(csm_pcie_ctrl_dma_request_offset, arc_misc_cntl_addr, msi, read_threshold, write_threshold).map_err(|v| {
+                PyException::new_err(format!("Could perform dma config: {}", v))
+            })?)
+        } else {
+            return Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ));
+        }
+    }
+
+    pub fn dma_transfer_turbo(&self, addr: u32, physical_dma_buffer: u64, size: u32, write: bool) -> PyResult<()> {
+        let value = PciInterface::from_wh(self);
+
+        if let Some(value) = value {
+            Ok(value.dma_transfer_turbo(addr, physical_dma_buffer, size, write).map_err(|v| {
+                PyException::new_err(format!("Could perform dma transfer: {}", v))
+            })?)
         } else {
             return Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",

@@ -164,12 +164,11 @@ impl PciDevice {
 impl PciDevice {
     // HACK(drosen): Yes user data should be a mut slice,
     // but I don't really want to refactor the code righ now to make that possible
-    fn pcie_dma_transfer_turbo(
+    pub fn pcie_dma_transfer_turbo(
         &mut self,
-        user_data: *const u8,
-        chunk_size: usize,
         chip_addr: u32,
-        host_addr: u64,
+        host_buffer_addr: u64,
+        size: u32,
         write: bool,
     ) -> Result<(), PciError> {
         if self.dma_config.is_none() {
@@ -178,28 +177,25 @@ impl PciDevice {
 
         let dma_config = unsafe { self.dma_config.as_ref().unwrap_unchecked().clone() };
 
-        // Yay this is very bad
-        let user_data = unsafe { std::slice::from_raw_parts(user_data, chunk_size) };
-
-        let host_phys_addr_hi = (host_addr >> 32) as u32;
+        let host_phys_addr_hi = (host_buffer_addr >> 32) as u32;
 
         if host_phys_addr_hi != 0 && !dma_config.support_64_bit_dma {
             return Err(PciError::No64bitDma { id: self.id });
         }
 
-        if user_data.len() > (1 << 28) - 1 {
+        if size > (1 << 28) - 1 {
             return Err(PciError::DmaTooLarge {
                 id: self.id,
-                size: user_data.len(),
+                size: size as usize,
             });
         }
 
         let req = kmdif::ArcPcieCtrlDmaRequest {
             chip_addr,
-            host_phys_addr_lo: (host_addr & 0xffffffff) as u32,
+            host_phys_addr_lo: (host_buffer_addr & 0xffffffff) as u32,
             completion_flag_phys_addr: self.completion_flag_buffer.physical_address as u32,
             dma_pack: kmdif::DmaPack::new()
-                .with_size_bytes(user_data.len() as u32)
+                .with_size_bytes(size)
                 .with_write(write)
                 .with_pcie_msi_on_done(dma_config.use_msi_for_dma)
                 .with_pcie_write_on_done(!dma_config.use_msi_for_dma)
@@ -252,7 +248,7 @@ impl PciDevice {
 
     pub fn write_block(&mut self, addr: u32, data: &[u8]) -> Result<(), PciError> {
         if let Some(dma_config) = self.dma_config.clone() {
-            if data.len() > dma_config.write_theshold as usize && dma_config.write_theshold > 0 {
+            if data.len() > dma_config.write_threshold as usize && dma_config.write_threshold > 0 {
                 let mut num_bytes = data.len();
                 let mut offset = 0;
                 while num_bytes > 0 {
@@ -264,10 +260,9 @@ impl PciDevice {
                     let buffer = &self.transfer_buffer;
                     let buffer_addr = buffer.buffer.as_ptr();
                     self.pcie_dma_transfer_turbo(
-                        buffer_addr,
-                        chunk_size,
                         addr + offset as u32,
                         buffer.physical_address,
+                        chunk_size as u32,
                         true,
                     )?;
                     num_bytes = num_bytes.saturating_sub(chunk_size);
@@ -285,7 +280,7 @@ impl PciDevice {
 
     pub fn read_block(&mut self, addr: u32, data: &mut [u8]) -> Result<(), PciError> {
         if let Some(dma_config) = self.dma_config.clone() {
-            if data.len() > dma_config.read_theshold as usize && dma_config.read_theshold > 0 {
+            if data.len() > dma_config.read_threshold as usize && dma_config.read_threshold > 0 {
                 let mut num_bytes = data.len();
                 let mut offset = 0;
                 while num_bytes > 0 {
@@ -295,10 +290,9 @@ impl PciDevice {
                     let buffer_addr = buffer.buffer.as_ptr();
 
                     self.pcie_dma_transfer_turbo(
-                        buffer_addr,
-                        chunk_size,
                         addr + offset as u32,
                         buffer.physical_address,
+                        chunk_size as u32,
                         false,
                     )?;
 
