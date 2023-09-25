@@ -52,8 +52,9 @@ pub fn main() -> Result<(), LuwenError> {
     let chips = luwen_ref::detect_chips()?;
 
     for (chip_index, chip) in chips.into_iter().enumerate() {
-        let size = 1000 * 10_000 * 100;
-        // let size = 1 << 19;
+        println!("Running on {chip_index}");
+        // let size = 1000 * 10_000 * 100;
+        let size = 1 << 19;
         // let size = 1000;
         let (write_time, read_time) = if let Some(wh) = chip.as_wh() {
             read_write_test(wh, 0, 0, size).unwrap()

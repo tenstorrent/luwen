@@ -67,6 +67,8 @@ pub trait ChipInterface: 'static {
         addr: u64,
         data: &[u8],
     ) -> Result<(), Box<dyn std::error::Error>>;
+
+    fn as_any(&self) -> &dyn std::any::Any;
 }
 
 impl ChipInterface for Arc<dyn ChipInterface + Send + Sync> {
@@ -148,5 +150,9 @@ impl ChipInterface for Arc<dyn ChipInterface + Send + Sync> {
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.as_ref()
             .eth_noc_broadcast(eth_addr, noc_id, addr, data)
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self.as_ref().as_any()
     }
 }

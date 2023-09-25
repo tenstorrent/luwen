@@ -404,9 +404,8 @@ impl PciWormhole {
     ) -> PyResult<RemoteWormhole> {
         Ok(RemoteWormhole(
             self.0
-                .open_remote((rack_x, rack_y, shelf_x, shelf_y)).map_err(|v| {
-                    PyException::new_err(format!("Could not open remote: {}", v))
-                })?,
+                .open_remote((rack_x, rack_y, shelf_x, shelf_y))
+                .map_err(|v| PyException::new_err(format!("Could not open remote: {}", v)))?,
         ))
     }
 

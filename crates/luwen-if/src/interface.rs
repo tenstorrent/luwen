@@ -253,4 +253,8 @@ impl<T: Clone + Send + 'static> ChipInterface for CallbackStorage<T> {
             }),
         )
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }

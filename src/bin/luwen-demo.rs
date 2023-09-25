@@ -2,10 +2,28 @@ use luwen_if::{
     chip::{ArcMsgOptions, Chip},
     detect_chips, ArcMsg, CallbackStorage, ChipImpl,
 };
-use luwen_ref::{comms_callback, error::LuwenError, ExtendedPciDevice, PciDevice};
+use luwen_ref::{
+    comms_callback, error::LuwenError, ExtendedPciDevice, ExtendedPciDeviceWrapper, PciDevice,
+};
 
 pub fn main() -> Result<(), LuwenError> {
     let mut chips = Vec::new();
+
+    let device_ids = PciDevice::scan();
+    for device_id in device_ids {
+        let ud = ExtendedPciDevice::open(device_id)?;
+        let arch = ud.borrow().device.arch;
+
+        let chip = Chip::open(arch, CallbackStorage::new(comms_callback, ud));
+
+        if let Some(wh) = chip.as_wh() {
+            let hi = wh
+                .chip_if
+                .as_any()
+                .downcast_ref::<CallbackStorage<ExtendedPciDeviceWrapper>>()
+                .unwrap();
+        }
+    }
 
     let device_ids = PciDevice::scan();
     for device_id in device_ids {

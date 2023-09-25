@@ -98,7 +98,7 @@ impl Wormhole {
     }
 
     pub fn get_if<T: ChipInterface>(&self) -> Option<&T> {
-        (&self.chip_if as &dyn std::any::Any).downcast_ref::<T>()
+        self.chip_if.as_any().downcast_ref::<T>()
     }
 
     pub fn open_remote(&self, addr: impl IntoChip<EthAddr>) -> Result<Wormhole, PlatformError> {
