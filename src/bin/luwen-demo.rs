@@ -1,9 +1,10 @@
 use luwen_if::{
-    chip::{ArcMsgOptions, Chip},
+    chip::{ArcMsgOptions, Chip, HlComms, HlCommsInterface},
     detect_chips, ArcMsg, CallbackStorage, ChipImpl,
 };
 use luwen_ref::{
-    comms_callback, error::LuwenError, ExtendedPciDevice, ExtendedPciDeviceWrapper, PciDevice,
+    comms_callback, error::LuwenError, DmaConfig, ExtendedPciDevice, ExtendedPciDeviceWrapper,
+    PciDevice, Tlb,
 };
 
 pub fn main() -> Result<(), LuwenError> {
@@ -17,11 +18,78 @@ pub fn main() -> Result<(), LuwenError> {
         let chip = Chip::open(arch, CallbackStorage::new(comms_callback, ud));
 
         if let Some(wh) = chip.as_wh() {
-            let hi = wh
+            let mut hi = wh
                 .chip_if
                 .as_any()
                 .downcast_ref::<CallbackStorage<ExtendedPciDeviceWrapper>>()
                 .unwrap();
+
+            let turbo_data = {
+                let pci_interface: &mut ExtendedPciDevice = &mut hi.user_data.borrow_mut();
+                let mut buffer = pci_interface.device.allocate_dma_buffer(0x1000)?;
+
+                let dma_request = wh.axi_translate("ARC_CSM.ARC_PCIE_DMA_REQUEST")?;
+                let arc_misc_cntl = wh.axi_translate("ARC_RESET.ARC_MISC_CNTL")?;
+
+                pci_interface.device.dma_config = Some(DmaConfig {
+                    csm_pcie_ctrl_dma_request_offset: dma_request.addr as u32,
+                    arc_misc_cntl_addr: arc_misc_cntl.addr as u32,
+                    dma_host_phys_addr_high: 0,
+                    support_64_bit_dma: false,
+                    use_msi_for_dma: false,
+                    read_threshold: 0,
+                    write_threshold: 0,
+                });
+
+                let (offset, size) = pci_interface.setup_tlb(
+                    168,
+                    Tlb {
+                        local_offset: 0x0,
+                        x_end: 1,
+                        y_end: 1,
+                        ..Default::default()
+                    },
+                )?;
+
+                let mut index = 0;
+                buffer.buffer.fill_with(|| {
+                    index += 1;
+                    index as u8
+                });
+
+                pci_interface.device.pcie_dma_transfer_turbo(
+                    offset as u32,
+                    buffer.physical_address,
+                    0x1000,
+                    true,
+                )?;
+
+                buffer.buffer.fill(0);
+
+                pci_interface.device.pcie_dma_transfer_turbo(
+                    offset as u32,
+                    buffer.physical_address,
+                    0x1000,
+                    false,
+                )?;
+
+                buffer.buffer.iter().copied().collect::<Vec<_>>()
+            };
+
+            let mut data = [0; 0x1000];
+            wh.noc_read(0, 1, 1, 0x0, &mut data).unwrap();
+
+            for i in 0..0x1000 {
+                if data[i] != (i + 1) as u8 {
+                    panic!("Mismatch at index {}", i);
+                }
+            }
+
+            for i in 0..0x1000 {
+                if turbo_data[i] != (i + 1) as u8 {
+                    panic!("Mismatch at index {}", i);
+                }
+            }
         }
     }
 

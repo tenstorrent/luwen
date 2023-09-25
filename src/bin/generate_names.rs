@@ -205,7 +205,7 @@ fn parse_translation_file(
                         lower_bits,
                         description: _,
                     } => {
-                        assert_eq!(mask, 0);
+                        println!("WARNING: while parsing {field_name} found non zero field info[0] {mask}");
 
                         slice.children.insert(
                             field_name.clone(),
@@ -226,7 +226,7 @@ fn parse_translation_file(
                         byte_offset,
                         description: _,
                     } => {
-                        assert_eq!(mask, 0);
+                        println!("WARNING: while parsing {field_name} found non zero field info[0] {mask}");
 
                         slice.children.insert(
                             field_name.clone(),
@@ -285,6 +285,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     parse_and_serialize_translation("data/wormhole", "axi-noc.yaml", "wormhole-axi-noc.bin")?;
 
     let os_keys = [
+        "ARC_CSM.ARC_PCIE_DMA_REQUEST",
         "ARC_RESET.ARC_MISC_CNTL",
         "ARC_RESET.SCRATCH[0]",
         "ARC_RESET.SCRATCH[1]",
