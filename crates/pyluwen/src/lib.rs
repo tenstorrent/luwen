@@ -58,6 +58,20 @@ impl DerefMut for PciGrayskull {
 }
 
 #[pyclass]
+pub struct DmaBuffer(luwen_ref::DmaBuffer);
+
+#[pymethods]
+impl DmaBuffer {
+    pub fn get_user_address(&self) -> u64 {
+        self.0.buffer.as_ptr() as u64
+    }
+
+    pub fn get_physical_address(&self) -> u64 {
+        self.0.physical_address
+    }
+}
+
+#[pyclass]
 pub struct AxiData {
     #[pyo3(get)]
     addr: u64,
@@ -399,14 +413,14 @@ impl PciInterface<'_> {
             .unwrap();
     }
 
-    pub fn allocate_dma_buffer(&self, size: u32) -> Result<(u64, u64), String> {
+    pub fn allocate_dma_buffer(&self, size: u32) -> Result<DmaBuffer, String> {
         let buffer = self
             .pci_interface
             .borrow_mut()
             .device
             .allocate_dma_buffer(size)
             .map_err(|v| v.to_string())?;
-        Ok((buffer.buffer.as_ptr() as u64, buffer.physical_address))
+        Ok(DmaBuffer(buffer))
     }
 
     pub fn config_dma(&self, csm_pcie_ctrl_dma_request_offset: u32, arc_misc_cntl_addr: u32, msi: bool, read_threshold: u32, write_threshold: u32) -> Result<(), String> {
@@ -492,7 +506,7 @@ impl PciWormhole {
         }
     }
 
-    pub fn allocate_dma_buffer(&self, size: u32) -> PyResult<(u64, u64)> {
+    pub fn allocate_dma_buffer(&self, size: u32) -> PyResult<DmaBuffer> {
         let value = PciInterface::from_wh(self);
 
         if let Some(value) = value {
@@ -557,6 +571,7 @@ fn pyluwen(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PciWormhole>()?;
     m.add_class::<RemoteWormhole>()?;
     m.add_class::<PciGrayskull>()?;
+    m.add_class::<DmaBuffer>()?;
     m.add_class::<AxiData>()?;
 
     m.add_wrapped(wrap_pyfunction!(detect_chips))?;

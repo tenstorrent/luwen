@@ -4,7 +4,7 @@ use std::{
 };
 
 use error::LuwenError;
-use kmdif::{DmaBuffer, PciError, Tlb};
+use kmdif::{PciError, Tlb};
 use luwen_if::{FnDriver, FnOptions};
 
 mod detect;
@@ -14,7 +14,7 @@ mod wormhole;
 use wormhole::ethernet::{self, EthCommCoord};
 
 pub use detect::detect_chips;
-pub use kmdif::{PciDevice, DmaConfig};
+pub use kmdif::{PciDevice, DmaConfig, DmaBuffer};
 
 #[derive(Clone)]
 pub struct ExtendedPciDeviceWrapper {
