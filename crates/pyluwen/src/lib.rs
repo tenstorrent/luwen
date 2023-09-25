@@ -267,7 +267,7 @@ impl PciChip {
 
     pub fn device_id(&self) -> PyResult<u32> {
         let info = self.device_info()?;
-        Ok(((info.vendor as u32) << 16) | info.slot as u32)
+        Ok(((info.vendor as u32) << 16) | info.device_id as u32)
     }
 
     pub fn bar_size(&self) -> PyResult<u64> {
@@ -401,12 +401,13 @@ impl PciWormhole {
         rack_y: Option<u8>,
         shelf_x: Option<u8>,
         shelf_y: Option<u8>,
-    ) -> RemoteWormhole {
-        RemoteWormhole(
+    ) -> PyResult<RemoteWormhole> {
+        Ok(RemoteWormhole(
             self.0
-                .open_remote((rack_x, rack_y, shelf_x, shelf_y))
-                .unwrap(),
-        )
+                .open_remote((rack_x, rack_y, shelf_x, shelf_y)).map_err(|v| {
+                    PyException::new_err(format!("Could not open remote: {}", v))
+                })?,
+        ))
     }
 
     pub fn setup_tlb(
