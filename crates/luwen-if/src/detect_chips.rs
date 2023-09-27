@@ -28,17 +28,19 @@ pub fn detect_chips(mut root_chips: Vec<Chip>) -> Result<Vec<Chip>, PlatformErro
     for (root_index, root_chip) in root_chips.iter().enumerate() {
         root_chip.init();
 
-        let telem = root_chip.get_telemetry()?;
-
         let ident = if let Some(wh) = root_chip.as_wh() {
+            let telem = root_chip.get_telemetry()?;
             remotes_to_investigate.push(root_index);
             (
-                telem.board_id,
+                Some(telem.board_id),
                 Some(InterfaceIdOrCoord::Coord(wh.get_local_chip_coord()?)),
             )
         } else {
             (
-                telem.board_id,
+                // Can't fetch board id from old gs chips
+                // this shouldn't matter anyway because we can only access them
+                // via pci
+                None,
                 root_chip
                     .get_device_info()?
                     .map(|v| InterfaceIdOrCoord::Id(v.interface_id)),
@@ -76,7 +78,10 @@ pub fn detect_chips(mut root_chips: Vec<Chip>) -> Result<Vec<Chip>, PlatformErro
 
                 let telem = wh.get_telemetry()?;
 
-                let ident = (telem.board_id, Some(InterfaceIdOrCoord::Coord(local_coord)));
+                let ident = (
+                    Some(telem.board_id),
+                    Some(InterfaceIdOrCoord::Coord(local_coord)),
+                );
 
                 if !seen_chips.insert(ident) {
                     continue;
