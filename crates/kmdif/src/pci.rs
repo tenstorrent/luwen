@@ -258,7 +258,6 @@ impl PciDevice {
                         .copy_from_slice(&data[offset..(offset + chunk_size)]);
 
                     let buffer = &self.transfer_buffer;
-                    let buffer_addr = buffer.buffer.as_ptr();
                     self.pcie_dma_transfer_turbo(
                         addr + offset as u32,
                         buffer.physical_address,
@@ -287,7 +286,6 @@ impl PciDevice {
                     let buffer = &self.transfer_buffer;
 
                     let chunk_size = num_bytes.min(buffer.size as usize);
-                    let buffer_addr = buffer.buffer.as_ptr();
 
                     self.pcie_dma_transfer_turbo(
                         addr + offset as u32,

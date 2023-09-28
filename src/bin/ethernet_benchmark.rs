@@ -1,4 +1,4 @@
-use luwen_if::{chip::HlComms, ChipImpl};
+use luwen_if::{chip::HlComms, CallbackStorage, ChipImpl};
 use luwen_ref::error::LuwenError;
 use rand::Rng;
 
@@ -53,7 +53,7 @@ pub fn main() -> Result<(), LuwenError> {
 
     for (chip_index, chip) in chips.into_iter().enumerate() {
         println!("Running on {chip_index}");
-        // let size = 1000 * 10_000 * 100;
+        // let size = 1 << 31;
         let size = 1 << 19;
         // let size = 1000;
         let (write_time, read_time) = if let Some(wh) = chip.as_wh() {
