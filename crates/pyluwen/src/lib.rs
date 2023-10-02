@@ -423,13 +423,13 @@ impl PciInterface<'_> {
         Ok(DmaBuffer(buffer))
     }
 
-    pub fn config_dma(&self, csm_pcie_ctrl_dma_request_offset: u32, arc_misc_cntl_addr: u32, msi: bool, read_threshold: u32, write_threshold: u32) -> Result<(), String> {
+    pub fn config_dma(&self, dma_64_bit_addr: Option<u32>, csm_pcie_ctrl_dma_request_offset: u32, arc_misc_cntl_addr: u32, msi: bool, read_threshold: u32, write_threshold: u32) -> Result<(), String> {
         let borrow: &mut _ = &mut self.pci_interface.borrow_mut();
         borrow.device.dma_config = Some(DmaConfig {
             csm_pcie_ctrl_dma_request_offset,
             arc_misc_cntl_addr,
-            dma_host_phys_addr_high: 0,
-            support_64_bit_dma: false,
+            dma_host_phys_addr_high: dma_64_bit_addr.unwrap_or(0),
+            support_64_bit_dma: dma_64_bit_addr.is_some(),
             use_msi_for_dma: msi,
             read_threshold,
             write_threshold,
@@ -520,11 +520,11 @@ impl PciWormhole {
         }
     }
 
-    pub fn config_dma(&self, csm_pcie_ctrl_dma_request_offset: u32, arc_misc_cntl_addr: u32, msi: bool, read_threshold: u32, write_threshold: u32) -> PyResult<()> {
+    pub fn config_dma(&self, dma_64_bit_addr: Option<u32>, csm_pcie_ctrl_dma_request_offset: u32, arc_misc_cntl_addr: u32, msi: bool, read_threshold: u32, write_threshold: u32) -> PyResult<()> {
         let value = PciInterface::from_wh(self);
 
         if let Some(value) = value {
-            Ok(value.config_dma(csm_pcie_ctrl_dma_request_offset, arc_misc_cntl_addr, msi, read_threshold, write_threshold).map_err(|v| {
+            Ok(value.config_dma(dma_64_bit_addr, csm_pcie_ctrl_dma_request_offset, arc_misc_cntl_addr, msi, read_threshold, write_threshold).map_err(|v| {
                 PyException::new_err(format!("Could perform dma config: {}", v))
             })?)
         } else {
