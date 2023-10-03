@@ -1,0 +1,18 @@
+[package]
+name = "luwencpp"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "C++ bindings for luwen"
+authors = ["Luwen Team <drosen@tenstorrent.com>"]
+
+[lib]
+# crate-type = ["staticlib"]
+crate-type = ["cdylib"]
+
+[dependencies]
+luwen-core = {path = "../luwen-core"}
+luwen-if = {path = "../luwen-if"}
+
+[build-dependencies]
+cbindgen = "0.25.0"

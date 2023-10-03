@@ -520,6 +520,7 @@ impl PciWormhole {
         }
     }
 
+    #[pyo3(signature = (dma_64_bit_addr, csm_pcie_ctrl_dma_request_offset, arc_misc_cntl_addr, msi, read_threshold, write_threshold))]
     pub fn config_dma(&self, dma_64_bit_addr: Option<u32>, csm_pcie_ctrl_dma_request_offset: u32, arc_misc_cntl_addr: u32, msi: bool, read_threshold: u32, write_threshold: u32) -> PyResult<()> {
         let value = PciInterface::from_wh(self);
 
