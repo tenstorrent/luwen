@@ -234,7 +234,7 @@ impl PciDevice {
             loop {
                 // The complete flag is set ty by ARC (see src/hardware/soc/tb/arc_fw/lib/pcie_dma.c)
                 unsafe {
-                    if *complete_flag == 0xfaca {
+                    if complete_flag.read_volatile() == 0xfaca {
                         break;
                     }
                 }

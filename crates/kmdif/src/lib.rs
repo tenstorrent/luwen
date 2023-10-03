@@ -355,12 +355,12 @@ impl PciDevice {
 
             device_fd: fd,
 
-            bar0_uc: bar0_uc,
-            bar0_uc_size: bar0_uc_size,
-            bar0_uc_offset: bar0_uc_offset,
+            bar0_uc,
+            bar0_uc_size,
+            bar0_uc_offset,
 
-            bar0_wc: bar0_wc,
-            bar0_wc_size: bar0_wc_size,
+            bar0_wc,
+            bar0_wc_size,
 
             config_space,
 
@@ -378,7 +378,7 @@ impl PciDevice {
                 buffer: memmap2::MmapMut::map_anon(0).map_err(|err| {
                     PciOpenError::FakeMmapFailed {
                         buffer: "completion_flag".to_string(),
-                        device_id: device_id,
+                        device_id,
                         source: err,
                     }
                 })?,
@@ -389,7 +389,7 @@ impl PciDevice {
                 buffer: memmap2::MmapMut::map_anon(0).map_err(|err| {
                     PciOpenError::FakeMmapFailed {
                         buffer: "transfer".to_string(),
-                        device_id: device_id,
+                        device_id,
                         source: err,
                     }
                 })?,
