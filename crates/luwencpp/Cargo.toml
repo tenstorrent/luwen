@@ -6,6 +6,12 @@ license = "Apache-2.0"
 description = "C++ bindings for luwen"
 authors = ["Luwen Team <drosen@tenstorrent.com>"]
 
+[package.metadata.deb]
+assets = [
+    ["target/release/luwen.h", "/usr/include/luwen.h", "644"],
+    ["target/release/libluwencpp.so", "/usr/lib/", "644"],
+]
+
 [lib]
 # crate-type = ["staticlib"]
 crate-type = ["cdylib"]
