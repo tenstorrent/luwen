@@ -19,23 +19,21 @@ stages:
   - test
   - deploy
 
-rust-latest:
+build:latest:
   stage: build
   image: rust:latest
   tags:
     - 8-core
   script:
     - cargo build --verbose
-    - cargo test --verbose
 
-rust-nightly:
+build:nightly:
   stage: build
   image: rustlang/rust:nightly
   tags:
     - 8-core
   script:
     - cargo build --verbose
-    - cargo test --verbose
   allow_failure: true
 
 # Use cargo to test the project
