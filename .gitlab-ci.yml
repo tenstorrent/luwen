@@ -1,0 +1,61 @@
+image: rust:latest
+
+# Optional: Pick zero or more services to be used on all builds.
+# Only needed when using a docker container to run your tests in.
+# Check out: https://docs.gitlab.com/ee/ci/services/index.html
+# services:
+#   - mysql:latest
+#   - redis:latest
+#   - postgres:latest
+
+# Optional: Install a C compiler, cmake and git into the container.
+# You will often need this when you (or any of your dependencies) depends on C code.
+# before_script:
+#   - apt-get update -yqq
+#   - apt-get install -yqq --no-install-recommends build-essential
+
+stages:
+  - build
+  - test
+  - deploy
+
+rust-latest:
+  stage: build
+  image: rust:latest
+  script:
+    - cargo build --verbose
+    - cargo test --verbose
+
+rust-nightly:
+  stage: build
+  image: rustlang/rust:nightly
+  script:
+    - cargo build --verbose
+    - cargo test --verbose
+  allow_failure: true
+
+# Use cargo to test the project
+test:cargo:
+  script:
+    - rustc --version && cargo --version  # Print version info for debugging
+    - cargo test --workspace --verbose
+
+# Optional: Use a third party library to generate gitlab junit reports
+# test:junit-report:
+#   script:
+#     Should be specified in Cargo.toml
+#     - cargo install junitify
+#     - cargo test -- --format=json -Z unstable-options --report-time | junitify --out $CI_PROJECT_DIR/tests/
+#   artifacts:
+#     when: always
+#     reports:
+#       junit: $CI_PROJECT_DIR/tests/*.xml
+
+deploy:
+  stage: deploy
+  before_script:
+    - sudo apt install dpkg dpkg-dev
+    - cargo install --locked cargo-deb
+  script:
+    - make deb
+  environment: production
