@@ -22,6 +22,8 @@ stages:
 rust-latest:
   stage: build
   image: rust:latest
+  tags:
+    - 8-core
   script:
     - cargo build --verbose
     - cargo test --verbose
@@ -29,6 +31,8 @@ rust-latest:
 rust-nightly:
   stage: build
   image: rustlang/rust:nightly
+  tags:
+    - 8-core
   script:
     - cargo build --verbose
     - cargo test --verbose
@@ -36,6 +40,9 @@ rust-nightly:
 
 # Use cargo to test the project
 test:cargo:
+  tags:
+    - 8-core
+    - 4-core
   script:
     - rustc --version && cargo --version  # Print version info for debugging
     - cargo test --workspace --verbose
@@ -52,6 +59,9 @@ test:cargo:
 #       junit: $CI_PROJECT_DIR/tests/*.xml
 
 deploy:
+  tags:
+    - 8-core
+    - 4-core
   stage: deploy
   before_script:
     - sudo apt install dpkg dpkg-dev
