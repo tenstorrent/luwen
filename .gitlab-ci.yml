@@ -77,16 +77,23 @@ build:nightly:
   allow_failure: true
 
 # Use cargo to test the project
-test:cargo:
+.cargo_test_setup:
   extends: .build-base
   stage: test
   needs: ["build:stable:release"]
-  tags:
-    - 8-core
-    - 4-core
   script:
     - rustc --version && cargo --version  # Print version info for debugging
     - cargo test --workspace --target $TARGET $([[ $PROFILE == "release" ]] && echo "--release" || echo "") $CARGO_OPTS
+
+test:cargo:gs:
+  extends: .cargo_test_setup
+  tags:
+    - gs-1-card
+
+test:cargo:wh:
+  extends: .cargo_test_setup
+  tags:
+    - wh-nebula_x2-card
 
 # Optional: Use a third party library to generate gitlab junit reports
 # test:junit-report:
@@ -102,7 +109,6 @@ test:cargo:
 deploy:
   tags:
     - 8-core
-    - 4-core
   stage: deploy
   before_script:
     - cargo install --locked cargo-deb
