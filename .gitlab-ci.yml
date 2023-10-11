@@ -43,7 +43,7 @@ variables:
 
 .build-base:
   stage: build
-  image: rust:latest
+  image: $CI_REGISTRY/syseng-platform/luwen/rust-ci-build:latest
   tags:
     - 8-core
   timeout: 1h
@@ -67,7 +67,6 @@ build:stable:release:
 build:stable:debug:
   extends: .build-base
   variables:
-    CHANNEL: nightly
     PROFILE: debug
 
 build:nightly:
