@@ -52,6 +52,8 @@ variables:
     PROFILE: release
     TARGET: x86_64-unknown-linux-gnu
     CARGO_OPTS: "--verbose"
+  before_script:
+    - rustup target add x86_64-unknown-linux-gnu
   script:
     - rustc --version && cargo --version  # Print version info for debugging
     - cargo build --target $TARGET $([[ $PROFILE == "release" ]] && echo "--release" || echo "") $CARGO_OPTS
