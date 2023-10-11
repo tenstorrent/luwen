@@ -19,32 +19,75 @@ stages:
   - test
   - deploy
 
-build:latest:
+# build:
+#   stage: build
+#   image: rust:latest
+#   tags:
+#     - 8-core
+#   timeout: 1h
+#   parallel:
+#     matrix:
+#       - CHANNEL: [stable, beta, nightly]
+#         PROFILE: [release]
+#         TARGET: [x86_64-unknown-linux-gnu]
+#         CARGO_OPTS: [ "--verbose" ]
+
+#   script:
+#     - cargo build --target $TARGET $([[ $PROFILE == "release" ]] && echo "--release" || echo "") $CARGO_OPTS
+#   artifacts:
+#     paths:
+#       - target/$TARGET/$PROFILE/*
+
+variables:
+  RUST_BACKTRACE: 1
+
+.build-base:
   stage: build
   image: rust:latest
   tags:
     - 8-core
+  timeout: 1h
+  variables:
+    CHANNEL: stable
+    PROFILE: release
+    TARGET: x86_64-unknown-linux-gnu
+    CARGO_OPTS: "--verbose"
   script:
-    - chmod +x /usr/local/rustup/toolchains/1.73.0-x86_64-unknown-linux-gnu/bin/rustc
-    - cargo build --verbose
+    - rustc --version && cargo --version  # Print version info for debugging
+    - cargo build --target $TARGET $([[ $PROFILE == "release" ]] && echo "--release" || echo "") $CARGO_OPTS
+  artifacts:
+    paths:
+      - target/$TARGET/$PROFILE/*
+
+build:stable:
+  extends: .build-base
+  variables:
+    CHANNEL: stable
+
+build:stable:debug:
+  extends: .build-base
+  variables:
+    CHANNEL: nightly
+    PROFILE: debug
+  allow_failure: true
 
 build:nightly:
-  stage: build
-  image: rustlang/rust:nightly
-  tags:
-    - 8-core
-  script:
-    - cargo build --verbose
+  extends: .build-base
+  image: rust:nightly
+  variables:
+    CHANNEL: nightly
   allow_failure: true
 
 # Use cargo to test the project
 test:cargo:
+  extends: .build-base
+  stage: test
   tags:
     - 8-core
     - 4-core
   script:
     - rustc --version && cargo --version  # Print version info for debugging
-    - cargo test --workspace --verbose
+    - cargo test --workspace --target $TARGET $([[ $PROFILE == "release" ]] && echo "--release" || echo "") $CARGO_OPTS
 
 # Optional: Use a third party library to generate gitlab junit reports
 # test:junit-report:
