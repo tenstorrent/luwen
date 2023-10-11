@@ -69,7 +69,6 @@ build:stable:debug:
   variables:
     CHANNEL: nightly
     PROFILE: debug
-  allow_failure: true
 
 build:nightly:
   extends: .build-base
@@ -107,7 +106,6 @@ deploy:
     - 4-core
   stage: deploy
   before_script:
-    - sudo apt install dpkg dpkg-dev
     - cargo install --locked cargo-deb
   script:
     - make deb
