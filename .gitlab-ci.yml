@@ -43,7 +43,7 @@ variables:
 
 .build-base:
   stage: build
-  image: rust:slim
+  image: rust:alpine
   tags:
     - 8-core
   timeout: 1h
