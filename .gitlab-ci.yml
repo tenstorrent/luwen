@@ -43,7 +43,7 @@ variables:
 
 .build-base:
   stage: build
-  image: rust:latest
+  image: rust:slim
   tags:
     - 8-core
   timeout: 1h
@@ -59,7 +59,7 @@ variables:
     paths:
       - target/$TARGET/$PROFILE/*
 
-build:stable:
+build:stable:release:
   extends: .build-base
   variables:
     CHANNEL: stable
@@ -73,7 +73,7 @@ build:stable:debug:
 
 build:nightly:
   extends: .build-base
-  image: rust:nightly
+  image: rustlang/rust:nightly
   variables:
     CHANNEL: nightly
   allow_failure: true
@@ -82,6 +82,7 @@ build:nightly:
 test:cargo:
   extends: .build-base
   stage: test
+  needs: ["build:stable:release"]
   tags:
     - 8-core
     - 4-core
