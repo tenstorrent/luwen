@@ -20,6 +20,12 @@ syseng-release:
 		DEST_DIR=~/work/syseng/src/t6ifc/t6py/packages/whl \
 		PYTHON=python3.7
 
+.PHONY: flash-release
+flash-release:
+	$(MAKE) whl \
+		DEST_DIR=~/work/tt-flash/pyluwen/whl \
+		PYTHON=python3.7
+
 .PHONY: deb
 deb:
 	@if ! cargo --list | grep -q '^\s*deb\s*$$'; then \
@@ -32,3 +38,9 @@ deb:
 .PHONY: rpm
 rpm:
 	$(MAKE) -C crates/luwencpp rpm
+
+.PHONY: upload-ci-docker
+upload-ci-docker:
+	docker login yyz-gitlab.local.tenstorrent.com:5005 -u drosen -p ${CONTAINER_ACCESS_TOKEN}
+	docker build -t yyz-gitlab.local.tenstorrent.com:5005/syseng-platform/luwen/rust-ci-build -f ci/dockerfiles/Dockerfile ci/dockerfiles
+	docker push yyz-gitlab.local.tenstorrent.com:5005/syseng-platform/luwen/rust-ci-build

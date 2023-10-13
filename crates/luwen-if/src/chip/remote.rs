@@ -156,11 +156,7 @@ impl Wormhole {
         })
     }
 
-    fn check_training_complete(&self) -> Result<(), PlatformError> {
-        let fw_version = self.noc_read32(0, 1, 0, 0x210)?;
-
-        let eth_addrs = EthAddresses::new(fw_version);
-
+    pub(crate) fn check_ethernet_training_complete(&self) -> Result<(), PlatformError> {
         let mut initial_heartbeat = Vec::with_capacity(self.eth_locations.len());
         for (x, y) in self.eth_locations.iter().copied() {
             initial_heartbeat.push(self.noc_read32(0, x, y, self.eth_addres.heartbeat)?);
@@ -185,20 +181,8 @@ impl Wormhole {
             let init_finished = valid_heartbeat.iter().all(|&x| x);
             if init_finished {
                 return Ok(());
-            }
-
-            let status_list = valid_heartbeat;
-
-            let current_time = std::time::Instant::now();
-
-            if current_time - start_time > std::time::Duration::from_secs(300) {
-                return Err(PlatformError::Generic(
-                    format!(
-                        "Timed out after {:?} seconds while waiting for ethernet links to train.",
-                        current_time - start_time,
-                    ),
-                    crate::error::BtWrapper::capture(),
-                ));
+            } else if start_time.elapsed() > std::time::Duration::from_millis(100) {
+                return Err(PlatformError::EthernetTrainingNotComplete(valid_heartbeat));
             }
         }
     }

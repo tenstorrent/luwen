@@ -1,8 +1,10 @@
 use std::ops::{Deref, DerefMut};
 
-use luwen_if::chip::{HlComms, HlCommsInterface};
+use luwen_if::chip::{
+    wait_for_init, ArcMsg, ArcMsgOk, ArcMsgOptions, ChipImpl, HlComms, HlCommsInterface, StatusInfo,
+};
 use luwen_if::{CallbackStorage, DeviceInfo};
-use luwen_ref::{ExtendedPciDeviceWrapper, DmaConfig};
+use luwen_ref::{DmaConfig, ExtendedPciDeviceWrapper};
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 
@@ -220,6 +222,28 @@ macro_rules! common_chip_comms_impls {
                     .axi_write(addr, &data.to_le_bytes())
                     .map_err(|v| PyException::new_err(v.to_string()))
             }
+
+            #[pyo3(signature = (msg, wait_for_done = true, use_second_mailbox = false, arg0 = 0xffff, arg1 = 0xffff, timeout = 1.0))]
+            pub fn arc_msg(&self, msg: u32, wait_for_done: bool, use_second_mailbox: bool, arg0: u16, arg1: u16, timeout: f64) -> PyResult<Option<(u32, u32)>> {
+                match self.0
+                    .arc_msg(ArcMsgOptions {
+                        addrs: None,
+                        msg: ArcMsg::from_values(msg, arg0, arg1),
+                        wait_for_done,
+                        use_second_mailbox,
+                        timeout: std::time::Duration::from_secs_f64(timeout),
+                    }) {
+                        Ok(ArcMsgOk::Ok {rc, arg}) => {
+                            Ok(Some((arg, rc)))
+                        }
+                        Ok(ArcMsgOk::OkNoWait) => {
+                            Ok(None)
+                        }
+                        Err(err) => {
+                            Err(PyException::new_err(err.to_string()))
+                        }
+                    }
+            }
         }
     };
 }
@@ -274,7 +298,7 @@ impl PciChip {
     }
 
     pub fn init(&self) {
-        self.0.inner.init();
+        wait_for_init(&self.0, &mut |_| {});
     }
 
     pub fn board_id(&self) -> u64 {
@@ -293,7 +317,10 @@ impl PciChip {
 
     pub fn get_pci_bdf(&self) -> PyResult<String> {
         let info = self.device_info()?;
-        Ok(format!("{:02x}:{:02x}.{:x}", info.bus, info.slot, info.function))
+        Ok(format!(
+            "{:02x}:{:02x}.{:x}",
+            info.bus, info.slot, info.function
+        ))
     }
 }
 
@@ -423,7 +450,15 @@ impl PciInterface<'_> {
         Ok(DmaBuffer(buffer))
     }
 
-    pub fn config_dma(&self, dma_64_bit_addr: Option<u32>, csm_pcie_ctrl_dma_request_offset: u32, arc_misc_cntl_addr: u32, msi: bool, read_threshold: u32, write_threshold: u32) -> Result<(), String> {
+    pub fn config_dma(
+        &self,
+        dma_64_bit_addr: Option<u32>,
+        csm_pcie_ctrl_dma_request_offset: u32,
+        arc_misc_cntl_addr: u32,
+        msi: bool,
+        read_threshold: u32,
+        write_threshold: u32,
+    ) -> Result<(), String> {
         let borrow: &mut _ = &mut self.pci_interface.borrow_mut();
         borrow.device.dma_config = Some(DmaConfig {
             csm_pcie_ctrl_dma_request_offset,
@@ -438,9 +473,16 @@ impl PciInterface<'_> {
         Ok(())
     }
 
-    pub fn dma_transfer_turbo(&self, addr: u32, physical_address: u64, size: u32, write: bool) -> Result<(), String> {
+    pub fn dma_transfer_turbo(
+        &self,
+        addr: u32,
+        physical_address: u64,
+        size: u32,
+        write: bool,
+    ) -> Result<(), String> {
         let borrow: &mut _ = &mut self.pci_interface.borrow_mut();
-        borrow.device
+        borrow
+            .device
             .pcie_dma_transfer_turbo(addr, physical_address, size, write)
             .map_err(|v| v.to_string())
     }
@@ -521,13 +563,28 @@ impl PciWormhole {
     }
 
     #[pyo3(signature = (dma_64_bit_addr, csm_pcie_ctrl_dma_request_offset, arc_misc_cntl_addr, msi, read_threshold, write_threshold))]
-    pub fn config_dma(&self, dma_64_bit_addr: Option<u32>, csm_pcie_ctrl_dma_request_offset: u32, arc_misc_cntl_addr: u32, msi: bool, read_threshold: u32, write_threshold: u32) -> PyResult<()> {
+    pub fn config_dma(
+        &self,
+        dma_64_bit_addr: Option<u32>,
+        csm_pcie_ctrl_dma_request_offset: u32,
+        arc_misc_cntl_addr: u32,
+        msi: bool,
+        read_threshold: u32,
+        write_threshold: u32,
+    ) -> PyResult<()> {
         let value = PciInterface::from_wh(self);
 
         if let Some(value) = value {
-            Ok(value.config_dma(dma_64_bit_addr, csm_pcie_ctrl_dma_request_offset, arc_misc_cntl_addr, msi, read_threshold, write_threshold).map_err(|v| {
-                PyException::new_err(format!("Could perform dma config: {}", v))
-            })?)
+            Ok(value
+                .config_dma(
+                    dma_64_bit_addr,
+                    csm_pcie_ctrl_dma_request_offset,
+                    arc_misc_cntl_addr,
+                    msi,
+                    read_threshold,
+                    write_threshold,
+                )
+                .map_err(|v| PyException::new_err(format!("Could perform dma config: {}", v)))?)
         } else {
             return Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
@@ -535,13 +592,19 @@ impl PciWormhole {
         }
     }
 
-    pub fn dma_transfer_turbo(&self, addr: u32, physical_dma_buffer: u64, size: u32, write: bool) -> PyResult<()> {
+    pub fn dma_transfer_turbo(
+        &self,
+        addr: u32,
+        physical_dma_buffer: u64,
+        size: u32,
+        write: bool,
+    ) -> PyResult<()> {
         let value = PciInterface::from_wh(self);
 
         if let Some(value) = value {
-            Ok(value.dma_transfer_turbo(addr, physical_dma_buffer, size, write).map_err(|v| {
-                PyException::new_err(format!("Could perform dma transfer: {}", v))
-            })?)
+            Ok(value
+                .dma_transfer_turbo(addr, physical_dma_buffer, size, write)
+                .map_err(|v| PyException::new_err(format!("Could perform dma transfer: {}", v)))?)
         } else {
             return Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",

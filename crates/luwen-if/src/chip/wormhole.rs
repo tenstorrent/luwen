@@ -17,7 +17,7 @@ use super::{
     eth_addr::EthAddr,
     hl_comms::HlComms,
     remote::{EthAddresses, RemoteArcIf},
-    ArcMsgOptions, NeighbouringChip,
+    ArcMsgOptions, NeighbouringChip, InitStatus, StatusInfo, WaitStatus,
 };
 
 /// Implementation of the interface for a Wormhole
@@ -215,10 +215,90 @@ impl Wormhole {
 }
 
 impl ChipImpl for Wormhole {
-    fn init(&self) {
-        while self.check_arg_msg_safe(5, 3).is_err() {
-            std::thread::sleep(std::time::Duration::from_millis(100));
+    fn is_inititalized(&self) -> Result<InitStatus, PlatformError> {
+        let mut status = InitStatus {
+            arc_status: StatusInfo {
+                total: 1,
+                ..Default::default()
+            },
+            dram_status: StatusInfo {
+                total: 4,
+                ..Default::default() },
+            eth_status: StatusInfo {
+                total: 16,
+                ..Default::default()
+            },
+            cpu_status: StatusInfo::not_present(),
+        };
+        self.update_init_state(&mut status)?;
+
+        Ok(status)
+    }
+
+    fn update_init_state(&self, status: &mut InitStatus) -> Result<(), PlatformError> {
+        {
+            let status = &mut status.arc_status;
+            match status.wait_status {
+                WaitStatus::Waiting(start) => {
+                    let timeout = std::time::Duration::from_secs(10);
+                    if let Ok(_) = self.check_arg_msg_safe(5, 3) {
+                        status.wait_status = WaitStatus::JustFinished;
+                    } else if start.elapsed() > timeout {
+                        status.wait_status = WaitStatus::Timeout(timeout);
+                    }
+                }
+                WaitStatus::JustFinished => {
+                    status.wait_status = WaitStatus::Done;
+                }
+                WaitStatus::Done  | WaitStatus::Timeout(_) |
+                WaitStatus::NotPresent => {}
+            }
         }
+
+        {
+            let status = &mut status.dram_status;
+            match status.wait_status {
+                WaitStatus::Waiting(start) => {
+                    let timeout = std::time::Duration::from_secs(10);
+                    if let Ok(_) = self.check_arg_msg_safe(5, 3) {
+                        status.wait_status = WaitStatus::JustFinished;
+                    } else if start.elapsed() > timeout {
+                        status.wait_status = WaitStatus::Timeout(timeout);
+                    }
+                }
+                WaitStatus::JustFinished => {
+                    status.wait_status = WaitStatus::Done;
+                }
+                WaitStatus::Done  | WaitStatus::Timeout(_) |
+                WaitStatus::NotPresent => {}
+            }
+        }
+
+        {
+            let status = &mut status.eth_status;
+            match status.wait_status {
+                WaitStatus::Waiting(start) => {
+                    let timeout = std::time::Duration::from_secs(10);
+                    if let Ok(_) = self.check_ethernet_training_complete() {
+                        status.wait_status = WaitStatus::JustFinished;
+                    } else if start.elapsed() > timeout {
+                        status.wait_status = WaitStatus::Timeout(timeout);
+                    }
+                }
+                WaitStatus::JustFinished => {
+                    status.wait_status = WaitStatus::Done;
+                }
+                WaitStatus::Done  | WaitStatus::Timeout(_) |
+                WaitStatus::NotPresent => {}
+            }
+        }
+
+        {
+            // This is not present in wormhole.
+            let _status = &mut status.cpu_status;
+        }
+
+        Ok(())
     }
 
     fn get_arch(&self) -> luwen_core::Arch {

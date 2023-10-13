@@ -305,11 +305,6 @@ pub extern "C" fn luwen_close(chip: *mut Chip) {
     }
 }
 
-#[no_mangle]
-pub extern "C" fn chip_init(chip: &Chip) {
-    chip.init()
-}
-
 #[repr(u8)]
 pub enum CResultTag {
     Ok,

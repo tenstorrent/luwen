@@ -37,6 +37,9 @@ pub enum PlatformError {
     #[error(transparent)]
     ArcMsgError(#[from] ArcMsgError),
 
+    #[error("Ethernet training not complete on {} ports", .0.iter().copied().filter(|v| *v).count())]
+    EthernetTrainingNotComplete(Vec<bool>),
+
     #[error(transparent)]
     AxiError(#[from] crate::chip::AxiError),
 

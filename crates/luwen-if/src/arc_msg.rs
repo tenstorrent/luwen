@@ -14,6 +14,14 @@ pub enum PowerState {
 
 
 #[derive(Debug)]
+pub enum ArcState {
+    A0,
+    A1,
+    A3,
+    A5,
+}
+
+#[derive(Debug)]
 pub enum ArcMsg {
     Nop,
     Test { arg: u32 },
@@ -24,6 +32,8 @@ pub enum ArcMsg {
     FwVersion,
     GetSmbusTelemetryAddr,
 
+
+    SetArcState { state: ArcState },
 
     GetAiclk,
 
@@ -44,6 +54,12 @@ impl ArcMsg {
             },
             ArcMsg::GetHarvesting => 0x57,
             ArcMsg::GetAiclk => 0x34,
+            ArcMsg::SetArcState { state } => match state {
+                ArcState::A0 => 0xA0,
+                ArcState::A1 => 0xA1,
+                ArcState::A3 => 0xA3,
+                ArcState::A5 => 0xA5,
+            },
             ArcMsg::FwVersion => 0xb9,
         };
 
@@ -75,6 +91,10 @@ impl ArcMsg {
             0x90 => ArcMsg::Test {
                 arg: ((arg1 as u32) << 16) | arg0 as u32,
             },
+            0xA0 => ArcMsg::SetArcState { state: ArcState::A0 },
+            0xA1 => ArcMsg::SetArcState { state: ArcState::A1 },
+            0xA3 => ArcMsg::SetArcState { state: ArcState::A3 },
+            0xA5 => ArcMsg::SetArcState { state: ArcState::A5 },
             value => {
                 unimplemented!("Unknown ARC message {:#x}", value)
             }
