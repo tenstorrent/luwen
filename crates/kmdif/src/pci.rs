@@ -305,7 +305,7 @@ impl PciDevice {
             }
         }
 
-        Self::memcpy_from_device(data, unsafe { self.register_address_mut(addr) });
+        Self::memcpy_from_device(data, unsafe { self.register_address(addr) });
 
         if data.len() >= std::mem::size_of::<u32>() {
             self.detect_ffffffff_read(Some(unsafe { (data.as_ptr() as *const u32).read() }))?;

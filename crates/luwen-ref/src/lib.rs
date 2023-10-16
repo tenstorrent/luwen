@@ -269,16 +269,52 @@ pub fn comms_callback_inner(
         },
         FnOptions::Axi(op) => match op {
             luwen_if::FnAxi::Read { addr, data, len } => {
-                unsafe {
-                    ud.borrow_mut()
-                        .read_block(addr, std::slice::from_raw_parts_mut(data, len as usize))?
-                };
+                if len > 0 {
+                    if len <= 4 {
+                        let output = ud.borrow_mut().device.read32(addr)?;
+                        let output = output.to_le_bytes();
+                        unsafe {
+                            data.copy_from_nonoverlapping(output.as_ptr(), len as usize);
+                        }
+                    } else {
+                        unsafe {
+                            ud.borrow_mut().read_block(
+                                addr,
+                                std::slice::from_raw_parts_mut(data, len as usize),
+                            )?
+                        };
+                    }
+                }
             }
             luwen_if::FnAxi::Write { addr, data, len } => {
-                unsafe {
-                    ud.borrow_mut()
-                        .write_block(addr, std::slice::from_raw_parts(data, len as usize))?
-                };
+                if len > 0 {
+                    // Assuming here that u32 is our fundamental unit of transfer
+                    if len <= 4 {
+                        let to_write = if len == 4 {
+                            let slice = unsafe { std::slice::from_raw_parts(data, len as usize) };
+                            u32::from_le_bytes(slice.try_into().unwrap())
+                        } else {
+                            // We are reading less than a u32, so we need to read the existing value first
+                            // then writeback the new value with the lower len bytes replaced
+                            let value = ud.borrow_mut().device.read32(addr)?;
+                            let mut value = value.to_le_bytes();
+                            unsafe {
+                                value
+                                    .as_mut_ptr()
+                                    .copy_from_nonoverlapping(data, len as usize);
+                            }
+
+                            u32::from_le_bytes(value)
+                        };
+
+                        ud.borrow_mut().device.write32(addr, to_write)?;
+                    } else {
+                        unsafe {
+                            ud.borrow_mut()
+                                .write_block(addr, std::slice::from_raw_parts(data, len as usize))?
+                        };
+                    }
+                }
             }
         },
         FnOptions::Noc(op) => match op {

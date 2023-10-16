@@ -322,8 +322,8 @@ impl PciDevice {
             .read(true)
             .write(false)
             .open(format!(
-                "/sys/bus/pci/devices/0000:{:02x}:{:02x}.{:01x}/config",
-                pci_bus, slot, pci_function
+                "/sys/bus/pci/devices/{:04x}:{:02x}:{:02x}.{:01x}/config",
+                pci_domain, pci_bus, slot, pci_function
             ));
         let config_space = match config_space {
             Ok(file) => file,

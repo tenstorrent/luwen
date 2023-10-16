@@ -371,6 +371,28 @@ impl PciGrayskull {
             ));
         }
     }
+
+    pub fn pci_axi_read32(&self, addr: u32) -> PyResult<u32> {
+        let value = PciInterface::from_gs(self);
+        if let Some(value) = value {
+            value.axi_read32(addr).map_err(|v| PyException::new_err(v.to_string()))
+        } else {
+            return Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ));
+        }
+    }
+
+    pub fn pci_axi_write32(&self, addr: u32, data: u32) -> PyResult<()> {
+        let value = PciInterface::from_gs(self);
+        if let Some(value) = value {
+            value.axi_write32(addr, data).map_err(|v| PyException::new_err(v.to_string()))
+        } else {
+            return Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ));
+        }
+    }
 }
 
 common_chip_comms_impls!(PciGrayskull);
@@ -387,8 +409,8 @@ impl PciInterface<'_> {
             })
     }
 
-    pub fn from_gs<'a>(wh: &'a PciGrayskull) -> Option<PciInterface<'a>> {
-        wh.0.get_if::<CallbackStorage<ExtendedPciDeviceWrapper>>()
+    pub fn from_gs<'a>(gs: &'a PciGrayskull) -> Option<PciInterface<'a>> {
+        gs.0.get_if::<CallbackStorage<ExtendedPciDeviceWrapper>>()
             .map(|v| PciInterface {
                 pci_interface: &v.user_data,
             })
@@ -484,6 +506,22 @@ impl PciInterface<'_> {
         borrow
             .device
             .pcie_dma_transfer_turbo(addr, physical_address, size, write)
+            .map_err(|v| v.to_string())
+    }
+
+    pub fn axi_write32(&self, addr: u32, value: u32) -> Result<(), String> {
+        let borrow: &mut _ = &mut self.pci_interface.borrow_mut();
+        borrow
+            .device
+            .write32(addr, value)
+            .map_err(|v| v.to_string())
+    }
+
+    pub fn axi_read32(&self, addr: u32) -> Result<u32, String> {
+        let borrow: &mut _ = &mut self.pci_interface.borrow_mut();
+        borrow
+            .device
+            .read32(addr)
             .map_err(|v| v.to_string())
     }
 }
