@@ -1,9 +1,11 @@
 .PHONY: whl
-whl:
+justbuild:
+	$(MAKE) -C crates/pyluwen whl
+
+whl: justbuild
 ifndef DEST_DIR
 	$(error DEST_DIR is undefined)
 endif
-	$(MAKE) -C crates/pyluwen whl
 	ls target/wheels/pyluwen*.whl | xargs -I {} cp {} $(DEST_DIR)
 
 .PHONY: dev-whl
@@ -44,3 +46,8 @@ upload-ci-docker:
 	docker login yyz-gitlab.local.tenstorrent.com:5005 -u drosen -p ${CONTAINER_ACCESS_TOKEN}
 	docker build -t yyz-gitlab.local.tenstorrent.com:5005/syseng-platform/luwen/rust-ci-build -f ci/dockerfiles/Dockerfile ci/dockerfiles
 	docker push yyz-gitlab.local.tenstorrent.com:5005/syseng-platform/luwen/rust-ci-build
+
+clean:
+	rm -rf \
+		target \
+		Cargo.lock
