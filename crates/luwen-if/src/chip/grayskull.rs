@@ -235,7 +235,7 @@ impl ChipImpl for Grayskull {
 
     fn get_telemetry(&self) -> Result<super::Telemetry, crate::error::PlatformError> {
         let result = self.arc_msg(ArcMsgOptions {
-            msg: ArcMsg::FwVersion,
+            msg: ArcMsg::FwVersion(crate::arc_msg::FwType::ArcL2),
             ..Default::default()
         })?;
         let version = match result {
