@@ -396,6 +396,17 @@ impl PciGrayskull {
             ));
         }
     }
+
+    pub fn pci_board_type(&self) -> PyResult<u16> {
+        let value = PciInterface::from_gs(self);
+        if let Some(value) = value {
+            Ok(value.pci_interface.borrow().device.physical.subsystem_id)
+        } else {
+            return Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ));
+        }
+    }
 }
 
 common_chip_comms_impls!(PciGrayskull);

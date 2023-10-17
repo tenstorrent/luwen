@@ -25,6 +25,12 @@ pub enum ArcState {
 }
 
 #[derive(Debug)]
+pub enum FwType {
+    ArcL2,
+    FwBundle
+}
+
+#[derive(Debug)]
 pub enum ArcMsg {
     Nop,
     Test { arg: u32 },
@@ -32,7 +38,7 @@ pub enum ArcMsg {
 
     SetPowerState(PowerState),
 
-    FwVersion,
+    FwVersion(FwType),
     GetSmbusTelemetryAddr,
 
 
@@ -63,7 +69,7 @@ impl ArcMsg {
                 ArcState::A3 => 0xA3,
                 ArcState::A5 => 0xA5,
             },
-            ArcMsg::FwVersion => 0xb9,
+            ArcMsg::FwVersion(_) => 0xb9,
         };
 
         0xaa00 | code
@@ -77,12 +83,17 @@ impl ArcMsg {
             | ArcMsg::GetSmbusTelemetryAddr
             | ArcMsg::SetPowerState(_)
             | ArcMsg::GetAiclk
-            | ArcMsg::FwVersion
-            | ArcMsg::GetHarvesting => (0, 0),
+            | ArcMsg::GetHarvesting
+            | ArcMsg::SetArcState { .. } => (0, 0),
+            ArcMsg::FwVersion(ty) => match ty {
+                FwType::ArcL2 => (0, 0),
+                FwType::FwBundle => (1, 0),
+            }
         }
     }
 
     pub fn from_values(msg: u32, arg0: u16, arg1: u16) -> Self {
+        let arg = ((arg1 as u32) << 16) | arg0 as u32;
         let msg = 0xFF & msg;
         match msg {
             0x11 => ArcMsg::Nop,
@@ -92,12 +103,17 @@ impl ArcMsg {
             0x54 => ArcMsg::SetPowerState(PowerState::LongIdle),
             0x57 => ArcMsg::GetHarvesting,
             0x90 => ArcMsg::Test {
-                arg: ((arg1 as u32) << 16) | arg0 as u32,
+                arg,
             },
             0xA0 => ArcMsg::SetArcState { state: ArcState::A0 },
             0xA1 => ArcMsg::SetArcState { state: ArcState::A1 },
             0xA3 => ArcMsg::SetArcState { state: ArcState::A3 },
             0xA5 => ArcMsg::SetArcState { state: ArcState::A5 },
+            0xB9 => ArcMsg::FwVersion(match arg {
+                0 => FwType::ArcL2,
+                1 => FwType::FwBundle,
+                _ => panic!("Unknown FW type {}", arg),
+            }),
             value => {
                 unimplemented!("Unknown ARC message {:#x}", value)
             }
