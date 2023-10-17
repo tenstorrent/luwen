@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 fn _workspace_dir() -> std::path::PathBuf {
     let output = std::process::Command::new(env!("CARGO"))
         .arg("locate-project")

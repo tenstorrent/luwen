@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 pub const MAX_DMA_BYTES: u32 = 4 * 1024 * 1024;
 pub const GS_BAR0_WC_MAPPING_SIZE: u64 = (156 << 20) + (10 << 21) + (18 << 24);
 

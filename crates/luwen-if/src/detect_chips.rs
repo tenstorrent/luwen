@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 use std::collections::HashSet;
 
 use crate::{chip::{Chip, wait_for_init}, error::PlatformError, ChipImpl, EthAddr};

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 const TENSTORRENT_IOCTL_MAGIC: usize = 0xFA;
 
 use nix::request_code_none;
