@@ -27,7 +27,8 @@ pub enum ArcState {
 #[derive(Debug)]
 pub enum FwType {
     ArcL2,
-    FwBundle
+    FwBundle,
+    FwBundleSPI
 }
 
 #[derive(Debug)]
@@ -88,6 +89,7 @@ impl ArcMsg {
             ArcMsg::FwVersion(ty) => match ty {
                 FwType::ArcL2 => (0, 0),
                 FwType::FwBundle => (1, 0),
+                FwType::FwBundleSPI => (2, 0),
             }
         }
     }
@@ -112,6 +114,7 @@ impl ArcMsg {
             0xB9 => ArcMsg::FwVersion(match arg {
                 0 => FwType::ArcL2,
                 1 => FwType::FwBundle,
+                2 => FwType::FwBundleSPI,
                 _ => panic!("Unknown FW type {}", arg),
             }),
             value => {
