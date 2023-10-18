@@ -15,7 +15,6 @@ pub enum PowerState {
     LongIdle,
 }
 
-
 #[derive(Debug)]
 pub enum ArcState {
     A0,
@@ -41,7 +40,6 @@ pub enum ArcMsg {
 
     FwVersion(FwType),
     GetSmbusTelemetryAddr,
-
 
     SetArcState { state: ArcState },
 
