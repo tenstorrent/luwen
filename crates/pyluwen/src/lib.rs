@@ -75,6 +75,162 @@ impl DmaBuffer {
         self.0.physical_address
     }
 }
+#[pyclass]
+pub struct Telemetry {
+    #[pyo3(get)]
+    board_id: u64,
+    #[pyo3(get)]
+    smbus_tx_enum_version: u32,
+    #[pyo3(get)]
+    smbus_tx_device_id: u32,
+    #[pyo3(get)]
+    smbus_tx_asic_ro: u32,
+    #[pyo3(get)]
+    smbus_tx_asic_idd: u32,
+    #[pyo3(get)]
+    smbus_tx_board_id_high: u32,
+    #[pyo3(get)]
+    smbus_tx_board_id_low: u32,
+    #[pyo3(get)]
+    smbus_tx_arc0_fw_version: u32,
+    #[pyo3(get)]
+    smbus_tx_arc1_fw_version: u32,
+    #[pyo3(get)]
+    smbus_tx_arc2_fw_version: u32,
+    #[pyo3(get)]
+    smbus_tx_arc3_fw_version: u32,
+    #[pyo3(get)]
+    smbus_tx_spibootrom_fw_version: u32,
+    #[pyo3(get)]
+    smbus_tx_eth_fw_version: u32,
+    #[pyo3(get)]
+    smbus_tx_m3_bl_fw_version: u32,
+    #[pyo3(get)]
+    smbus_tx_m3_app_fw_version: u32,
+    #[pyo3(get)]
+    smbus_tx_ddr_speed: Option<u32>,
+    #[pyo3(get)]
+    smbus_tx_ddr_status: u32,
+    #[pyo3(get)]
+    smbus_tx_eth_status0: u32,
+    #[pyo3(get)]
+    smbus_tx_eth_status1: u32,
+    #[pyo3(get)]
+    smbus_tx_pcie_status: u32,
+    #[pyo3(get)]
+    smbus_tx_faults: u32,
+    #[pyo3(get)]
+    smbus_tx_arc0_health: u32,
+    #[pyo3(get)]
+    smbus_tx_arc1_health: u32,
+    #[pyo3(get)]
+    smbus_tx_arc2_health: u32,
+    #[pyo3(get)]
+    smbus_tx_arc3_health: u32,
+    #[pyo3(get)]
+    smbus_tx_fan_speed: u32,
+    #[pyo3(get)]
+    smbus_tx_aiclk: u32,
+    #[pyo3(get)]
+    smbus_tx_axiclk: u32,
+    #[pyo3(get)]
+    smbus_tx_arcclk: u32,
+    #[pyo3(get)]
+    smbus_tx_throttler: u32,
+    #[pyo3(get)]
+    smbus_tx_vcore: u32,
+    #[pyo3(get)]
+    smbus_tx_asic_temperature: u32,
+    #[pyo3(get)]
+    smbus_tx_vreg_temperature: u32,
+    #[pyo3(get)]
+    smbus_tx_board_temperature: u32,
+    #[pyo3(get)]
+    smbus_tx_tdp: u32,
+    #[pyo3(get)]
+    smbus_tx_tdc: u32,
+    #[pyo3(get)]
+    smbus_tx_vdd_limits: u32,
+    #[pyo3(get)]
+    smbus_tx_thm_limits: u32,
+    #[pyo3(get)]
+    smbus_tx_wh_fw_date: u32,
+    #[pyo3(get)]
+    smbus_tx_asic_tmon0: u32,
+    #[pyo3(get)]
+    smbus_tx_asic_tmon1: u32,
+    #[pyo3(get)]
+    smbus_tx_mvddq_power: u32,
+    #[pyo3(get)]
+    smbus_tx_gddr_train_temp0: u32,
+    #[pyo3(get)]
+    smbus_tx_gddr_train_temp1: u32,
+    #[pyo3(get)]
+    smbus_tx_boot_date: u32,
+    #[pyo3(get)]
+    smbus_tx_rt_seconds: u32,
+    #[pyo3(get)]
+    smbus_tx_eth_debug_status0: u32,
+    #[pyo3(get)]
+    smbus_tx_eth_debug_status1: u32,
+    #[pyo3(get)]
+    smbus_tx_tt_flash_version: u32,
+}
+impl From<luwen_if::chip::Telemetry> for Telemetry {
+    fn from(value: luwen_if::chip::Telemetry) -> Self {
+        Self {
+            board_id: value.board_id,
+            smbus_tx_enum_version : value.smbus_tx_enum_version,
+            smbus_tx_device_id: value.smbus_tx_device_id,
+            smbus_tx_asic_ro: value.smbus_tx_asic_ro,
+            smbus_tx_asic_idd: value.smbus_tx_asic_idd,
+            smbus_tx_board_id_high: value.smbus_tx_board_id_high,
+            smbus_tx_board_id_low: value.smbus_tx_board_id_low,
+            smbus_tx_arc0_fw_version: value.smbus_tx_arc0_fw_version,
+            smbus_tx_arc1_fw_version: value.smbus_tx_arc1_fw_version,
+            smbus_tx_arc2_fw_version: value.smbus_tx_arc2_fw_version,
+            smbus_tx_arc3_fw_version: value.smbus_tx_arc3_fw_version,
+            smbus_tx_spibootrom_fw_version: value.smbus_tx_spibootrom_fw_version,
+            smbus_tx_eth_fw_version: value.smbus_tx_eth_fw_version,
+            smbus_tx_m3_bl_fw_version: value.smbus_tx_m3_bl_fw_version,
+            smbus_tx_m3_app_fw_version: value.smbus_tx_m3_app_fw_version,
+            smbus_tx_ddr_speed: value.smbus_tx_ddr_speed,
+            smbus_tx_ddr_status: value.smbus_tx_ddr_status,
+            smbus_tx_eth_status0: value.smbus_tx_eth_status0,
+            smbus_tx_eth_status1: value.smbus_tx_eth_status1,
+            smbus_tx_pcie_status: value.smbus_tx_pcie_status,
+            smbus_tx_faults: value.smbus_tx_faults,
+            smbus_tx_arc0_health: value.smbus_tx_arc0_health,
+            smbus_tx_arc1_health: value.smbus_tx_arc1_health,
+            smbus_tx_arc2_health: value.smbus_tx_arc2_health,
+            smbus_tx_arc3_health: value.smbus_tx_arc3_health,
+            smbus_tx_fan_speed: value.smbus_tx_fan_speed,
+            smbus_tx_aiclk: value.smbus_tx_aiclk,
+            smbus_tx_axiclk: value.smbus_tx_axiclk,
+            smbus_tx_arcclk: value.smbus_tx_arcclk,
+            smbus_tx_throttler: value.smbus_tx_throttler,
+            smbus_tx_vcore: value.smbus_tx_vcore,
+            smbus_tx_asic_temperature: value.smbus_tx_asic_temperature,
+            smbus_tx_vreg_temperature: value.smbus_tx_vreg_temperature,
+            smbus_tx_board_temperature: value.smbus_tx_board_temperature,
+            smbus_tx_tdp: value.smbus_tx_tdp,
+            smbus_tx_tdc: value.smbus_tx_tdc,
+            smbus_tx_vdd_limits: value.smbus_tx_vdd_limits,
+            smbus_tx_thm_limits: value.smbus_tx_thm_limits,
+            smbus_tx_wh_fw_date: value.smbus_tx_wh_fw_date,
+            smbus_tx_asic_tmon0: value.smbus_tx_asic_tmon0,
+            smbus_tx_asic_tmon1: value.smbus_tx_asic_tmon1,
+            smbus_tx_mvddq_power: value.smbus_tx_mvddq_power,
+            smbus_tx_gddr_train_temp0: value.smbus_tx_gddr_train_temp0,
+            smbus_tx_gddr_train_temp1: value.smbus_tx_gddr_train_temp1,
+            smbus_tx_boot_date: value.smbus_tx_boot_date,
+            smbus_tx_rt_seconds: value.smbus_tx_rt_seconds,
+            smbus_tx_eth_debug_status0: value.smbus_tx_eth_debug_status0,
+            smbus_tx_eth_debug_status1: value.smbus_tx_eth_debug_status1,
+            smbus_tx_tt_flash_version: value.smbus_tx_tt_flash_version,
+        }
+    }
+}
 
 #[pyclass]
 pub struct AxiData {
@@ -83,6 +239,7 @@ pub struct AxiData {
     #[pyo3(get)]
     size: u64,
 }
+
 
 impl From<luwen_if::chip::AxiData> for AxiData {
     fn from(value: luwen_if::chip::AxiData) -> Self {
@@ -307,6 +464,10 @@ impl PciChip {
     pub fn board_id(&self) -> u64 {
         self.0.inner.get_telemetry().unwrap().board_id
     }
+ 
+    pub fn get_telemetry(&self) -> Telemetry {
+        self.0.inner.get_telemetry().unwrap().into()
+    }
 
     pub fn device_id(&self) -> PyResult<u32> {
         let info = self.device_info()?;
@@ -407,6 +568,25 @@ impl PciGrayskull {
             ));
         }
     }
+
+    // pub fn all_tensix_toggle_reset(&self) -> PyResult<()> {
+    // // clock_state = self._drop_clocks_to_reset_safe()
+
+    // // try:
+    // //     self.all_riscs_assert_reset()
+
+    // //     self._tensix_toggle_reset()
+
+    // //     self.setup_interface()
+
+    // //     self.assert_all_riscv_soft_reset()
+
+    // //     self.all_riscs_deassert_reset()
+
+    // // finally:
+    // //     self._restore_clocks(clock_state)
+
+    // }
 }
 
 common_chip_comms_impls!(PciGrayskull);

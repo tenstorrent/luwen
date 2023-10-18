@@ -267,16 +267,96 @@ impl ChipImpl for Grayskull {
         let csm_offset = self.arc_if.axi_translate("ARC_CSM.DATA[0]")?;
 
         let telemetry_struct_offset = csm_offset.addr + (offset - 0x10000000) as u64;
+        let smbus_tx_enum_version = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (0 * 4))?;
+        let smbus_tx_device_id = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (1 * 4))?;
+        let smbus_tx_asic_ro = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (2 * 4))?;
+        let smbus_tx_asic_idd = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (3 * 4))?;
+        let smbus_tx_board_id_high = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (4 * 4))?;
+        let smbus_tx_board_id_low = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (5 * 4))?;
+        let smbus_tx_arc0_fw_version = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (6 * 4))?;
+        let smbus_tx_arc1_fw_version = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (7 * 4))?;
+        let smbus_tx_arc2_fw_version = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (8 * 4))?;
+        let smbus_tx_arc3_fw_version = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (9 * 4))?;
+        let smbus_tx_spibootrom_fw_version = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (10 * 4))?;
+        let smbus_tx_ddr_speed = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (11 * 4))?;
+        let smbus_tx_ddr_status = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (12 * 4))?;
+        let smbus_tx_pcie_status = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (13 * 4))?;
+        let smbus_tx_faults = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (14 * 4))?;
+        let smbus_tx_arc0_health = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (15 * 4))?;
+        let smbus_tx_arc1_health = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (16 * 4))?;
+        let smbus_tx_arc2_health = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (17 * 4))?;
+        let smbus_tx_arc3_health = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (18 * 4))?;
+        let smbus_tx_fan_speed = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (19 * 4))?;
+        let smbus_tx_aiclk = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (20 * 4))?;
+        let smbus_tx_axiclk = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (21 * 4))?;
+        let smbus_tx_arcclk = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (22 * 4))?;
+        let smbus_tx_throttler = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (23 * 4))?;
+        let smbus_tx_vcore = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (24 * 4))?;
+        let smbus_tx_asic_temperature = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (25 * 4))?;
+        let smbus_tx_vreg_temperature = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (26 * 4))?;
+        let smbus_tx_tdp = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (27 * 4))?;
+        let smbus_tx_tdc = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (28 * 4))?;
+        let smbus_tx_vdd_limits = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (29 * 4))?;
+        let smbus_tx_thm_limits = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (30 * 4))?;
+        let smbus_tx_wh_fw_date = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (31 * 4))?;
+        let smbus_tx_asic_tmon0 = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (32 * 4))?;
+        let smbus_tx_asic_tmon1 = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (33 * 4))?;
+        let smbus_tx_asic_power = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (34 * 4))?;
+        
+        let smbus_tx_aux_status = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (35 * 4))?;
+        let smbus_tx_boot_date = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (36 * 4))?;
+        let smbus_tx_rt_seconds = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (37 * 4))?;
+        let smbus_tx_tt_flash_version = self.arc_if.axi_read32(&self.chip_if, telemetry_struct_offset + (38 * 4))?;
 
-        let board_id_high =
-            self.arc_if
-                .axi_read32(&self.chip_if, telemetry_struct_offset + (4 * 4))? as u64;
-        let board_id_low =
-            self.arc_if
-                .axi_read32(&self.chip_if, telemetry_struct_offset + (5 * 4))? as u64;
-
+        // let board_id_high =
+        //     self.arc_if
+        //         .axi_read32(&self.chip_if, telemetry_struct_offset + (4 * 4))? as u64;
+        // let board_id_low =
+        //     self.arc_if
+        //         .axi_read32(&self.chip_if, telemetry_struct_offset + (5 * 4))? as u64;
+        
         Ok(super::Telemetry {
-            board_id: (board_id_high << 32) | board_id_low,
+            board_id: ((smbus_tx_board_id_high as u64) << 32) | (smbus_tx_board_id_high as u64),
+            smbus_tx_enum_version,
+            smbus_tx_device_id,
+            smbus_tx_asic_ro,
+            smbus_tx_asic_idd,
+            smbus_tx_board_id_high,
+            smbus_tx_board_id_low,
+            smbus_tx_arc0_fw_version,
+            smbus_tx_arc1_fw_version,
+            smbus_tx_arc2_fw_version,
+            smbus_tx_arc3_fw_version,
+            smbus_tx_spibootrom_fw_version,
+            smbus_tx_ddr_speed: Some(smbus_tx_ddr_speed),
+            smbus_tx_ddr_status,
+            smbus_tx_pcie_status,
+            smbus_tx_faults,
+            smbus_tx_arc0_health,
+            smbus_tx_arc1_health,
+            smbus_tx_arc2_health,
+            smbus_tx_arc3_health,
+            smbus_tx_fan_speed,
+            smbus_tx_aiclk,
+            smbus_tx_axiclk,
+            smbus_tx_arcclk,
+            smbus_tx_throttler,
+            smbus_tx_vcore,
+            smbus_tx_asic_temperature,
+            smbus_tx_vreg_temperature,
+            smbus_tx_tdp,
+            smbus_tx_tdc,
+            smbus_tx_vdd_limits,
+            smbus_tx_thm_limits,
+            smbus_tx_wh_fw_date,
+            smbus_tx_asic_tmon0,
+            smbus_tx_asic_tmon1,
+            smbus_tx_asic_power : Some(smbus_tx_asic_power),
+            smbus_tx_aux_status : Some(smbus_tx_aux_status),
+            smbus_tx_boot_date,
+            smbus_tx_rt_seconds,
+            smbus_tx_tt_flash_version,
+            ..Default::default()
         })
     }
 

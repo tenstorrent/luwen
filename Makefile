@@ -28,6 +28,12 @@ flash-release:
 		DEST_DIR=~/work/tt-flash/pyluwen/whl \
 		PYTHON=python3.7
 
+.PHONY: tools-common-release
+tools-common-release:
+	$(MAKE) whl \
+		DEST_DIR=~/tt-tools-common/pyluwen/whl \
+		PYTHON=python3.7
+
 .PHONY: deb
 deb:
 	@if ! cargo --list | grep -q '^\s*deb\s*$$'; then \
