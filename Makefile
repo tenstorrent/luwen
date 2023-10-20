@@ -57,3 +57,7 @@ clean:
 	rm -rf \
 		target \
 		Cargo.lock
+
+.PHONY: pyluwen-pyi
+pyluwen-pyi:
+	$(MAKE) -C crates/pyluwen build-pyi
