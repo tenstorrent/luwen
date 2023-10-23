@@ -10,8 +10,35 @@ fn read_write_test(
     x: u8,
     y: u8,
     size: usize,
+    use_dma: bool,
 ) -> Result<(f64, f64), Box<dyn std::error::Error>> {
     let mut rng = rand::thread_rng();
+
+    if use_dma {
+        let pci = chip
+            .comms_obj()
+            .1
+            .as_any()
+            .downcast_ref::<CallbackStorage<luwen_ref::ExtendedPciDeviceWrapper>>()
+            .unwrap();
+
+        let pci_interface: &mut luwen_ref::ExtendedPciDevice = &mut pci.user_data.borrow_mut();
+
+        let dma_request =
+            luwen_if::chip::HlCommsInterface::axi_translate(&chip, "ARC_CSM.ARC_PCIE_DMA_REQUEST")?;
+        let arc_misc_cntl =
+            luwen_if::chip::HlCommsInterface::axi_translate(&chip, "ARC_RESET.ARC_MISC_CNTL")?;
+
+        pci_interface.device.dma_config = Some(luwen_ref::DmaConfig {
+            csm_pcie_ctrl_dma_request_offset: dma_request.addr as u32,
+            arc_misc_cntl_addr: arc_misc_cntl.addr as u32,
+            dma_host_phys_addr_high: 0,
+            support_64_bit_dma: false,
+            use_msi_for_dma: false,
+            read_threshold: 32,
+            write_threshold: 4096,
+        });
+    }
 
     let mut write_data = Vec::with_capacity(size);
     for _ in 0..size {
@@ -60,9 +87,9 @@ pub fn main() -> Result<(), LuwenError> {
         let size = 1 << 19;
         // let size = 1000;
         let (write_time, read_time) = if let Some(wh) = chip.as_wh() {
-            read_write_test(wh, 0, 0, size).unwrap()
+            read_write_test(wh, 0, 0, size, false).unwrap()
         } else if let Some(gs) = chip.as_gs() {
-            read_write_test(gs, 1, 0, size).unwrap()
+            read_write_test(gs, 1, 0, size, false).unwrap()
         } else {
             unimplemented!("Chip of arch {:?} not supported", chip.get_arch());
         };

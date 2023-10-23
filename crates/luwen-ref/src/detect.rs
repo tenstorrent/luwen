@@ -59,14 +59,21 @@ pub fn detect_chips() -> Result<Vec<Chip>, LuwenError> {
                     bar.set_message(format_message);
                 }
             }
-            luwen_if::chip::CallReason::ChipInitCompleted => {
+            luwen_if::chip::CallReason::ChipInitCompleted(status) => {
                 chip_detect_bar.set_message("Chip initialization complete (found {pos})");
+
                 if let Some(bar) = chip_init_bar.take() {
+                    if status.init_error() {
+                        bar.finish_with_message("Chip initialization failed");
+                    } else {
+                        bar.finish();
+                    }
+
                     bars.remove(&bar);
                 }
             }
         };
     };
 
-    Ok(luwen_if::detect_chips(chips, &mut init_callback)?)
+    Ok(luwen_if::detect_chips(chips, &mut init_callback, false)?)
 }

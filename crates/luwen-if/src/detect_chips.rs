@@ -3,7 +3,11 @@
 
 use std::collections::HashSet;
 
-use crate::{chip::{Chip, wait_for_init}, error::PlatformError, ChipImpl, EthAddr};
+use crate::{
+    chip::{wait_for_init, Chip},
+    error::PlatformError,
+    ChipImpl, EthAddr,
+};
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 enum InterfaceIdOrCoord {
@@ -24,12 +28,18 @@ enum InterfaceIdOrCoord {
 /// 1. Add all given chips to output list removing duplicates this will ensure that if list indexes are used to
 /// assign a chip id pci chips will always be output instead of the remote equivalent.
 /// 2. To a depth first search for each root chip, adding all new chips found to the output list.
-pub fn detect_chips(mut root_chips: Vec<Chip>, init_callback: &mut impl FnMut(crate::chip::ChipDetectState<'_>)) -> Result<Vec<Chip>, PlatformError> {
+pub fn detect_chips(
+    mut root_chips: Vec<Chip>,
+    init_callback: &mut impl FnMut(crate::chip::ChipDetectState<'_>),
+    continue_on_failure: bool,
+) -> Result<Vec<Chip>, PlatformError> {
     let mut remotes_to_investigate = Vec::new();
     let mut seen_chips = HashSet::new();
 
     for (root_index, root_chip) in root_chips.iter().enumerate() {
-        wait_for_init(root_chip, init_callback)?;
+        // If cont is false, then we cannot continue to interact with the chip
+        // if it's true, then we can continue.
+        let cont = wait_for_init(root_chip, init_callback, continue_on_failure)?;
 
         let ident = if let Some(wh) = root_chip.as_wh() {
             let telem = root_chip.get_telemetry()?;
@@ -90,7 +100,7 @@ pub fn detect_chips(mut root_chips: Vec<Chip>, init_callback: &mut impl FnMut(cr
                     continue;
                 }
 
-                wait_for_init(&wh, init_callback)?;
+                wait_for_init(&wh, init_callback, continue_on_failure)?;
 
                 for nchip in wh.get_neighbouring_chips()? {
                     if !seen_coords.contains(&nchip.eth_addr) {
@@ -113,5 +123,5 @@ pub fn detect_chips(mut root_chips: Vec<Chip>, init_callback: &mut impl FnMut(cr
 }
 
 pub fn detect_chips_silent(root_chips: Vec<Chip>) -> Result<Vec<Chip>, PlatformError> {
-    detect_chips(root_chips, &mut |_| {})
+    detect_chips(root_chips, &mut |_| {}, false)
 }

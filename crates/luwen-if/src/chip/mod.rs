@@ -212,9 +212,9 @@ pub enum InitType {
 // pub struct Telemetry {
 //     pub board_id: u64,
 //     // add stuff here
-//     pub eth_fw_version: u64, 
+//     pub eth_fw_version: u64,
 // }
-#[derive (Default)]
+#[derive(Default)]
 pub struct Telemetry {
     pub board_id: u64,
     pub smbus_tx_enum_version: u32,
@@ -269,13 +269,38 @@ pub struct Telemetry {
     pub smbus_tx_tt_flash_version: u32,
 }
 
+pub enum ChipInitResult {
+    /// Everything is good, can continue with init
+    NoError,
+    /// We hit an error, but we can continue with init
+    /// this is for things like arc or ethernet training timeout.
+    /// If this is returned then there shouldn't be a chip returned to the user,
+    /// but we are okay to findout more information.
+    ErrorContinue,
+    /// We hit an error that indicates that it would be unsafe to continue with init.
+    ErrorAbort,
+}
+
 /// Defines common functionality for all chips.
 /// This is a convinence interface that allows chip type agnostic code to be written.
+///
+/// As a general rule the chip should not be accessed without an explicit request from the user.
+/// This means that chip initialization must be explicity called and for example if the user has not
+/// explicity stated that they want to enumerate remote chips, then we won't even start looking at remote readiness.
+/// This is to avoid situations where a problematic state is reached and causes an abort even if that capability is not needed.
 pub trait ChipImpl: HlComms + Send + Sync + 'static {
-    /// Check if the chip has been initialized
+    /// Check if the chip has been initialized.
+    /// This is also the starting point for the chip initialization process.
     fn is_inititalized(&self) -> Result<InitStatus, PlatformError>;
 
-    fn update_init_state(&self, status: &mut InitStatus) -> Result<(), PlatformError>;
+    /// Update the initialization state of the chip.
+    /// The primary purpose of this function is to tell the caller when it is safe to starting interacting with the chip.
+    ///
+    /// However the secondary purpose is to provide information about what chip functions are currently available for use.
+    /// For example if the arc is not ready, then we should not try to send an arc message.
+    /// Or in a more complex example, if the arc is ready, but the ethernet is not (for example the ethernet fw is hung)
+    /// then we will be able to access the local arc, but won't be able to access any remote chips.
+    fn update_init_state(&self, status: &mut InitStatus) -> Result<ChipInitResult, PlatformError>;
 
     /// Returns the current arch of the chip, can be used to avoid
     /// needing to ducktype when downcasting.
@@ -336,7 +361,7 @@ impl ChipImpl for Chip {
         self.inner.is_inititalized()
     }
 
-    fn update_init_state(&self, status: &mut InitStatus) -> Result<(), PlatformError> {
+    fn update_init_state(&self, status: &mut InitStatus) -> Result<ChipInitResult, PlatformError> {
         self.inner.update_init_state(status)
     }
 

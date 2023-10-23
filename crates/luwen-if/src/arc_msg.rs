@@ -132,8 +132,6 @@ pub enum ArcMsgProtocolError {
     ArcAsleep,
     #[error("Failed to trigger FW interrupt")]
     FwIntFailed,
-    #[error("It was unsafe to send an arc msg because {0}")]
-    UnsafeToSendArcMsg(String),
     #[error("Mailbox {0} is invalid")]
     InvalidMailbox(usize),
 }

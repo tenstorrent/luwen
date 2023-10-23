@@ -180,7 +180,7 @@ impl From<luwen_if::chip::Telemetry> for Telemetry {
     fn from(value: luwen_if::chip::Telemetry) -> Self {
         Self {
             board_id: value.board_id,
-            smbus_tx_enum_version : value.smbus_tx_enum_version,
+            smbus_tx_enum_version: value.smbus_tx_enum_version,
             smbus_tx_device_id: value.smbus_tx_device_id,
             smbus_tx_asic_ro: value.smbus_tx_asic_ro,
             smbus_tx_asic_idd: value.smbus_tx_asic_idd,
@@ -239,7 +239,6 @@ pub struct AxiData {
     #[pyo3(get)]
     size: u64,
 }
-
 
 impl From<luwen_if::chip::AxiData> for AxiData {
     fn from(value: luwen_if::chip::AxiData) -> Self {
@@ -458,13 +457,13 @@ impl PciChip {
     }
 
     pub fn init(&self) {
-        wait_for_init(&self.0, &mut |_| {});
+        wait_for_init(&self.0, &mut |_| {}, false);
     }
 
     pub fn board_id(&self) -> u64 {
         self.0.inner.get_telemetry().unwrap().board_id
     }
- 
+
     pub fn get_telemetry(&self) -> Telemetry {
         self.0.inner.get_telemetry().unwrap().into()
     }
@@ -482,8 +481,8 @@ impl PciChip {
     pub fn get_pci_bdf(&self) -> PyResult<String> {
         let info = self.device_info()?;
         Ok(format!(
-            "{:02x}:{:02x}.{:x}",
-            info.bus, info.slot, info.function
+            "{:04x}:{:02x}:{:02x}.{:x}",
+            info.domain, info.bus, info.slot, info.function
         ))
     }
 }
@@ -539,7 +538,9 @@ impl PciGrayskull {
     pub fn pci_axi_read32(&self, addr: u32) -> PyResult<u32> {
         let value = PciInterface::from_gs(self);
         if let Some(value) = value {
-            value.axi_read32(addr).map_err(|v| PyException::new_err(v.to_string()))
+            value
+                .axi_read32(addr)
+                .map_err(|v| PyException::new_err(v.to_string()))
         } else {
             return Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
@@ -550,7 +551,9 @@ impl PciGrayskull {
     pub fn pci_axi_write32(&self, addr: u32, data: u32) -> PyResult<()> {
         let value = PciInterface::from_gs(self);
         if let Some(value) = value {
-            value.axi_write32(addr, data).map_err(|v| PyException::new_err(v.to_string()))
+            value
+                .axi_write32(addr, data)
+                .map_err(|v| PyException::new_err(v.to_string()))
         } else {
             return Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
@@ -713,10 +716,7 @@ impl PciInterface<'_> {
 
     pub fn axi_read32(&self, addr: u32) -> Result<u32, String> {
         let borrow: &mut _ = &mut self.pci_interface.borrow_mut();
-        borrow
-            .device
-            .read32(addr)
-            .map_err(|v| v.to_string())
+        borrow.device.read32(addr).map_err(|v| v.to_string())
     }
 }
 
