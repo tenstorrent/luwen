@@ -485,6 +485,11 @@ impl PciChip {
             info.domain, info.bus, info.slot, info.function
         ))
     }
+
+    pub fn get_pci_interface_id(&self) -> PyResult<u32> {
+        let info = self.device_info()?;
+        Ok(info.interface_id)
+    }
 }
 
 common_chip_comms_impls!(PciChip);
