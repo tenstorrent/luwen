@@ -60,7 +60,7 @@ pub enum ArcStatus {
     ArcOk,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum WaitStatus {
     Waiting(std::time::Instant),
     Timeout(std::time::Duration),
@@ -84,7 +84,7 @@ impl Default for WaitStatus {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct StatusInfo {
     pub ready: usize,
     pub total: usize,
@@ -173,11 +173,20 @@ impl StatusInfo {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct InitOptions {
+    /// If false, then we will not try to initialize anything that would require talking on the NOC
+    noc_safe: bool,
+}
+
+#[derive(Clone, Debug)]
 pub struct InitStatus {
     pub arc_status: StatusInfo,
     pub dram_status: StatusInfo,
     pub eth_status: StatusInfo,
     pub cpu_status: StatusInfo,
+
+    pub init_options: InitOptions,
 }
 
 impl InitStatus {

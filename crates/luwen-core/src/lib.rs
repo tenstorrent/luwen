@@ -22,4 +22,12 @@ impl Arch {
             _ => false,
         }
     }
+
+    pub fn from_string(s: &str) -> Option<Self> {
+        match s {
+            "grayskull" => Some(Arch::Grayskull),
+            "wormhole" => Some(Arch::Wormhole),
+            _ => None,
+        }
+    }
 }

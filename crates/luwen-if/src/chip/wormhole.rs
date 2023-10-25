@@ -243,6 +243,8 @@ impl ChipImpl for Wormhole {
                 ..Default::default()
             },
             cpu_status: StatusInfo::not_present(),
+
+            init_options: super::InitOptions { noc_safe: false },
         };
         self.update_init_state(&mut status)?;
 
@@ -263,19 +265,30 @@ impl ChipImpl for Wormhole {
                                     status.wait_status = WaitStatus::Timeout(timeout)
                                 }
                             }
-                            PlatformError::AxiError(_) => todo!(),
 
-                            // If we hit these, something has gone terribly wrong. We will therefore abort...
-                            PlatformError::WrongChipArch {
-                                actual,
-                                expected,
-                                backtrace,
-                            } => todo!(),
-                            PlatformError::UnsupportedFwVersion { version, required } => todo!(),
-                            PlatformError::ArcMsgError(_) => todo!(),
-                            PlatformError::EthernetTrainingNotComplete(_) => todo!(),
-                            PlatformError::Generic(_, _) => todo!(),
-                            PlatformError::GenericError(_, _) => todo!(),
+                            // The fact that this is here means that our result is too generic, for now we just ignore it.
+                            PlatformError::ArcMsgError(err) => {
+                                return Ok(ChipInitResult::ErrorContinue);
+                            }
+
+                            // This is fine to hit at this stage (though it should have been already verrified to not be the case).
+                            // For now we just ignore it and hope that it will be resolved by the time the timeout expires...
+                            PlatformError::EthernetTrainingNotComplete(_) => {
+                                return Ok(ChipInitResult::ErrorContinue);
+                            }
+
+                            // This is an "expected error" but we probably can't recover from it, so we should abort the init.
+                            PlatformError::AxiError(_) => return Ok(ChipInitResult::ErrorAbort),
+
+                            // We don't expect to hit these cases so if we do, we should assume that something went terribly
+                            // wrong and abort the init.
+                            PlatformError::UnsupportedFwVersion { .. }
+                            | PlatformError::WrongChipArch { .. }
+                            | PlatformError::WrongChipArchs { .. }
+                            | PlatformError::Generic(_, _)
+                            | PlatformError::GenericError(_, _) => {
+                                return Ok(ChipInitResult::ErrorAbort)
+                            }
                         },
                     }
                     {}
@@ -307,20 +320,23 @@ impl ChipImpl for Wormhole {
         }
 
         {
-            let status = &mut status.eth_status;
-            match status.wait_status {
-                WaitStatus::Waiting(start) => {
-                    let timeout = std::time::Duration::from_secs(300);
-                    if let Ok(_) = self.check_ethernet_training_complete() {
-                        status.wait_status = WaitStatus::JustFinished;
-                    } else if start.elapsed() > timeout {
-                        status.wait_status = WaitStatus::Timeout(timeout);
+            // Only try to initiliaze the ethernet if we are not in noc_safe mode.
+            if !status.init_options.noc_safe {
+                let status = &mut status.eth_status;
+                match status.wait_status {
+                    WaitStatus::Waiting(start) => {
+                        let timeout = std::time::Duration::from_secs(10);
+                        if let Ok(_) = self.check_ethernet_training_complete() {
+                            status.wait_status = WaitStatus::JustFinished;
+                        } else if start.elapsed() > timeout {
+                            status.wait_status = WaitStatus::Timeout(timeout);
+                        }
                     }
+                    WaitStatus::JustFinished => {
+                        status.wait_status = WaitStatus::Done;
+                    }
+                    WaitStatus::Done | WaitStatus::Timeout(_) | WaitStatus::NotPresent => {}
                 }
-                WaitStatus::JustFinished => {
-                    status.wait_status = WaitStatus::Done;
-                }
-                WaitStatus::Done | WaitStatus::Timeout(_) | WaitStatus::NotPresent => {}
             }
         }
 

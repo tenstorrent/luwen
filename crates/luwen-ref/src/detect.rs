@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use kmdif::PciDevice;
-use luwen_if::{chip::Chip, CallbackStorage};
+use luwen_if::{chip::Chip, CallbackStorage, ChipDetectOptions, UninitChip};
 
 use crate::{comms_callback, error::LuwenError, ExtendedPciDevice};
 
-pub fn detect_chips() -> Result<Vec<Chip>, LuwenError> {
+pub fn detect_chips() -> Result<Vec<UninitChip>, LuwenError> {
     let mut chips = Vec::new();
 
     let device_ids = PciDevice::scan();
@@ -75,5 +75,17 @@ pub fn detect_chips() -> Result<Vec<Chip>, LuwenError> {
         };
     };
 
-    Ok(luwen_if::detect_chips(chips, &mut init_callback, false)?)
+    let options = ChipDetectOptions::default();
+    Ok(luwen_if::detect_chips(chips, &mut init_callback, options)?)
+}
+
+pub fn detect_initialized_chips() -> Result<Vec<Chip>, LuwenError> {
+    let chips = detect_chips()?;
+
+    let mut output = Vec::with_capacity(chips.len());
+    for chip in chips {
+        output.push(chip.init(&mut |_| {})?);
+    }
+
+    Ok(output)
 }

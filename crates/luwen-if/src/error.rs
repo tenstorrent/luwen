@@ -34,6 +34,13 @@ pub enum PlatformError {
         backtrace: BtWrapper,
     },
 
+    #[error("Tried to initialize chip with the wrong architecture, expected one of {expected:?} but got {actual:?}\n{backtrace}")]
+    WrongChipArchs {
+        actual: Arch,
+        expected: Vec<Arch>,
+        backtrace: BtWrapper,
+    },
+
     #[error("Unsupported fw version, got {version:x} but required {required:x}")]
     UnsupportedFwVersion { version: u32, required: u32 },
 
@@ -60,5 +67,12 @@ impl From<Box<dyn std::error::Error>> for PlatformError {
     #[inline]
     fn from(e: Box<dyn std::error::Error>) -> Self {
         Self::GenericError(e, BtWrapper::capture())
+    }
+}
+
+impl From<String> for PlatformError {
+    #[inline]
+    fn from(e: String) -> Self {
+        Self::Generic(e, BtWrapper::capture())
     }
 }

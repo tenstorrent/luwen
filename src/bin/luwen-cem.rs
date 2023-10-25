@@ -20,7 +20,7 @@ fn main() -> Result<(), LuwenError> {
     let mut mmio_chips = Vec::new();
     let mut connection_map = HashMap::new();
 
-    for chip in luwen_ref::detect_chips()? {
+    for chip in luwen_ref::detect_initialized_chips()? {
         let telemetry = chip.get_telemetry()?;
 
         let ident = if let Some(wh) = chip.as_wh() {

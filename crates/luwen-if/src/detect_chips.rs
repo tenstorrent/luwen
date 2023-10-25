@@ -3,9 +3,11 @@
 
 use std::collections::HashSet;
 
+use luwen_core::Arch;
+
 use crate::{
-    chip::{wait_for_init, Chip},
-    error::PlatformError,
+    chip::{wait_for_init, Chip, InitStatus},
+    error::{BtWrapper, PlatformError},
     ChipImpl, EthAddr,
 };
 
@@ -13,6 +15,163 @@ use crate::{
 enum InterfaceIdOrCoord {
     Id(u32),
     Coord(EthAddr),
+}
+
+/// Represents a chip object which may or may not be initialized.
+pub enum UninitChip {
+    /// A partially initialized chip, it may be unsafe (0xffffffff errors) to interact with this chip.
+    Partially {
+        /// Contains the init status
+        status: InitStatus,
+        /// Returned when the chip is explicitly upgraded.
+        /// Or init is rerun.
+        underlying: Chip,
+    },
+    /// The chip is fine and can be safely upgraded.
+    Initialized(Chip),
+}
+
+// HACK(drosen): Probably should just implement clone on Chip...
+fn clone_chip(chip: &Chip) -> Chip {
+    if let Some(wh) = chip.as_wh() {
+        Chip::from(Box::new(wh.clone()) as Box<dyn ChipImpl>)
+    } else if let Some(gs) = chip.as_gs() {
+        Chip::from(Box::new(gs.clone()) as Box<dyn ChipImpl>)
+    } else {
+        unimplemented!(
+            "Don't have a clone handler for chip with arch {:?}.",
+            chip.get_arch()
+        )
+    }
+}
+
+impl Clone for UninitChip {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Partially { status, underlying } => Self::Partially {
+                status: status.clone(),
+                underlying: clone_chip(underlying),
+            },
+            Self::Initialized(chip) => Self::Initialized(clone_chip(chip)),
+        }
+    }
+}
+
+impl UninitChip {
+    pub fn new(status: InitStatus, chip: &Chip) -> Self {
+        let chip = clone_chip(chip);
+        if status.init_complete() {
+            UninitChip::Initialized(chip)
+        } else {
+            UninitChip::Partially {
+                status,
+                underlying: chip,
+            }
+        }
+    }
+
+    pub fn status(&self) -> Option<&InitStatus> {
+        match self {
+            UninitChip::Partially { status, .. } => Some(status),
+            UninitChip::Initialized(_) => None,
+        }
+    }
+
+    /// Initialize the chip, if init fails at this point then we return a result
+    /// instead of an UninitChip.
+    pub fn init(
+        self,
+        init_callback: &mut impl FnMut(crate::chip::ChipDetectState<'_>),
+    ) -> Result<Chip, PlatformError> {
+        match self {
+            UninitChip::Partially { underlying, .. } => {
+                wait_for_init(&underlying, init_callback, false, false)?;
+
+                Ok(underlying)
+            }
+            UninitChip::Initialized(chip) => Ok(chip),
+        }
+    }
+
+    pub fn upgrade(self) -> Chip {
+        match self {
+            UninitChip::Partially { underlying, .. } => underlying,
+            UninitChip::Initialized(chip) => chip,
+        }
+    }
+
+    pub fn is_initialized(&self) -> bool {
+        match self {
+            UninitChip::Partially { status, .. } => status.init_complete(),
+            UninitChip::Initialized(_) => true,
+        }
+    }
+
+    pub fn arc_alive(&self) -> bool {
+        match self {
+            UninitChip::Partially { status, .. } => status.arc_status.is_completed(),
+            UninitChip::Initialized(_) => true,
+        }
+    }
+
+    pub fn dram_safe(&self) -> bool {
+        match self {
+            UninitChip::Partially { status, .. } => status.dram_status.is_completed(),
+            UninitChip::Initialized(_) => true,
+        }
+    }
+
+    pub fn eth_safe(&self) -> bool {
+        match self {
+            UninitChip::Partially { status, .. } => status.eth_status.is_completed(),
+            UninitChip::Initialized(_) => true,
+        }
+    }
+}
+
+pub struct ChipDetectOptions {
+    /// If true, we will continue searching for chips even if we encounter a *recoverable* error.
+    /// If false, detection errors will be raised as an Err(..).
+    pub continue_on_failure: bool,
+    /// If true, then we will search for chips directly available over a physical interface (pci, jtag, i2c, etc...)
+    /// If false, we will search for chips directly available and via ethernet.
+    pub local_only: bool,
+    /// If len > 0 then only chips with the given archs will be returned.
+    pub chip_filter: Vec<Arch>,
+    /// If true, then we will not initialize anything that might cause a problem (i.e. a noc hang).
+    pub noc_safe: bool,
+}
+
+impl Default for ChipDetectOptions {
+    fn default() -> Self {
+        Self {
+            continue_on_failure: false,
+            local_only: false,
+            chip_filter: Vec::new(),
+            noc_safe: false,
+        }
+    }
+}
+
+impl ChipDetectOptions {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn continue_on_failure(mut self, continue_on_failure: bool) -> Self {
+        self.continue_on_failure = continue_on_failure;
+        self
+    }
+
+    pub fn local_only(mut self, local_only: bool) -> Self {
+        self.local_only = local_only;
+        self
+    }
+
+    pub fn noc_safe(mut self, noc_safe: bool) -> Self {
+        self.noc_safe = noc_safe;
+        self
+    }
 }
 
 /// Find all chips accessible from the given set of root chips.
@@ -28,22 +187,66 @@ enum InterfaceIdOrCoord {
 /// 1. Add all given chips to output list removing duplicates this will ensure that if list indexes are used to
 /// assign a chip id pci chips will always be output instead of the remote equivalent.
 /// 2. To a depth first search for each root chip, adding all new chips found to the output list.
+///
+/// When continue on failure is true, we report errors, but continue searching for chips.
+/// We pass all chips that did not complete initializations as UninitChip, the user will see the status and can
+/// decide for themselves if they want to upgrade the chip to a full Chip.
+/// Error Cases:
+/// 1. ARC fw is hung, this usually means that there is a noc hang as well.
+///     a. Not catastrophic, we can recover from the hang by resetting the chip.
+/// 2. DRAM is not trained
+///     a. Not catastrophic, but we should not pass this over as a good chip as we may get a noc hang when accessing DRAM.
+/// 3. ARC did not complete initialization
+///     a. Not catastrophic, but for gs we will have no thermal control.
+/// 3. Ethernet fw is corrupted, we check this by looking for a known fw version.
+///     a. Not catastrophic, we need to report this, but can continue exploring other chips in the mesh.
+/// 4. Ethernet fw is hung, this usually means that the ethernet is in a bad state.
+///     a. Not catastrophic, we need to report this, but can continue exploring other chips in the mesh.
+/// 5. 0xffffffff error, this means that the underlying transport is hung.
+///     a. This is catastrophic, we cannot continue searching for chips, because some of the chips in the mesh may no longer be accesible
+///     b. We could recover from this by rerunning the search, but this is not implemented.
 pub fn detect_chips(
-    mut root_chips: Vec<Chip>,
+    root_chips: Vec<Chip>,
     init_callback: &mut impl FnMut(crate::chip::ChipDetectState<'_>),
-    continue_on_failure: bool,
-) -> Result<Vec<Chip>, PlatformError> {
+    options: ChipDetectOptions,
+) -> Result<Vec<UninitChip>, PlatformError> {
+    let ChipDetectOptions {
+        continue_on_failure,
+        local_only,
+        chip_filter,
+        noc_safe,
+    } = options;
+
     let mut remotes_to_investigate = Vec::new();
     let mut seen_chips = HashSet::new();
 
+    let mut output = Vec::new();
     for (root_index, root_chip) in root_chips.iter().enumerate() {
-        // If cont is false, then we cannot continue to interact with the chip
-        // if it's true, then we can continue.
-        let cont = wait_for_init(root_chip, init_callback, continue_on_failure)?;
+        if !chip_filter.is_empty() && !chip_filter.contains(&root_chip.get_arch()) {
+            return Err(PlatformError::WrongChipArchs {
+                actual: root_chip.get_arch(),
+                expected: chip_filter.clone(),
+                backtrace: BtWrapper::capture(),
+            });
+        }
+
+        let status = wait_for_init(root_chip, init_callback, continue_on_failure, noc_safe)?;
+
+        // We now want to convert to the uninitialized chip type.
+        let chip = UninitChip::new(status, root_chip);
+
+        // At this point we may not be able to talk to the chip over ethernet, there should have been an error output to the terminal,
+        // so we will just not perform remote chip detection.
+        let remote_ready = chip.eth_safe();
+
+        output.push(chip);
 
         let ident = if let Some(wh) = root_chip.as_wh() {
             let telem = root_chip.get_telemetry()?;
-            remotes_to_investigate.push(root_index);
+            if !local_only && remote_ready {
+                remotes_to_investigate.push(root_index);
+            }
+
             (
                 Some(telem.board_id),
                 Some(InterfaceIdOrCoord::Coord(wh.get_local_chip_coord()?)),
@@ -65,7 +268,6 @@ pub fn detect_chips(
         }
     }
 
-    let mut output = Vec::new();
     for root_index in remotes_to_investigate {
         let root_chip = &root_chips[root_index];
 
@@ -74,6 +276,10 @@ pub fn detect_chips(
         let mut seen_coords = HashSet::new();
         while let Some(nchip) = to_check.pop() {
             if !seen_coords.insert(nchip.eth_addr) {
+                continue;
+            }
+
+            if !chip_filter.is_empty() && !chip_filter.contains(&root_chip.get_arch()) {
                 continue;
             }
 
@@ -100,7 +306,7 @@ pub fn detect_chips(
                     continue;
                 }
 
-                wait_for_init(&wh, init_callback, continue_on_failure)?;
+                let status = wait_for_init(&wh, init_callback, continue_on_failure, noc_safe)?;
 
                 for nchip in wh.get_neighbouring_chips()? {
                     if !seen_coords.contains(&nchip.eth_addr) {
@@ -110,18 +316,39 @@ pub fn detect_chips(
                     to_check.push(nchip);
                 }
 
-                output.push(Chip::from(Box::new(wh) as Box<dyn ChipImpl>));
+                let chip = Chip::from(Box::new(wh) as Box<dyn ChipImpl>);
+                output.push(UninitChip::new(status, &chip));
             } else {
                 unimplemented!("Don't have a handler for non-WH chips with ethernet support yet.")
             }
         }
     }
 
-    root_chips.extend(output);
-
-    Ok(root_chips)
+    Ok(output)
 }
 
-pub fn detect_chips_silent(root_chips: Vec<Chip>) -> Result<Vec<Chip>, PlatformError> {
-    detect_chips(root_chips, &mut |_| {}, false)
+pub fn detect_initialized_chips(
+    root_chips: Vec<Chip>,
+    init_callback: &mut impl FnMut(crate::chip::ChipDetectState<'_>),
+    options: ChipDetectOptions,
+) -> Result<Vec<Chip>, PlatformError> {
+    let chips = detect_chips(root_chips, init_callback, options)?;
+
+    let mut output = Vec::with_capacity(chips.len());
+    for chip in chips {
+        if chip.is_initialized() {
+            output.push(chip.upgrade());
+        } else {
+            output.push(chip.init(&mut |_| {})?);
+        }
+    }
+
+    Ok(output)
+}
+
+pub fn detect_chips_silent(
+    root_chips: Vec<Chip>,
+    options: ChipDetectOptions,
+) -> Result<Vec<Chip>, PlatformError> {
+    detect_initialized_chips(root_chips, &mut |_| {}, options)
 }

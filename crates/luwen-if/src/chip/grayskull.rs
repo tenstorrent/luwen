@@ -164,6 +164,8 @@ impl ChipImpl for Grayskull {
             },
             eth_status: StatusInfo::not_present(),
             cpu_status: StatusInfo::not_present(),
+
+            init_options: super::InitOptions { noc_safe: false },
         };
         self.update_init_state(&mut status)?;
 
@@ -201,6 +203,7 @@ impl ChipImpl for Grayskull {
                             // wrong and abort the init.
                             PlatformError::UnsupportedFwVersion { .. }
                             | PlatformError::WrongChipArch { .. }
+                            | PlatformError::WrongChipArchs { .. }
                             | PlatformError::Generic(_, _)
                             | PlatformError::GenericError(_, _) => {
                                 return Ok(ChipInitResult::ErrorAbort)
@@ -306,7 +309,9 @@ impl ChipImpl for Grayskull {
         let offset = match result {
             ArcMsgOk::Ok { arg, .. } => arg,
             ArcMsgOk::OkNoWait => {
-                unreachable!("GetSmbusTelemetryAddr should always be waited on for completion")
+                return Err(
+                    "GetSmbusTelemetryAddr should always be waited on for completion".to_string(),
+                )?;
             }
         };
 
