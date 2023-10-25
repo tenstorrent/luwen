@@ -969,7 +969,7 @@ pub fn detect_chips_fallible(
         if error_interfaces.len() > 0 {
             return Err(PyException::new_err(format!(
                 "Could not open TT-PCI device: {:?}; expected one of {:?}",
-                error_interfaces, interfaces
+                error_interfaces, all_devices
             )));
         }
 
@@ -997,7 +997,7 @@ pub fn detect_chips_fallible(
     };
 
     let chips = luwen_if::detect_chips(root_chips, &mut |_| {}, options)
-        .map_err(|v| PyException::new_err(format!("Could perform dma transfer: {}", v)))?;
+        .map_err(|v| PyException::new_err(v.to_string()))?;
     Ok(chips
         .into_iter()
         .map(|chip| UninitPciChip { chip })
