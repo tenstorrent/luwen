@@ -44,8 +44,8 @@ pub enum PlatformError {
     #[error("Unsupported fw version, got {version:x} but required {required:x}")]
     UnsupportedFwVersion { version: u32, required: u32 },
 
-    #[error("It is not currently safe to communicate with ARC because, {0}")]
-    ArcNotReady(String),
+    #[error("It is not currently safe to communicate with ARC because, {0}\n{1}")]
+    ArcNotReady(String, BtWrapper),
 
     #[error(transparent)]
     ArcMsgError(#[from] ArcMsgError),

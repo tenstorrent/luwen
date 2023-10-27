@@ -8,7 +8,7 @@ use luwen_core::Arch;
 use crate::{
     arc_msg::{ArcMsgAddr, ArcMsgOk, ArcMsgProtocolError},
     chip::HlCommsInterface,
-    error::PlatformError,
+    error::{BtWrapper, PlatformError},
     ArcMsg, ChipImpl,
 };
 
@@ -35,7 +35,7 @@ impl Grayskull {
         self.chip_if.as_any().downcast_ref::<T>()
     }
 
-    fn check_arg_msg_safe(&self, msg_reg: u64, _return_reg: u64) -> Result<(), PlatformError> {
+    fn check_arc_msg_safe(&self, msg_reg: u64, _return_reg: u64) -> Result<(), PlatformError> {
         const POST_CODE_INIT_DONE: u32 = 0xC0DE0001;
         const _POST_CODE_ARC_MSG_HANDLE_START: u32 = 0xC0DE0030;
 
@@ -46,12 +46,14 @@ impl Grayskull {
         if pc == 0xFFFFFFFF {
             return Err(PlatformError::ArcNotReady(
                 "scratch register access failed".to_string(),
+                BtWrapper::capture(),
             ))?;
         }
 
         if s5 == 0xDEADC0DE {
             return Err(PlatformError::ArcNotReady(
                 "ARC watchdog has triggered".to_string(),
+                BtWrapper::capture(),
             ))?;
         }
 
@@ -59,11 +61,15 @@ impl Grayskull {
         if s5 == 0x00000060 || pc == 0x11110000 {
             return Err(PlatformError::ArcNotReady(
                 "ARC FW has not yet booted".to_string(),
+                BtWrapper::capture(),
             ))?;
         }
 
         if s5 == 0x0000AA00 || s5 == ArcMsg::ArcGoToSleep.msg_code() as u32 {
-            return Err(PlatformError::ArcNotReady("ARC is asleep".to_string()))?;
+            return Err(PlatformError::ArcNotReady(
+                "ARC is asleep".to_string(),
+                BtWrapper::capture(),
+            ))?;
         }
 
         // PCIE DMA writes SCRATCH[5] on exit, so it's not safe.
@@ -72,21 +78,24 @@ impl Grayskull {
         if dma != 0 {
             return Err(PlatformError::ArcNotReady(
                 "there is an outstanding PCIE DMA request".to_string(),
+                BtWrapper::capture(),
             ))?;
         }
 
         if s5 & 0xFFFFFF00 == 0x0000AA00 {
             let message_id = s5 & 0xFF;
-            return Err(PlatformError::ArcNotReady(format!(
-                "another message is queued (0x{message_id:02x})"
-            )))?;
+            return Err(PlatformError::ArcNotReady(
+                format!("another message is queued (0x{message_id:02x})",),
+                BtWrapper::capture(),
+            ))?;
         }
 
         if s5 & 0xFF00FFFF == 0xAA000000 {
             let message_id = (s5 >> 16) & 0xFF;
-            return Err(PlatformError::ArcNotReady(format!(
-                "another message is being procesed (0x{message_id:02x})"
-            )))?;
+            return Err(PlatformError::ArcNotReady(
+                format!("another message is being procesed (0x{message_id:02x})"),
+                BtWrapper::capture(),
+            ))?;
         }
 
         // Boot complete (new FW only), message not recognized,
@@ -108,9 +117,10 @@ impl Grayskull {
             if pc == POST_CODE_INIT_DONE {
                 return Ok(());
             } else {
-                return Err(PlatformError::ArcNotReady(format!(
-                    "post code 0x{pc:08x} indicates ARC is not ready"
-                )))?;
+                return Err(PlatformError::ArcNotReady(
+                    format!("post code 0x{pc:08x} indicates ARC is not ready"),
+                    BtWrapper::capture(),
+                ))?;
             }
         }
 
@@ -156,11 +166,21 @@ impl ChipImpl for Grayskull {
         let mut status = InitStatus {
             arc_status: StatusInfo {
                 total: 1,
-                ..Default::default()
+                ready: 0,
+                wait_status: WaitStatus::Waiting {
+                    start: std::time::Instant::now(),
+                    timeout: std::time::Duration::from_secs(10),
+                },
+                status: String::new(),
             },
             dram_status: StatusInfo {
                 total: 4,
-                ..Default::default()
+                ready: 0,
+                wait_status: WaitStatus::Waiting {
+                    start: std::time::Instant::now(),
+                    timeout: std::time::Duration::from_secs(10),
+                },
+                status: String::new(),
             },
             eth_status: StatusInfo::not_present(),
             cpu_status: StatusInfo::not_present(),
@@ -176,12 +196,11 @@ impl ChipImpl for Grayskull {
         {
             let status = &mut status.arc_status;
             match status.wait_status {
-                WaitStatus::Waiting(start) => {
-                    let timeout = std::time::Duration::from_secs(10);
-                    match self.check_arg_msg_safe(5, 3) {
+                WaitStatus::Waiting { start, timeout } => {
+                    match self.check_arc_msg_safe(5, 3) {
                         Ok(_) => status.wait_status = WaitStatus::JustFinished,
                         Err(err) => match err {
-                            PlatformError::ArcNotReady(_) => {
+                            PlatformError::ArcNotReady(_, _) => {
                                 status.wait_status = WaitStatus::Timeout(timeout);
                             }
 
@@ -220,11 +239,11 @@ impl ChipImpl for Grayskull {
 
         {
             // Should be covered by the above.
-            let _status = &mut status.dram_status;
+            let status = &mut status.dram_status;
             // match status.wait_status {
             //     WaitStatus::Waiting(start) => {
             //         let timeout = std::time::Duration::from_secs(10);
-            //         if let Ok(_) = self.check_arg_msg_safe(5, 3) {
+            //         if let Ok(_) = self.check_arc_msg_safe(5, 3) {
             //             status.wait_status = WaitStatus::JustFinished;
             //         } else if start.elapsed() > timeout {
             //             status.wait_status = WaitStatus::Timeout(timeout);
@@ -235,6 +254,7 @@ impl ChipImpl for Grayskull {
             //     }
             //     WaitStatus::Done | WaitStatus::Timeout(_) | WaitStatus::NotPresent => {}
             // }
+            status.wait_status = WaitStatus::Done;
         }
 
         {
@@ -261,7 +281,7 @@ impl ChipImpl for Grayskull {
             (5, 3)
         };
 
-        self.check_arg_msg_safe(msg_reg, return_reg)?;
+        self.check_arc_msg_safe(msg_reg, return_reg)?;
 
         crate::arc_msg::arc_msg(
             self,

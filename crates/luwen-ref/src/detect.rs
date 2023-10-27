@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use kmdif::PciDevice;
-use luwen_if::{chip::Chip, CallbackStorage, ChipDetectOptions, UninitChip};
+use luwen_if::{
+    chip::{Chip, WaitStatus},
+    CallbackStorage, ChipDetectOptions, UninitChip,
+};
 
 use crate::{comms_callback, error::LuwenError, ExtendedPciDevice};
 
@@ -30,19 +33,21 @@ pub fn detect_chips() -> Result<Vec<UninitChip>, LuwenError> {
 
     let bars = indicatif::MultiProgress::new();
     let chip_detect_bar = bars.add(chip_detect_bar);
+    chip_detect_bar.enable_steady_tick(std::time::Duration::from_secs_f32(1.0 / 30.0));
     let mut init_callback = |status: luwen_if::chip::ChipDetectState| {
         match status.call {
             luwen_if::chip::CallReason::NewChip => {
                 chip_detect_bar.inc(1);
-                chip_init_bar = Some(
-                    bars.add(
-                        indicatif::ProgressBar::new_spinner().with_style(
-                            indicatif::ProgressStyle::default_spinner()
-                                .template("{spinner:.green} Initializing Chip")
-                                .unwrap(),
-                        ),
+                let new_bar = bars.add(
+                    indicatif::ProgressBar::new_spinner().with_style(
+                        indicatif::ProgressStyle::default_spinner()
+                            .template("{spinner:.green} {msg}")
+                            .unwrap(),
                     ),
                 );
+                new_bar.set_message("Initializing Chip");
+                new_bar.enable_steady_tick(std::time::Duration::from_secs_f32(1.0 / 30.0));
+                chip_init_bar = Some(new_bar);
             }
             luwen_if::chip::CallReason::InitWait(component, status) => {
                 if let Some(bar) = chip_init_bar.as_ref() {
@@ -54,6 +59,11 @@ pub fn detect_chips() -> Result<Vec<UninitChip>, LuwenError> {
 
                     if !status.status.is_empty() {
                         format_message = format!("{}: {}", format_message, status.status);
+                    }
+
+                    if let WaitStatus::Waiting {start, timeout} = &status.wait_status {
+                        format_message =
+                            format!("({}/{}) {format_message}", start.elapsed().as_secs(), timeout.as_secs());
                     }
 
                     bar.set_message(format_message);

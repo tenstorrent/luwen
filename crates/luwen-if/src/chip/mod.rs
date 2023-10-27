@@ -62,7 +62,10 @@ pub enum ArcStatus {
 
 #[derive(Debug, Clone)]
 pub enum WaitStatus {
-    Waiting(std::time::Instant),
+    Waiting {
+        start: std::time::Instant,
+        timeout: std::time::Duration,
+    },
     Timeout(std::time::Duration),
     JustFinished,
     Done,
@@ -78,13 +81,7 @@ impl WaitStatus {
     }
 }
 
-impl Default for WaitStatus {
-    fn default() -> Self {
-        Self::NotPresent
-    }
-}
-
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct StatusInfo {
     pub ready: usize,
     pub total: usize,
@@ -96,13 +93,15 @@ impl StatusInfo {
     pub fn not_present() -> Self {
         Self {
             wait_status: WaitStatus::NotPresent,
-            ..Default::default()
+            ready: 0,
+            total: 0,
+            status: String::new(),
         }
     }
 
     pub fn get_status(&self) -> String {
         match &self.wait_status {
-            WaitStatus::Waiting(_) => {
+            WaitStatus::Waiting { .. } => {
                 let status_line = if !self.status.is_empty() {
                     format!(": {}", self.status)
                 } else {
@@ -143,7 +142,7 @@ impl StatusInfo {
 
     pub fn is_waiting(&self) -> bool {
         match &self.wait_status {
-            WaitStatus::Waiting(_) => true,
+            WaitStatus::Waiting { .. } => true,
             _ => false,
         }
     }

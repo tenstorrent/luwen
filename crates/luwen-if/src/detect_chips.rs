@@ -100,6 +100,19 @@ impl UninitChip {
         }
     }
 
+    pub fn try_upgrade(&self) -> Option<&Chip> {
+        match self {
+            UninitChip::Partially { status, underlying } => {
+                if status.init_complete() {
+                    Some(underlying)
+                } else {
+                    None
+                }
+            }
+            UninitChip::Initialized(chip) => Some(chip),
+        }
+    }
+
     pub fn is_initialized(&self) -> bool {
         match self {
             UninitChip::Partially { status, .. } => status.init_complete(),
@@ -145,7 +158,7 @@ pub struct ChipDetectOptions {
 impl Default for ChipDetectOptions {
     fn default() -> Self {
         Self {
-            continue_on_failure: false,
+            continue_on_failure: true,
             local_only: false,
             chip_filter: Vec::new(),
             noc_safe: false,
@@ -295,25 +308,29 @@ pub fn detect_chips(
                     ));
                 }
 
-                let telem = wh.get_telemetry()?;
-
-                let ident = (
-                    Some(telem.board_id),
-                    Some(InterfaceIdOrCoord::Coord(local_coord)),
-                );
-
-                if !seen_chips.insert(ident) {
-                    continue;
-                }
-
                 let status = wait_for_init(&wh, init_callback, continue_on_failure, noc_safe)?;
 
-                for nchip in wh.get_neighbouring_chips()? {
-                    if !seen_coords.contains(&nchip.eth_addr) {
+                // If we cannot talk to the ARC then we cannot get the ident information so we
+                // will just return the chip and not continue to search.
+                if !status.arc_status.is_error() {
+                    let telem = wh.get_telemetry()?;
+
+                    let ident = (
+                        Some(telem.board_id),
+                        Some(InterfaceIdOrCoord::Coord(local_coord)),
+                    );
+
+                    if !seen_chips.insert(ident) {
                         continue;
                     }
 
-                    to_check.push(nchip);
+                    for nchip in wh.get_neighbouring_chips()? {
+                        if !seen_coords.contains(&nchip.eth_addr) {
+                            continue;
+                        }
+
+                        to_check.push(nchip);
+                    }
                 }
 
                 let chip = Chip::from(Box::new(wh) as Box<dyn ChipImpl>);
