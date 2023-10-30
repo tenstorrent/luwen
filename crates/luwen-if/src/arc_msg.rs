@@ -43,6 +43,9 @@ pub enum ArcMsg {
 
     SetArcState { state: ArcState },
 
+    ResetSafeClks { arg: u32 },
+    ToggleTensixReset { arg: u32},
+    DeassertRiscVReset,
     GetAiclk,
 
     GetHarvesting,
@@ -61,6 +64,9 @@ impl ArcMsg {
                 PowerState::LongIdle => 0x54,
             },
             ArcMsg::GetHarvesting => 0x57,
+            ArcMsg::DeassertRiscVReset => 0xba,
+            ArcMsg::ResetSafeClks { .. } => 0xbb,
+            ArcMsg::ToggleTensixReset { .. } => 0xaf,
             ArcMsg::GetAiclk => 0x34,
             ArcMsg::SetArcState { state } => match state {
                 ArcState::A0 => 0xA0,
@@ -76,11 +82,15 @@ impl ArcMsg {
 
     pub fn args(&self) -> (u16, u16) {
         match self {
-            ArcMsg::Test { arg } => ((arg & 0xFFFF) as u16, ((arg >> 16) & 0xFFFF) as u16),
+            ArcMsg::Test { arg }
+            | ArcMsg::ResetSafeClks { arg }
+            | ArcMsg::ToggleTensixReset { arg }
+             => ((arg & 0xFFFF) as u16, ((arg >> 16) & 0xFFFF) as u16),
             ArcMsg::Nop
             | ArcMsg::ArcGoToSleep
             | ArcMsg::GetSmbusTelemetryAddr
             | ArcMsg::SetPowerState(_)
+            | ArcMsg::DeassertRiscVReset
             | ArcMsg::GetAiclk
             | ArcMsg::GetHarvesting
             | ArcMsg::SetArcState { .. } => (0, 0),
@@ -98,6 +108,13 @@ impl ArcMsg {
         match msg {
             0x11 => ArcMsg::Nop,
             0x34 => ArcMsg::GetAiclk,
+            0xbb => ArcMsg::ResetSafeClks{
+                arg,
+            },
+            0xaf => ArcMsg::ToggleTensixReset{
+                arg,
+            },
+            0xba => ArcMsg::DeassertRiscVReset,
             0x52 => ArcMsg::SetPowerState(PowerState::Busy),
             0x53 => ArcMsg::SetPowerState(PowerState::ShortIdle),
             0x54 => ArcMsg::SetPowerState(PowerState::LongIdle),

@@ -577,24 +577,6 @@ impl PciGrayskull {
         }
     }
 
-    // pub fn all_tensix_toggle_reset(&self) -> PyResult<()> {
-    // // clock_state = self._drop_clocks_to_reset_safe()
-
-    // // try:
-    // //     self.all_riscs_assert_reset()
-
-    // //     self._tensix_toggle_reset()
-
-    // //     self.setup_interface()
-
-    // //     self.assert_all_riscv_soft_reset()
-
-    // //     self.all_riscs_deassert_reset()
-
-    // // finally:
-    // //     self._restore_clocks(clock_state)
-
-    // }
 }
 
 common_chip_comms_impls!(PciGrayskull);
