@@ -115,3 +115,19 @@ deploy:
   script:
     - make deb
   environment: production
+
+# The default cross riscv image doesn't work with 
+# simd instructions, so I've made a manual job here 
+# to deploy the image to the container registry
+deploy-cross:
+  when: manual
+  # Seems to be how we setup docker in docker
+  image: rust:latest
+  services:
+    - docker:20.10.16-dind
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - git clone https://github.com/TTDRosen/cross
+    - cd cross
+    - CROSS_CONTAINER_IN_CONTAINER=true cargo build-docker-image riscv64gc-unknown-linux-gnu --tag latest --repo $CI_REGISTRY/syseng-platform/luwen
+    - docker push $CI_REGISTRY/syseng-platform/luwen/riscv64gc-unknown-linux-gnu:latest
