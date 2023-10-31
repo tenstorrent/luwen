@@ -120,6 +120,8 @@ deploy:
 # simd instructions, so I've made a manual job here 
 # to deploy the image to the container registry
 deploy-cross:
+  tags:
+    - 8-core
   when: manual
   # Seems to be how we setup docker in docker
   image: rust:latest
