@@ -134,14 +134,14 @@ impl Wormhole {
 
         if pc == 0xFFFFFFFF {
             return Err(PlatformError::ArcNotReady(
-                "scratch register access failed".to_string(),
+                crate::error::ArcReadyError::NoAccess,
                 BtWrapper::capture(),
             ))?;
         }
 
         if s5 == 0xDEADC0DE {
             return Err(PlatformError::ArcNotReady(
-                "ARC watchdog has triggered".to_string(),
+                crate::error::ArcReadyError::WatchdogTriggered,
                 BtWrapper::capture(),
             ))?;
         }
@@ -149,14 +149,14 @@ impl Wormhole {
         // Still booting and it will later wipe SCRATCH[5/2].
         if s5 == 0x00000060 || pc == 0x11110000 {
             return Err(PlatformError::ArcNotReady(
-                "ARC FW has not yet booted".to_string(),
+                crate::error::ArcReadyError::BootIncomplete,
                 BtWrapper::capture(),
             ))?;
         }
 
         if s5 == 0x0000AA00 || s5 == ArcMsg::ArcGoToSleep.msg_code() as u32 {
             return Err(PlatformError::ArcNotReady(
-                "ARC is asleep".to_string(),
+                crate::error::ArcReadyError::Asleep,
                 BtWrapper::capture(),
             ))?;
         }
@@ -166,7 +166,7 @@ impl Wormhole {
         // (The former is only relevant when msg_reg==5, but the latter is always relevant.)
         if dma != 0 {
             return Err(PlatformError::ArcNotReady(
-                "there is an outstanding PCIE DMA request".to_string(),
+                crate::error::ArcReadyError::OutstandingPcieDMA,
                 BtWrapper::capture(),
             ))?;
         }
@@ -174,7 +174,7 @@ impl Wormhole {
         if s5 & 0xFFFFFF00 == 0x0000AA00 {
             let message_id = s5 & 0xFF;
             return Err(PlatformError::ArcNotReady(
-                format!("another message is queued (0x{message_id:02x})"),
+                crate::error::ArcReadyError::MessageQueued(message_id),
                 BtWrapper::capture(),
             ))?;
         }
@@ -182,7 +182,7 @@ impl Wormhole {
         if s5 & 0xFF00FFFF == 0xAA000000 {
             let message_id = (s5 >> 16) & 0xFF;
             return Err(PlatformError::ArcNotReady(
-                format!("another message is being procesed (0x{message_id:02x})"),
+                crate::error::ArcReadyError::HandlingMessage(message_id),
                 BtWrapper::capture(),
             ))?;
         }
@@ -210,7 +210,7 @@ impl Wormhole {
                 return Ok(());
             } else {
                 return Err(PlatformError::ArcNotReady(
-                    format!("post code 0x{pc:08x} indicates ARC is not ready"),
+                    crate::error::ArcReadyError::PostCodeBusy(pc),
                     BtWrapper::capture(),
                 ))?;
             }
@@ -284,9 +284,34 @@ impl ChipImpl for Wormhole {
                     match self.check_arc_msg_safe(5, 3) {
                         Ok(_) => status.wait_status = WaitStatus::JustFinished,
                         Err(err) => match err {
-                            PlatformError::ArcNotReady(_, _) => {
-                                if start.elapsed() > timeout {
-                                    status.wait_status = WaitStatus::Timeout(timeout)
+                            PlatformError::ArcNotReady(reason, _) => {
+                                // There are three possibilities when trying to get a response
+                                // here. 1. 0xffffffff in this case we want to assume this is some
+                                // sort of AxiError and abort the init. 2. An error we may
+                                // eventually recover from, i.e. arc booting... 3. we have hit an
+                                // error that won't resolve but isn't indicative of further
+                                // problems. For example watchdog triggered.
+                                match reason {
+                                    // This is triggered when the s5 or pc registers readback
+                                    // 0xffffffff. I am treating it like an AXI error and will
+                                    // assume something has gone terribly wrong and abort.
+                                    crate::error::ArcReadyError::NoAccess => {
+                                        return Ok(ChipInitResult::ErrorAbort)
+                                    }
+                                    crate::error::ArcReadyError::WatchdogTriggered
+                                    | crate::error::ArcReadyError::Asleep => {
+                                        status.wait_status = WaitStatus::JustFinished;
+                                        status.status = reason.to_string();
+                                    }
+                                    crate::error::ArcReadyError::BootIncomplete
+                                    | crate::error::ArcReadyError::OutstandingPcieDMA
+                                    | crate::error::ArcReadyError::MessageQueued(_)
+                                    | crate::error::ArcReadyError::HandlingMessage(_)
+                                    | crate::error::ArcReadyError::PostCodeBusy(_) => {
+                                        if start.elapsed() > timeout {
+                                            status.wait_status = WaitStatus::Timeout(timeout)
+                                        }
+                                    }
                                 }
                             }
 
@@ -295,7 +320,7 @@ impl ChipImpl for Wormhole {
                                 return Ok(ChipInitResult::ErrorContinue);
                             }
 
-                            // This is fine to hit at this stage (though it should have been already verrified to not be the case).
+                            // This is fine to hit at this stage (though it should have been already verified to not be the case).
                             // For now we just ignore it and hope that it will be resolved by the time the timeout expires...
                             PlatformError::EthernetTrainingNotComplete(_) => {
                                 return Ok(ChipInitResult::ErrorContinue);

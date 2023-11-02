@@ -134,7 +134,11 @@ impl StatusInfo {
                     format!("")
                 };
 
-                format!("Completed{status_line}")
+                if self.is_error() {
+                    format!("Error{status_line}")
+                } else {
+                    format!("Completed{status_line}")
+                }
             }
             WaitStatus::NotPresent => String::from("No Present"),
         }

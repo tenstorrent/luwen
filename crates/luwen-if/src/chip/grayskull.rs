@@ -45,14 +45,14 @@ impl Grayskull {
 
         if pc == 0xFFFFFFFF {
             return Err(PlatformError::ArcNotReady(
-                "scratch register access failed".to_string(),
+                crate::error::ArcReadyError::NoAccess,
                 BtWrapper::capture(),
             ))?;
         }
 
         if s5 == 0xDEADC0DE {
             return Err(PlatformError::ArcNotReady(
-                "ARC watchdog has triggered".to_string(),
+                crate::error::ArcReadyError::WatchdogTriggered,
                 BtWrapper::capture(),
             ))?;
         }
@@ -60,14 +60,14 @@ impl Grayskull {
         // Still booting and it will later wipe SCRATCH[5/2].
         if s5 == 0x00000060 || pc == 0x11110000 {
             return Err(PlatformError::ArcNotReady(
-                "ARC FW has not yet booted".to_string(),
+                crate::error::ArcReadyError::BootIncomplete,
                 BtWrapper::capture(),
             ))?;
         }
 
         if s5 == 0x0000AA00 || s5 == ArcMsg::ArcGoToSleep.msg_code() as u32 {
             return Err(PlatformError::ArcNotReady(
-                "ARC is asleep".to_string(),
+                crate::error::ArcReadyError::Asleep,
                 BtWrapper::capture(),
             ))?;
         }
@@ -77,7 +77,7 @@ impl Grayskull {
         // (The former is only relevant when msg_reg==5, but the latter is always relevant.)
         if dma != 0 {
             return Err(PlatformError::ArcNotReady(
-                "there is an outstanding PCIE DMA request".to_string(),
+                crate::error::ArcReadyError::OutstandingPcieDMA,
                 BtWrapper::capture(),
             ))?;
         }
@@ -85,7 +85,7 @@ impl Grayskull {
         if s5 & 0xFFFFFF00 == 0x0000AA00 {
             let message_id = s5 & 0xFF;
             return Err(PlatformError::ArcNotReady(
-                format!("another message is queued (0x{message_id:02x})",),
+                crate::error::ArcReadyError::MessageQueued(message_id),
                 BtWrapper::capture(),
             ))?;
         }
@@ -93,7 +93,7 @@ impl Grayskull {
         if s5 & 0xFF00FFFF == 0xAA000000 {
             let message_id = (s5 >> 16) & 0xFF;
             return Err(PlatformError::ArcNotReady(
-                format!("another message is being procesed (0x{message_id:02x})"),
+                crate::error::ArcReadyError::HandlingMessage(message_id),
                 BtWrapper::capture(),
             ))?;
         }
@@ -118,7 +118,7 @@ impl Grayskull {
                 return Ok(());
             } else {
                 return Err(PlatformError::ArcNotReady(
-                    format!("post code 0x{pc:08x} indicates ARC is not ready"),
+                    crate::error::ArcReadyError::PostCodeBusy(pc),
                     BtWrapper::capture(),
                 ))?;
             }
@@ -200,9 +200,26 @@ impl ChipImpl for Grayskull {
                     match self.check_arc_msg_safe(5, 3) {
                         Ok(_) => status.wait_status = WaitStatus::JustFinished,
                         Err(err) => match err {
-                            PlatformError::ArcNotReady(_, _) => {
-                                status.wait_status = WaitStatus::Timeout(timeout);
-                            }
+                            PlatformError::ArcNotReady(reason, _) => match reason {
+                                crate::error::ArcReadyError::NoAccess => {
+                                    return Ok(ChipInitResult::ErrorAbort);
+                                }
+                                crate::error::ArcReadyError::WatchdogTriggered
+                                | crate::error::ArcReadyError::Asleep => {
+                                    status.wait_status = WaitStatus::JustFinished;
+                                    status.status = reason.to_string();
+                                }
+                                crate::error::ArcReadyError::BootIncomplete
+                                | crate::error::ArcReadyError::OutstandingPcieDMA
+                                | crate::error::ArcReadyError::MessageQueued(_)
+                                | crate::error::ArcReadyError::HandlingMessage(_)
+                                | crate::error::ArcReadyError::PostCodeBusy(_) => {
+                                    if start.elapsed() > timeout {
+                                        status.wait_status = WaitStatus::Timeout(timeout);
+                                        status.status = reason.to_string();
+                                    }
+                                }
+                            },
 
                             // The fact that this is here means that our result is too generic, for now we just ignore it.
                             PlatformError::ArcMsgError(err) => {

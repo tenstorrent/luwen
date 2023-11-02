@@ -26,6 +26,41 @@ impl Display for BtWrapper {
 }
 
 #[derive(Error, Debug)]
+pub enum ArcReadyError {
+    #[error("scratch register access failed")]
+    NoAccess,
+    #[error("ARC watchdog has triggered")]
+    WatchdogTriggered,
+    #[error("ARC FW has not yet booted")]
+    BootIncomplete,
+    #[error("ARC is asleep")]
+    Asleep,
+    #[error("there is an outstanding PCIE DMA request")]
+    OutstandingPcieDMA,
+    #[error("another message is queued (0x{0:02x})")]
+    MessageQueued(u32),
+    #[error("another message is being procesed (0x{0:02x})")]
+    HandlingMessage(u32),
+    #[error("post code 0x{0:08x} indicates ARC is not ready")]
+    PostCodeBusy(u32),
+}
+
+impl ArcReadyError {
+    fn expect_recovert(&self) -> bool {
+        match self {
+            ArcReadyError::NoAccess => false,
+            ArcReadyError::WatchdogTriggered => false,
+            ArcReadyError::BootIncomplete => todo!(),
+            ArcReadyError::Asleep => todo!(),
+            ArcReadyError::OutstandingPcieDMA => todo!(),
+            ArcReadyError::MessageQueued(_) => todo!(),
+            ArcReadyError::HandlingMessage(_) => todo!(),
+            ArcReadyError::PostCodeBusy(_) => todo!(),
+        }
+    }
+}
+
+#[derive(Error, Debug)]
 pub enum PlatformError {
     #[error("Tried to initialize chip with the wrong architecture, expected {expected:?} but got {actual:?}\n{backtrace}")]
     WrongChipArch {
@@ -45,7 +80,7 @@ pub enum PlatformError {
     UnsupportedFwVersion { version: u32, required: u32 },
 
     #[error("It is not currently safe to communicate with ARC because, {0}\n{1}")]
-    ArcNotReady(String, BtWrapper),
+    ArcNotReady(ArcReadyError, BtWrapper),
 
     #[error(transparent)]
     ArcMsgError(#[from] ArcMsgError),
