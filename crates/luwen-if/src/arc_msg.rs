@@ -27,7 +27,7 @@ pub enum ArcState {
 pub enum FwType {
     ArcL2,
     FwBundle,
-    FwBundleSPI
+    FwBundleSPI,
 }
 
 #[derive(Debug)]
@@ -44,7 +44,7 @@ pub enum ArcMsg {
     SetArcState { state: ArcState },
 
     ResetSafeClks { arg: u32 },
-    ToggleTensixReset { arg: u32},
+    ToggleTensixReset { arg: u32 },
     DeassertRiscVReset,
     GetAiclk,
 
@@ -84,8 +84,9 @@ impl ArcMsg {
         match self {
             ArcMsg::Test { arg }
             | ArcMsg::ResetSafeClks { arg }
-            | ArcMsg::ToggleTensixReset { arg }
-             => ((arg & 0xFFFF) as u16, ((arg >> 16) & 0xFFFF) as u16),
+            | ArcMsg::ToggleTensixReset { arg } => {
+                ((arg & 0xFFFF) as u16, ((arg >> 16) & 0xFFFF) as u16)
+            }
             ArcMsg::Nop
             | ArcMsg::ArcGoToSleep
             | ArcMsg::GetSmbusTelemetryAddr
@@ -98,7 +99,7 @@ impl ArcMsg {
                 FwType::ArcL2 => (0, 0),
                 FwType::FwBundle => (1, 0),
                 FwType::FwBundleSPI => (2, 0),
-            }
+            },
         }
     }
 
@@ -108,24 +109,26 @@ impl ArcMsg {
         match msg {
             0x11 => ArcMsg::Nop,
             0x34 => ArcMsg::GetAiclk,
-            0xbb => ArcMsg::ResetSafeClks{
-                arg,
-            },
-            0xaf => ArcMsg::ToggleTensixReset{
-                arg,
-            },
+            0xbb => ArcMsg::ResetSafeClks { arg },
+            0xaf => ArcMsg::ToggleTensixReset { arg },
             0xba => ArcMsg::DeassertRiscVReset,
             0x52 => ArcMsg::SetPowerState(PowerState::Busy),
             0x53 => ArcMsg::SetPowerState(PowerState::ShortIdle),
             0x54 => ArcMsg::SetPowerState(PowerState::LongIdle),
             0x57 => ArcMsg::GetHarvesting,
-            0x90 => ArcMsg::Test {
-                arg,
+            0x90 => ArcMsg::Test { arg },
+            0xA0 => ArcMsg::SetArcState {
+                state: ArcState::A0,
             },
-            0xA0 => ArcMsg::SetArcState { state: ArcState::A0 },
-            0xA1 => ArcMsg::SetArcState { state: ArcState::A1 },
-            0xA3 => ArcMsg::SetArcState { state: ArcState::A3 },
-            0xA5 => ArcMsg::SetArcState { state: ArcState::A5 },
+            0xA1 => ArcMsg::SetArcState {
+                state: ArcState::A1,
+            },
+            0xA3 => ArcMsg::SetArcState {
+                state: ArcState::A3,
+            },
+            0xA5 => ArcMsg::SetArcState {
+                state: ArcState::A5,
+            },
             0xB9 => ArcMsg::FwVersion(match arg {
                 0 => FwType::ArcL2,
                 1 => FwType::FwBundle,

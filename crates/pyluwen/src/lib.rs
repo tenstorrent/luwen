@@ -576,7 +576,6 @@ impl PciGrayskull {
             ));
         }
     }
-
 }
 
 common_chip_comms_impls!(PciGrayskull);
