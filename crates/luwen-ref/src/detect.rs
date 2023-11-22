@@ -34,7 +34,7 @@ pub fn detect_chips() -> Result<Vec<UninitChip>, LuwenError> {
     let bars = indicatif::MultiProgress::new();
     let chip_detect_bar = bars.add(chip_detect_bar);
     chip_detect_bar.enable_steady_tick(std::time::Duration::from_secs_f32(1.0 / 30.0));
-    let mut init_callback = |status: luwen_if::chip::ChipDetectState| {
+    let mut init_callback = |status: luwen_if::chip::ChipDetectState<'_, &dyn std::fmt::Display, &dyn std::fmt::Display>| {
         match status.call {
             luwen_if::chip::CallReason::NewChip => {
                 chip_detect_bar.inc(1);
@@ -49,7 +49,7 @@ pub fn detect_chips() -> Result<Vec<UninitChip>, LuwenError> {
                 new_bar.enable_steady_tick(std::time::Duration::from_secs_f32(1.0 / 30.0));
                 chip_init_bar = Some(new_bar);
             }
-            luwen_if::chip::CallReason::InitWait(component, status) => {
+            luwen_if::chip::CallReason::InitWait(component, status ) => {
                 if let Some(bar) = chip_init_bar.as_ref() {
                     let mut format_message = format!("Waiting for {} to initialize", component);
                     if status.total > 1 {
@@ -61,7 +61,7 @@ pub fn detect_chips() -> Result<Vec<UninitChip>, LuwenError> {
                         format_message = format!("{}: {}", format_message, status.status);
                     }
 
-                    if let WaitStatus::Waiting {start, timeout} = &status.wait_status {
+                    if let WaitStatus::Waiting { start, timeout } = &status.wait_status {
                         format_message =
                             format!("({}/{}) {format_message}", start.elapsed().as_secs(), timeout.as_secs());
                     }

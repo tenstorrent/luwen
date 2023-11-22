@@ -60,7 +60,7 @@ impl Clone for UninitChip {
 impl UninitChip {
     pub fn new(status: InitStatus, chip: &Chip) -> Self {
         let chip = clone_chip(chip);
-        if status.init_complete() {
+        if status.init_complete() && !status.init_partially() {
             UninitChip::Initialized(chip)
         } else {
             UninitChip::Partially {
@@ -81,7 +81,7 @@ impl UninitChip {
     /// instead of an UninitChip.
     pub fn init(
         self,
-        init_callback: &mut impl FnMut(crate::chip::ChipDetectState<'_>),
+        init_callback: &mut impl FnMut(crate::chip::ChipDetectState<'_, &dyn std::fmt::Display, &dyn std::fmt::Display>),
     ) -> Result<Chip, PlatformError> {
         match self {
             UninitChip::Partially { underlying, .. } => {
@@ -103,9 +103,10 @@ impl UninitChip {
     pub fn try_upgrade(&self) -> Option<&Chip> {
         match self {
             UninitChip::Partially { status, underlying } => {
-                if status.init_complete() {
+                if status.init_partially() {
                     Some(underlying)
                 } else {
+                    println!("test");
                     None
                 }
             }
@@ -220,7 +221,7 @@ impl ChipDetectOptions {
 ///     b. We could recover from this by rerunning the search, but this is not implemented.
 pub fn detect_chips(
     root_chips: Vec<Chip>,
-    init_callback: &mut impl FnMut(crate::chip::ChipDetectState<'_>),
+    init_callback: &mut impl FnMut(crate::chip::ChipDetectState<'_, &dyn std::fmt::Display, &dyn std::fmt::Display>),
     options: ChipDetectOptions,
 ) -> Result<Vec<UninitChip>, PlatformError> {
     let ChipDetectOptions {
@@ -346,7 +347,7 @@ pub fn detect_chips(
 
 pub fn detect_initialized_chips(
     root_chips: Vec<Chip>,
-    init_callback: &mut impl FnMut(crate::chip::ChipDetectState<'_>),
+    init_callback: &mut impl FnMut(crate::chip::ChipDetectState<'_, &dyn std::fmt::Display, &dyn std::fmt::Display>),
     options: ChipDetectOptions,
 ) -> Result<Vec<Chip>, PlatformError> {
     let chips = detect_chips(root_chips, init_callback, options)?;

@@ -2,46 +2,131 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{error::PlatformError, ChipImpl};
-
 use super::{InitStatus, StatusInfo};
+use std::{fmt::{self, Display}, sync::Arc};
 
-pub enum CallReason<'a> {
+pub enum CallReason<'a, E: std::fmt::Display, M: std::fmt::Display> {
     NewChip,
-    InitWait(&'a str, &'a StatusInfo),
+    InitWait(&'a str, &'a StatusInfo<E, M>),
     ChipInitCompleted(&'a InitStatus),
 }
 
 #[allow(dead_code)]
-pub struct ChipDetectState<'a> {
+pub struct ChipDetectState<'a, E: std::fmt::Display, M: std::fmt::Display> {
     pub chip: &'a dyn ChipImpl,
-    pub call: CallReason<'a>,
+    pub call: CallReason<'a, E, M>,
 }
 
-pub enum EthernetInitState {
-    NotPresent,
+#[derive(Clone, Debug)]
+pub enum EthernetInitError {
     FwCorrupted,
     NotTrained,
-    Ready,
 }
 
-pub enum ArcInitState {
+impl fmt::Display for EthernetInitError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            EthernetInitError::FwCorrupted => f.write_str("Ethernet firmware is corrupted"),
+            EthernetInitError::NotTrained => f.write_str("Ethernet is not trained"),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum EthernetPartiallyInitError {
+    FwOverwritten,
+}
+
+impl fmt::Display for EthernetPartiallyInitError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            EthernetPartiallyInitError::FwOverwritten => {
+                f.write_str("Ethernet firmware version is overwritten")
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum ArcInitError {
     FwCorrupted,
     WaitingForInit,
     Hung,
-    Ready,
 }
 
-pub struct ChipInitState {
-    pub can_access: bool,
-    pub ethernet_state: EthernetInitState,
-    pub arc_state: ArcInitState,
-
-    underlying_chip: super::Chip,
+impl fmt::Display for ArcInitError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ArcInitError::FwCorrupted => f.write_str("ARC firmware is corrupted"),
+            ArcInitError::WaitingForInit => f.write_str("ARC is waiting for initialization"),
+            ArcInitError::Hung => f.write_str("ARC is hung"),
+        }
+    }
+    
 }
 
-impl ChipInitState {
-    pub fn get_chip(self) -> super::Chip {
-        self.underlying_chip
+#[derive(Clone, Debug)]
+pub enum ArcPartiallyInitError {
+    //TODO: Add more errors here.
+}
+
+impl fmt::Display for ArcPartiallyInitError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            _ => f.write_str("ARC is completely initialized"),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum DramInitError {
+    // TODO: Add more errors here.
+}
+
+impl fmt::Display for DramInitError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            _ => f.write_str("DRAM is completely initialized"),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum DramPartiallyInitError {
+    //TODO: Add more errors here.
+}
+
+impl fmt::Display for DramPartiallyInitError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            _ => f.write_str("DRAM is completely initialized"),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum CpuInitError {
+    //TODO: Add more errors here.
+}
+
+impl fmt::Display for CpuInitError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            _ => f.write_str("CPU is completely initialized"),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum CpuPartiallyInitError {
+    //TODO: Add more errors here.
+}
+
+impl fmt::Display for CpuPartiallyInitError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            _ => f.write_str("CPU is completely initialized"),
+        }
     }
 }
 
@@ -53,7 +138,7 @@ impl ChipInitState {
 ///     - In the case that allow_failure is false, Ok(true) will be returned as an error.
 pub fn wait_for_init(
     chip: &impl ChipImpl,
-    callback: &mut impl FnMut(ChipDetectState<'_>),
+    callback: &mut impl FnMut(ChipDetectState<'_, &dyn std::fmt::Display, &dyn std::fmt::Display>),
     allow_failure: bool,
     noc_safe: bool,
 ) -> Result<InitStatus, PlatformError> {
@@ -94,22 +179,25 @@ pub fn wait_for_init(
             }
         }
 
-        let mut state = ChipDetectState {
+        let mut state: ChipDetectState<'_, &dyn Display, &dyn Display> = ChipDetectState {
             chip,
             call: CallReason::NewChip,
         };
 
-        if !status.arc_status.is_completed() {
-            state.call = CallReason::InitWait("ARC", &status.arc_status);
-        } else if !status.dram_status.is_completed() {
-            state.call = CallReason::InitWait("DRAM", &status.dram_status);
-        } else if !status.eth_status.is_completed() {
-            state.call = CallReason::InitWait("ETH", &status.eth_status);
-        } else if !status.cpu_status.is_completed() {
-            state.call = CallReason::InitWait("CPU", &status.cpu_status);
+        if !status.arc_status.init_partially() {
+            state.call = CallReason::InitWait("ARC", &status.arc_status.make_dyn());
+            
+        } else if !status.dram_status.init_partially() {
+            state.call = CallReason::InitWait("DRAM", &status.dram_status.make_dyn());
+        } else if !status.eth_status.init_partially() {
+
+            state.call = CallReason::InitWait("ETH", &status.eth_status.make_dyn());
+        } else if !status.cpu_status.init_partially() {
+            state.call = CallReason::InitWait("CPU", &status.cpu_status.make_dyn());
         } else {
             // Yes, this also returns a result that we are ignoring.
             // But we are always going to return right after this anyway.
+            println!("Chip initialization complete");
             callback(ChipDetectState {
                 chip,
                 call: CallReason::ChipInitCompleted(&status),
@@ -117,6 +205,6 @@ pub fn wait_for_init(
             return Ok(status);
         }
 
-        callback(state)
+        // callback(state)
     }
 }

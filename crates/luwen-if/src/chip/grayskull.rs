@@ -250,7 +250,8 @@ impl ChipImpl for Grayskull {
                 WaitStatus::JustFinished => {
                     status.wait_status = WaitStatus::Done;
                 }
-                WaitStatus::Done | WaitStatus::Timeout(_) | WaitStatus::NotPresent => {}
+                WaitStatus::Done | WaitStatus::Timeout(_) | WaitStatus::NotPresent  => {}
+                _ => {}
             }
         }
 

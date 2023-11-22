@@ -22,8 +22,11 @@ use luwen_core::Arch;
 pub use wormhole::Wormhole;
 
 use crate::{arc_msg::ArcMsgAddr, error::PlatformError, DeviceInfo};
+use std::fmt;
 
 pub use crate::arc_msg::{ArcMsg, ArcMsgOk};
+
+use self::init::{EthernetInitError, DramInitError, CpuInitError, ArcInitError, DramPartiallyInitError, CpuPartiallyInitError, ArcPartiallyInitError, EthernetPartiallyInitError};
 
 /// Arc message interface
 #[derive(Debug)]
@@ -61,35 +64,125 @@ pub enum ArcStatus {
 }
 
 #[derive(Debug, Clone)]
-pub enum WaitStatus {
+pub enum WaitStatus<E, M>
+where
+    E: std::fmt::Display,
+    M: std::fmt::Display,
+ {
     Waiting {
         start: std::time::Instant,
         timeout: std::time::Duration,
     },
-    Timeout(std::time::Duration),
+
     JustFinished,
+
+    Timeout(std::time::Duration),
     Done,
     NotPresent,
+    Error(E),
+    PartialInit(M),
 }
 
-impl WaitStatus {
+impl<E, M> WaitStatus<E, M> 
+where
+    E: std::fmt::Display,
+    M: std::fmt::Display,
+{
     pub fn is_done(&self) -> bool {
         match self {
-            Self::Done => true,
+            WaitStatus::Done => true,
             _ => false,
+        }
+    }
+
+    pub fn make_dyn(&self) -> WaitStatus<&dyn std::fmt::Display, &dyn std::fmt::Display> {
+        match self {
+            WaitStatus::Waiting { start, timeout } => WaitStatus::Waiting {
+                start: *start,
+                timeout: *timeout,
+            },
+            WaitStatus::JustFinished => WaitStatus::JustFinished,
+            WaitStatus::Timeout(timeout) => WaitStatus::Timeout(*timeout),
+            WaitStatus::Done => WaitStatus::Done,
+            WaitStatus::NotPresent => WaitStatus::NotPresent,
+            WaitStatus::Error(e) => WaitStatus::Error(e),
+            WaitStatus::PartialInit(m) => WaitStatus::PartialInit(m),
+        }
+    }
+
+}
+
+impl <E: std::fmt::Display, M: std::fmt::Display> fmt::Display for WaitStatus<E, M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            WaitStatus::Waiting { start, timeout } => {
+                let elapsed = start.elapsed();
+                let remaining = timeout.checked_sub(elapsed).unwrap_or_default();
+                write!(f, "Waiting for {}s", remaining.as_secs())
+            }
+            WaitStatus::JustFinished => write!(f, "Just finished"),
+            WaitStatus::Timeout(timeout) => write!(f, "Timeout after {}s", timeout.as_secs()),
+            WaitStatus::Done => write!(f, "Done"),
+            WaitStatus::NotPresent => write!(f, "Not Present"),
+            WaitStatus::Error(e) => write!(f, "Error: {}", e),
+            WaitStatus::PartialInit(m) => write!(f, "Partial Init: {}", m),
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct StatusInfo {
+pub struct StatusInfo<E, M>
+where 
+    E: std::fmt::Display,
+    M: std::fmt::Display,
+ {
     pub ready: usize,
     pub total: usize,
-    pub wait_status: WaitStatus,
+    pub wait_status: WaitStatus<E, M>,
     pub status: String,
 }
 
-impl StatusInfo {
+impl <E: std::fmt::Display, M: std::fmt::Display> fmt::Display for StatusInfo<E, M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.wait_status {
+            WaitStatus::Waiting { start, timeout } => {
+                let format_message =
+                format!("({}/{})", start.elapsed().as_secs(), timeout.as_secs());
+                
+                Ok(())
+            }
+            _ => {
+                if self.total > 1 {
+                    let format_message =
+                            format!("[{}/{}]", self.ready, self.total);
+                }
+
+                if !self.status.is_empty() {
+                    let format_message =
+                            format!("{}", self.status);
+                            Ok(())
+                } else {
+                    Err(fmt::Error::default())
+                }
+            }
+        }
+    }
+}
+
+impl<E, M> StatusInfo<E, M> 
+where
+    E: std::fmt::Display,
+    M: std::fmt::Display,
+{   
+    pub fn make_dyn(&self) -> StatusInfo<&dyn std::fmt::Display, &dyn std::fmt::Display> {
+        StatusInfo {
+            ready: self.ready,
+            total: self.total,
+            wait_status: self.wait_status.make_dyn(),
+            status: self.status.clone(),
+        }
+    }
+
     pub fn not_present() -> Self {
         Self {
             wait_status: WaitStatus::NotPresent,
@@ -101,7 +194,7 @@ impl StatusInfo {
 
     pub fn get_status(&self) -> String {
         match &self.wait_status {
-            WaitStatus::Waiting { .. } => {
+            WaitStatus::Waiting{ .. } => {
                 let status_line = if !self.status.is_empty() {
                     format!(": {}", self.status)
                 } else {
@@ -134,46 +227,85 @@ impl StatusInfo {
                     format!("")
                 };
 
-                if self.is_error() {
-                    format!("Error{status_line}")
-                } else {
-                    format!("Completed{status_line}")
-                }
+                format!("Completed{status_line}")
             }
             WaitStatus::NotPresent => String::from("No Present"),
+            WaitStatus::Error(_) | WaitStatus::PartialInit(_) => {
+                let status_line = if !self.status.is_empty() {
+                    format!(": {}", self.status)
+                } else {
+                    format!("")
+                };
+
+                let error_line = format!("Error occurs");
+
+                format!("{error_line}{status_line}")
+            }
         }
     }
 
     pub fn is_waiting(&self) -> bool {
         match &self.wait_status {
             WaitStatus::Waiting { .. } => true,
-            _ => false,
+            
+            WaitStatus::Done 
+            | WaitStatus::JustFinished 
+            | WaitStatus::Timeout(_) 
+            | WaitStatus::NotPresent
+            | WaitStatus::PartialInit(_) 
+            | WaitStatus::Error(_) => false,
         }
     }
 
     pub fn is_error(&self) -> bool {
         match &self.wait_status {
-            WaitStatus::Timeout(_) => true,
+            WaitStatus::Error(_) | WaitStatus::Timeout(_) => true,
+
             WaitStatus::JustFinished | WaitStatus::Done => self.ready != self.total,
-            _ => false,
+
+            WaitStatus::NotPresent 
+            | WaitStatus::Waiting { .. } 
+            | WaitStatus::PartialInit(_) => false,
         }
     }
 
     pub fn is_completed(&self) -> bool {
         match &self.wait_status {
-            WaitStatus::Timeout(_) | WaitStatus::Done | WaitStatus::JustFinished => true,
+            WaitStatus::Timeout(_) 
+            | WaitStatus::Done 
+            | WaitStatus::JustFinished 
+            | WaitStatus::Error(_) 
+            | WaitStatus::PartialInit(_) => true,
             // Not present shouldn't hold up the complete check
             WaitStatus::NotPresent => true,
-            _ => false,
+
+            WaitStatus::Waiting { .. } => false,
         }
     }
 
     pub fn just_finished(&self) -> bool {
         match &self.wait_status {
             WaitStatus::JustFinished => true,
-            _ => false,
+            
+            WaitStatus::Done 
+            | WaitStatus::Timeout(_) 
+            | WaitStatus::NotPresent 
+            | WaitStatus::Waiting { .. }
+            | WaitStatus::Error(_) 
+            | WaitStatus::PartialInit(_) => false,
         }
     }
+
+    pub fn init_partially(&self) -> bool {
+        match &self.wait_status {
+            WaitStatus::PartialInit(_) | WaitStatus::Done | WaitStatus::JustFinished => true,
+            // Not present shouldn't hold up the complete check
+            WaitStatus::NotPresent => true,
+            
+            WaitStatus::Timeout(_) | WaitStatus::Waiting { .. } | WaitStatus::Error(_)  => false,
+        }
+    }
+
 }
 
 #[derive(Clone, Debug)]
@@ -184,10 +316,10 @@ pub struct InitOptions {
 
 #[derive(Clone, Debug)]
 pub struct InitStatus {
-    pub arc_status: StatusInfo,
-    pub dram_status: StatusInfo,
-    pub eth_status: StatusInfo,
-    pub cpu_status: StatusInfo,
+    pub dram_status: StatusInfo<DramInitError, DramPartiallyInitError>,
+    pub cpu_status: StatusInfo<CpuInitError, CpuPartiallyInitError>,
+    pub arc_status: StatusInfo<ArcInitError, ArcPartiallyInitError>,
+    pub eth_status: StatusInfo<EthernetInitError, EthernetPartiallyInitError>,
 
     pub init_options: InitOptions,
 }
@@ -205,6 +337,13 @@ impl InitStatus {
             && self.dram_status.is_completed()
             && self.eth_status.is_completed()
             && self.cpu_status.is_completed()
+    }
+
+    pub fn init_partially(&self) -> bool {
+        self.arc_status.init_partially()
+            || self.dram_status.init_partially()
+            || self.eth_status.init_partially()
+            || self.cpu_status.init_partially()
     }
 
     pub fn init_error(&self) -> bool {
@@ -449,6 +588,7 @@ pub trait ChipImpl: HlComms + Send + Sync + 'static {
 /// A wrapper around a chip that implements `ChipImpl`.
 /// This allows us to create and use chips without knowing their type,
 /// but we can still downcast to the concrete type if we need to.
+
 pub struct Chip {
     pub inner: Box<dyn ChipImpl>,
 }

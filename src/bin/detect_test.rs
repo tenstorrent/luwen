@@ -5,9 +5,11 @@ fn main() {
     };
 
     for chip in partial_chips {
+        let status = chip.status();
         println!(
             "Chip: {:?}",
             chip.try_upgrade().map(|v| {
+                let eth_status = chip.eth_safe();
                 let remote = if let Some(wh) = v.as_wh() {
                     wh.is_remote
                 } else {
@@ -15,7 +17,8 @@ fn main() {
                 };
                 (
                     remote,
-                    v.inner.get_telemetry().map(|v| format!("{:X}", v.board_id)),
+                    status,
+                    eth_status,
                 )
             })
         );

@@ -75,6 +75,7 @@ impl ChipComms for RemoteArcIf {
 
 #[derive(Clone)]
 pub struct EthAddresses {
+    pub masked_version: u32,
     pub boot_params: u64,
     pub node_info: u64,
     pub eth_conn_info: u64,
@@ -134,6 +135,7 @@ impl EthAddresses {
         }
 
         EthAddresses {
+            masked_version,
             boot_params,
             node_info,
             eth_conn_info,
@@ -187,6 +189,16 @@ impl Wormhole {
             } else if start_time.elapsed() > std::time::Duration::from_millis(100) {
                 return Err(PlatformError::EthernetTrainingNotComplete(valid_heartbeat));
             }
+        }
+    }
+
+    pub(crate) fn check_ethernet_fw_version(&self) -> Result<(), ()> {
+        let eth_fw_version = self.eth_addres.masked_version;
+        let msbyte = (eth_fw_version >> 24) & 0xFF;
+        if msbyte != 0x0 || msbyte != 0x6 {
+            return Err(());
+        } else {
+            Ok(())
         }
     }
 }

@@ -943,6 +943,10 @@ impl UninitPciChip {
     }
 }
 
+//silent callback (import), stdout (print) 
+//add arguments, (own or from luwen)
+//from luwen, multiple points to different callback functions
+
 #[pyfunction]
 #[pyo3(signature = (interfaces = None, local_only = false, continue_on_failure = false, chip_filter = None, noc_safe = false))]
 pub fn detect_chips_fallible(

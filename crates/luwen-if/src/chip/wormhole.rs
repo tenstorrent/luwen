@@ -10,7 +10,7 @@ use crate::{
             chip_comms::{load_axi_table, ChipComms},
             chip_interface::ChipInterface,
         },
-        hl_comms::HlCommsInterface,
+        hl_comms::HlCommsInterface, init::EthernetInitError,
     },
     error::{BtWrapper, PlatformError},
     ArcMsg, ChipImpl, IntoChip,
@@ -20,7 +20,7 @@ use super::{
     eth_addr::EthAddr,
     hl_comms::HlComms,
     remote::{EthAddresses, RemoteArcIf},
-    ArcMsgOptions, ChipInitResult, InitStatus, NeighbouringChip, StatusInfo, WaitStatus,
+    ArcMsgOptions, ChipInitResult, InitStatus, NeighbouringChip, StatusInfo, WaitStatus, init::EthernetPartiallyInitError,
 };
 
 /// Implementation of the interface for a Wormhole
@@ -243,28 +243,28 @@ impl ChipImpl for Wormhole {
             arc_status: StatusInfo {
                 total: 1,
                 ready: 0,
-                wait_status: WaitStatus::Waiting {
+                wait_status: WaitStatus::Waiting { 
                     start: std::time::Instant::now(),
                     timeout: std::time::Duration::from_secs(300),
-                },
+                 },
                 status: String::new(),
             },
             dram_status: StatusInfo {
                 total: 4,
                 ready: 0,
-                wait_status: WaitStatus::Waiting {
+                wait_status: WaitStatus::Waiting{ 
                     start: std::time::Instant::now(),
                     timeout: std::time::Duration::from_secs(300),
-                },
+                 },
                 status: String::new(),
             },
             eth_status: StatusInfo {
                 total: 16,
                 ready: 0,
-                wait_status: WaitStatus::Waiting {
+                wait_status: WaitStatus::Waiting { 
                     start: std::time::Instant::now(),
                     timeout: std::time::Duration::from_secs(15 * 60),
-                },
+                 },
                 status: String::new(),
             },
             cpu_status: StatusInfo::not_present(),
@@ -296,7 +296,7 @@ impl ChipImpl for Wormhole {
                                     // 0xffffffff. I am treating it like an AXI error and will
                                     // assume something has gone terribly wrong and abort.
                                     crate::error::ArcReadyError::NoAccess => {
-                                        return Ok(ChipInitResult::ErrorAbort)
+                                        return Ok(ChipInitResult::ErrorAbort) //-> complete restart
                                     }
                                     crate::error::ArcReadyError::WatchdogTriggered
                                     | crate::error::ArcReadyError::Asleep => {
@@ -309,7 +309,7 @@ impl ChipImpl for Wormhole {
                                     | crate::error::ArcReadyError::HandlingMessage(_)
                                     | crate::error::ArcReadyError::PostCodeBusy(_) => {
                                         if start.elapsed() > timeout {
-                                            status.wait_status = WaitStatus::Timeout(timeout)
+                                            status.wait_status = WaitStatus::Timeout(timeout);
                                         }
                                     }
                                 }
@@ -345,7 +345,8 @@ impl ChipImpl for Wormhole {
                 WaitStatus::JustFinished => {
                     status.wait_status = WaitStatus::Done;
                 }
-                WaitStatus::Done | WaitStatus::Timeout(_) | WaitStatus::NotPresent => {}
+                WaitStatus::Done | WaitStatus::Timeout(_) | WaitStatus::NotPresent  => {}
+                _ => {}
             }
         }
 
@@ -374,11 +375,15 @@ impl ChipImpl for Wormhole {
         {
             // Only try to initiliaze the ethernet if we are not in noc_safe mode.
             if !status.init_options.noc_safe {
-                let status = &mut status.eth_status;
+                let status: &mut StatusInfo<EthernetInitError, EthernetPartiallyInitError> = &mut status.eth_status;
                 match status.wait_status {
                     WaitStatus::Waiting { start, timeout } => {
                         if let Ok(_) = self.check_ethernet_training_complete() {
-                            status.wait_status = WaitStatus::JustFinished;
+                            if let Err(err) = self.check_ethernet_fw_version() {
+                                status.wait_status = WaitStatus::PartialInit(EthernetPartiallyInitError::FwOverwritten);
+                            } else {
+                                status.wait_status = WaitStatus::JustFinished;
+                            }
                         } else if start.elapsed() > timeout {
                             status.wait_status = WaitStatus::Timeout(timeout);
                         }
@@ -387,6 +392,7 @@ impl ChipImpl for Wormhole {
                         status.wait_status = WaitStatus::Done;
                     }
                     WaitStatus::Done | WaitStatus::Timeout(_) | WaitStatus::NotPresent => {}
+                    _ => {}
                 }
             } else {
                 let status = &mut status.eth_status;
