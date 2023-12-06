@@ -47,7 +47,7 @@ pub enum ArcMsg {
     ToggleTensixReset { arg: u32 },
     DeassertRiscVReset,
     GetAiclk,
-
+    TriggerReset,
     GetHarvesting,
 
     GetSpiDumpAddr,
@@ -67,6 +67,7 @@ impl ArcMsg {
                 PowerState::ShortIdle => 0x53,
                 PowerState::LongIdle => 0x54,
             },
+            ArcMsg::TriggerReset => 0x56,
             ArcMsg::GetHarvesting => 0x57,
             ArcMsg::DeassertRiscVReset => 0xba,
             ArcMsg::ResetSafeClks { .. } => 0xbb,
@@ -102,6 +103,7 @@ impl ArcMsg {
             | ArcMsg::SetPowerState(_)
             | ArcMsg::DeassertRiscVReset
             | ArcMsg::GetAiclk
+            | ArcMsg::TriggerReset
             | ArcMsg::GetHarvesting
             | ArcMsg::GetSpiDumpAddr
             | ArcMsg::SetArcState { .. } => (0, 0),
@@ -119,6 +121,7 @@ impl ArcMsg {
         match msg {
             0x11 => ArcMsg::Nop,
             0x34 => ArcMsg::GetAiclk,
+            0x56 => ArcMsg::TriggerReset,
             0xbb => ArcMsg::ResetSafeClks { arg },
             0xaf => ArcMsg::ToggleTensixReset { arg },
             0xba => ArcMsg::DeassertRiscVReset,
