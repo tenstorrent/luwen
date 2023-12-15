@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::chip::{eth_addr::EthAddr, ChipInterface};
+use std::fs;
 
 #[derive(Debug)]
 pub enum FnNoc {
@@ -61,6 +62,68 @@ pub struct DeviceInfo {
     pub vendor: u16,
     pub device_id: u16,
     pub bar_size: u64,
+}
+
+impl DeviceInfo {
+    /// Return the sysfs path for the PCIe device.
+    fn pcie_base_path(&self) -> String {
+        let domain = format!("{:04x}", self.domain);
+        let bus = format!("{:02x}", self.bus);
+        let slot = format!("{:02x}", self.slot);
+        let function = format!("{:01x}", self.function);
+        format!(
+            "/sys/bus/pci/devices/{}:{}:{}.{}/",
+            domain, bus, slot, function
+        )
+    }
+
+    /// Return link width; valid values of `s` are "current" and "max".
+    fn pcie_link_width(&self, s: &str) -> u32 {
+        let base_path = self.pcie_base_path();
+        let path = format!("{}{}{}", &base_path, s, "_link_width");
+        let width = fs::read_to_string(path)
+            .map(|s| s.trim().to_string())
+            .unwrap();
+        width.parse::<u32>().unwrap()
+    }
+
+    /// Return link gen; valid values of `s` are "current" and "max".
+    fn pcie_link_gen(&self, s: &str) -> i32 {
+        let base_path = self.pcie_base_path();
+        let path = format!("{}{}{}", &base_path, s, "_link_speed");
+        let speed = fs::read_to_string(path)
+            .map(|s| s.trim().to_string())
+            .unwrap();
+        match speed.split_whitespace().next().unwrap_or("") {
+            "2.5" => 1,
+            "5.0" => 2,
+            "8.0" => 3,
+            "16.0" => 4,
+            "32.0" => 5,
+            "64.0" => 6,
+            _ => -1,
+        }
+    }
+
+    /// Return the current PCIe link width.
+    pub fn pcie_current_link_width(&self) -> u32 {
+        self.pcie_link_width("current")
+    }
+
+    /// Return the current PCIe link generation.
+    pub fn pcie_current_link_gen(&self) -> i32 {
+        self.pcie_link_gen("current")
+    }
+
+    /// Return the maximum PCIe link width.
+    pub fn pcie_max_link_width(&self) -> u32 {
+        self.pcie_link_width("max")
+    }
+
+    /// Return the maximum PCIe link generation.
+    pub fn pcie_max_link_gen(&self) -> i32 {
+        self.pcie_link_gen("max")
+    }
 }
 
 #[derive(Debug)]

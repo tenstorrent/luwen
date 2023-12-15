@@ -209,12 +209,7 @@ pub enum InitType {
     Cpu,
 }
 
-// pub struct Telemetry {
-//     pub board_id: u64,
-//     // add stuff here
-//     pub eth_fw_version: u64,
-// }
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Telemetry {
     pub board_id: u64,
     pub smbus_tx_enum_version: u32,
@@ -267,6 +262,119 @@ pub struct Telemetry {
     pub smbus_tx_eth_debug_status0: u32,
     pub smbus_tx_eth_debug_status1: u32,
     pub smbus_tx_tt_flash_version: u32,
+}
+
+impl Telemetry {
+    /// Return firmware date in YYYY-MM-DD format.
+    pub fn firmware_date(&self) -> String {
+        let year = (self.smbus_tx_wh_fw_date >> 28 & 0xF) + 2020;
+        let month = (self.smbus_tx_wh_fw_date >> 24) & 0xF;
+        let day = (self.smbus_tx_wh_fw_date >> 16) & 0xFF;
+        let _hour = (self.smbus_tx_wh_fw_date >> 8) & 0xFF;
+        let _minute = self.smbus_tx_wh_fw_date & 0xFF;
+        format!("{:04}-{:02}-{:02}", year, month, day)
+    }
+
+    /// Return ARC firmware version in MAJOR.MINOR.PATCH format.
+    pub fn arc_fw_version(&self) -> String {
+        let major = (self.smbus_tx_arc0_fw_version >> 16) & 0xFF;
+        let minor = (self.smbus_tx_arc0_fw_version >> 8) & 0xFF;
+        let patch = (self.smbus_tx_arc0_fw_version >> 0) & 0xFF;
+        format!("{}.{}.{}", major, minor, patch)
+    }
+
+    /// Return Ethernet firmware version in MAJOR.MINOR.PATCH format.
+    pub fn eth_fw_version(&self) -> String {
+        let major = (self.smbus_tx_eth_fw_version >> 16) & 0x0FF;
+        let minor = (self.smbus_tx_eth_fw_version >> 12) & 0x00F;
+        let patch = (self.smbus_tx_eth_fw_version >> 0) & 0xFFF;
+        format!("{}.{}.{}", major, minor, patch)
+    }
+
+    /// Return the board serial number as an integer.
+    pub fn board_serial_number(&self) -> u64 {
+        ((self.smbus_tx_board_id_high as u64) << 32) | self.smbus_tx_board_id_low as u64
+    }
+
+    /// Return the board serial number as a hex-formatted string.
+    pub fn board_serial_number_hex(&self) -> String {
+        format!("{:016x}", self.board_serial_number())
+    }
+
+    /// Return the board type.
+    pub fn board_type(&self) -> &'static str {
+        let serial_num = self.board_serial_number();
+        match (serial_num >> 36) & 0xFFFFF {
+            0x1 => match (serial_num >> 32) & 0xF {
+                0x2 => "E300_R2",
+                0x3 | 0x4 => "E300_R3",
+                _ => "UNSUPPORTED",
+            },
+            0x3 => "e150",
+            0x7 => "e75",
+            0x8 => "NEBULA_CB",
+            0xA => "e300",
+            0xB => "GALAXY",
+            0x14 => "n300",
+            0x18 => "n150",
+            _ => "UNSUPPORTED",
+        }
+    }
+
+    /// Return the AI clock speed in MHz.
+    pub fn ai_clk(&self) -> u32 {
+        self.smbus_tx_aiclk & 0xffff
+    }
+
+    /// Return the AXI clock speed in MHz.
+    pub fn axi_clk(&self) -> u32 {
+        self.smbus_tx_axiclk
+    }
+
+    /// Return the ARC clock speed in MHz.
+    pub fn arc_clk(&self) -> u32 {
+        self.smbus_tx_arcclk
+    }
+
+    /// Return the core voltage in volts.
+    pub fn voltage(&self) -> f64 {
+        self.smbus_tx_vcore as f64 / 1000.0
+    }
+
+    /// Return the ASIC temperature in degrees celsius.
+    pub fn asic_temperature(&self) -> f64 {
+        ((self.smbus_tx_asic_temperature & 0xffff) >> 4) as f64
+    }
+
+    /// Return the voltage regulator temperature in degrees celsius.
+    pub fn vreg_temperature(&self) -> f64 {
+        (self.smbus_tx_vreg_temperature & 0xffff) as f64
+    }
+
+    /// Return the inlet temperature in degrees celsius.
+    pub fn inlet_temperature(&self) -> f64 {
+        ((self.smbus_tx_board_temperature >> 0x10) & 0xff) as f64
+    }
+
+    /// Return the first outlet temperature in degrees celsius.
+    pub fn outlet_temperature1(&self) -> f64 {
+        ((self.smbus_tx_board_temperature >> 0x08) & 0xff) as f64
+    }
+
+    /// Return the second outlet temperature in degrees celsius.
+    pub fn outlet_temperature2(&self) -> f64 {
+        ((self.smbus_tx_board_temperature >> 0x00) & 0xff) as f64
+    }
+
+    /// Return the power consumption in watts.
+    pub fn power(&self) -> f64 {
+        (self.smbus_tx_tdp & 0xffff) as f64
+    }
+
+    /// Return the current consumption in amperes.
+    pub fn current(&self) -> f64 {
+        (self.smbus_tx_tdc & 0xffff) as f64
+    }
 }
 
 pub enum ChipInitResult {
