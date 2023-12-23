@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use crate::{
-    arc_msg::{ArcMsgAddr, ArcMsgOk, ArcMsgProtocolError},
+    arc_msg::{ArcMsgAddr, ArcMsgOk},
     chip::{
         communication::{
             chip_comms::{load_axi_table, ChipComms},
@@ -31,6 +31,7 @@ pub struct Wormhole {
     pub arc_if: Arc<dyn ChipComms + Send + Sync>,
 
     pub is_remote: bool,
+    pub use_arc_for_spi: bool,
 
     pub arc_addrs: ArcMsgAddr,
     pub eth_addres: EthAddresses,
@@ -55,6 +56,7 @@ impl Wormhole {
         CI: ChipInterface + Send + Sync + 'static,
     >(
         is_remote: bool,
+        use_arc_for_spi: bool,
         arc_if: CC,
         chip_if: CI,
     ) -> Result<Self, PlatformError> {
@@ -71,6 +73,7 @@ impl Wormhole {
             chip_if: Arc::new(chip_if),
 
             is_remote,
+            use_arc_for_spi,
 
             arc_addrs: ArcMsgAddr::try_from(&arc_if as &dyn ChipComms)?,
 
@@ -110,7 +113,7 @@ impl Wormhole {
             axi_data: Some(load_axi_table("wormhole-axi-noc.bin", 0)),
         };
 
-        Self::init(true, arc_if, self.chip_if.clone())
+        Self::init(true, true, arc_if, self.chip_if.clone())
     }
 
     // fn check_dram_trained(&self) {
@@ -205,6 +208,22 @@ impl Wormhole {
 
         // We should never get here, every case should be handled above.
         return Ok(());
+    }
+
+    pub fn spi_write(&self, addr: u32, value: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+        let spi = super::spi::ActiveSpi::new(self, self.use_arc_for_spi)?;
+
+        spi.write(self, addr, value)?;
+
+        Ok(())
+    }
+
+    pub fn spi_read(&self, addr: u32, value: &mut [u8]) -> Result<(), Box<dyn std::error::Error>> {
+        let spi = super::spi::ActiveSpi::new(self, self.use_arc_for_spi)?;
+
+        spi.read(self, addr, value)?;
+
+        Ok(())
     }
 }
 

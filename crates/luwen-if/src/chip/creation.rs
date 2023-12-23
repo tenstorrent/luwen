@@ -61,6 +61,7 @@ impl Chip {
 
             Ok(Wormhole::init(
                 false,
+                true,
                 arc_if,
                 Arc::new(backend) as Arc<dyn ChipInterface + Sync + Send>,
             )?)
