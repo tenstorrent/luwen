@@ -468,9 +468,9 @@ pub fn comms_callback_inner(
                     )?;
 
                     let sl = unsafe { std::slice::from_raw_parts_mut(data, len as usize) };
-                    let vl = value.to_ne_bytes();
+                    let vl = value.to_le_bytes();
 
-                    for (s, v) in sl.iter_mut().rev().zip(vl.iter().rev()) {
+                    for (s, v) in sl.iter_mut().zip(vl.iter()) {
                         *s = *v;
                     }
                 } else {

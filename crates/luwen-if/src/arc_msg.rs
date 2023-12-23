@@ -49,6 +49,10 @@ pub enum ArcMsg {
     GetAiclk,
 
     GetHarvesting,
+
+    GetSpiDumpAddr,
+    SpiRead { addr: u32 },
+    SpiWrite,
 }
 
 impl ArcMsg {
@@ -75,6 +79,9 @@ impl ArcMsg {
                 ArcState::A5 => 0xA5,
             },
             ArcMsg::FwVersion(_) => 0xb9,
+            ArcMsg::GetSpiDumpAddr => 0x29,
+            ArcMsg::SpiRead { .. } => 0x2A,
+            ArcMsg::SpiWrite => 0x2B,
         };
 
         0xaa00 | code
@@ -84,9 +91,11 @@ impl ArcMsg {
         match self {
             ArcMsg::Test { arg }
             | ArcMsg::ResetSafeClks { arg }
-            | ArcMsg::ToggleTensixReset { arg } => {
+            | ArcMsg::ToggleTensixReset { arg }
+            | ArcMsg::SpiRead { addr: arg } => {
                 ((arg & 0xFFFF) as u16, ((arg >> 16) & 0xFFFF) as u16)
             }
+            ArcMsg::SpiWrite => (0xFFFF, 0xFFFF),
             ArcMsg::Nop
             | ArcMsg::ArcGoToSleep
             | ArcMsg::GetSmbusTelemetryAddr
@@ -94,6 +103,7 @@ impl ArcMsg {
             | ArcMsg::DeassertRiscVReset
             | ArcMsg::GetAiclk
             | ArcMsg::GetHarvesting
+            | ArcMsg::GetSpiDumpAddr
             | ArcMsg::SetArcState { .. } => (0, 0),
             ArcMsg::FwVersion(ty) => match ty {
                 FwType::ArcL2 => (0, 0),

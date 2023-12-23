@@ -4,6 +4,15 @@
 use std::collections::HashMap;
 
 use luwen_if::chip::{axi_translate, MemorySlice, MemorySlices};
+use nom::{
+    branch::alt,
+    bytes::complete::tag,
+    character::complete::{char, one_of},
+    combinator::{all_consuming, map_res, recognize},
+    multi::{many0, many1},
+    sequence::{preceded, terminated},
+    Finish, IResult,
+};
 use serde::{
     de::{value::SeqAccessDeserializer, Visitor},
     Deserialize, Deserializer, Serialize,
@@ -106,10 +115,74 @@ where
     fields.deserialize_any(DeserializeFieldMap)
 }
 
+fn parse_hexidecimal(i: &str) -> IResult<&str, u64> {
+    map_res(
+        preceded(
+            alt((tag("0x"), tag("0X"))),
+            recognize(many1(terminated(
+                one_of("0123456789abcdefABCDEF"),
+                many0(char('_')),
+            ))),
+        ),
+        |value: &str| u64::from_str_radix(&value.replace("_", ""), 16),
+    )(i)
+}
+
+fn parse_decimal(i: &str) -> IResult<&str, u64> {
+    map_res(
+        recognize(many1(terminated(one_of("0123456789"), many0(char('_'))))),
+        |value: &str| u64::from_str_radix(&value.replace("_", ""), 10),
+    )(i)
+}
+
+fn parse_octal(i: &str) -> IResult<&str, u64> {
+    map_res(
+        preceded(
+            alt((tag("0o"), tag("0O"))),
+            recognize(many1(terminated(one_of("01234567"), many0(char('_'))))),
+        ),
+        |value: &str| u64::from_str_radix(&value.replace("_", ""), 8),
+    )(i)
+}
+
+fn parse_binary(i: &str) -> IResult<&str, u64> {
+    map_res(
+        preceded(
+            alt((tag("0b"), tag("0B"))),
+            recognize(many1(terminated(one_of("01"), many0(char('_'))))),
+        ),
+        |value: &str| u64::from_str_radix(&value.replace("_", ""), 2),
+    )(i)
+}
+
+fn deserialize_underscore_number<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: serde_yaml::Value = Deserialize::deserialize(deserializer)?;
+    let s = serde_yaml::to_string(&s)
+        .map_err(|_| serde::de::Error::custom("Failed to convert yaml value to string"))?;
+
+    let s = s.trim();
+
+    // Then use nom to parse the string as an integer, this parser accepts (and ignores) '_' in the
+    // value.
+    let (_, s) = all_consuming(alt((
+        parse_hexidecimal,
+        parse_decimal,
+        parse_binary,
+        parse_octal,
+    )))(&s)
+    .finish()
+    .map_err(|e| serde::de::Error::custom(format!("Could not parse string {s} as integer: {e}")))?;
+
+    Ok(s)
+}
+
 #[derive(Default, Debug, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct MemoryRegion {
-    #[serde(rename = "Address")]
+    #[serde(rename = "Address", deserialize_with = "deserialize_underscore_number")]
     pub address: u64,
     #[serde(rename = "ArraySize")]
     pub array_size: Option<u64>,
@@ -131,6 +204,7 @@ pub struct MemoryDefs {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MemoryTopLevel {
+    #[serde(deserialize_with = "deserialize_underscore_number")]
     pub offset: u64,
     pub filename: String,
 }
@@ -177,7 +251,13 @@ fn parse_translation_file(
                     false
                 }
             });
-            assert!(all_array || all_struct);
+            assert!(
+                def.fields.is_empty() || (all_array ^ all_struct),
+                "{} ^ {} from {:?}",
+                all_array,
+                all_struct,
+                def.fields
+            );
 
             let address_increment = def.address_increment.unwrap_or(defs.regsize / 8);
 
@@ -208,14 +288,18 @@ fn parse_translation_file(
                         lower_bits,
                         description: _,
                     } => {
-                        println!("WARNING: while parsing {field_name} found non zero field info[0] {mask}");
+                        if mask != 0 {
+                            println!("WARNING: while parsing {field_name} found non zero field info[0] {mask}");
+                        }
+
+                        let size = ((upper_bits + 1 + 7) / 8) as u64;
 
                         slice.children.insert(
                             field_name.clone(),
                             MemorySlice {
                                 name: field_name,
                                 offset: 0,
-                                size: 0,
+                                size,
                                 array_count: None,
                                 bit_mask: Some((lower_bits, upper_bits)),
                                 children: HashMap::new(),
@@ -229,14 +313,18 @@ fn parse_translation_file(
                         byte_offset,
                         description: _,
                     } => {
-                        println!("WARNING: while parsing {field_name} found non zero field info[0] {mask}");
+                        if mask != 0 {
+                            println!("WARNING: while parsing {field_name} found non zero field info[0] {mask}");
+                        }
+
+                        let size = ((upper_bits + 1 + 7) / 8) as u64;
 
                         slice.children.insert(
                             field_name.clone(),
                             MemorySlice {
                                 name: field_name,
                                 offset: byte_offset,
-                                size: 0,
+                                size,
                                 array_count: None,
                                 bit_mask: Some((lower_bits, upper_bits)),
                                 children: HashMap::new(),
@@ -299,6 +387,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "ARC_RESET.POST_CODE",
         "ARC_CSM.DATA[0]",
         "ARC_CSM.ARC_PCIE_DMA_REQUEST.trigger",
+        "ARC_RESET.GPIO2_PAD_TRIEN_CNTL",
+        "ARC_RESET.GPIO2_PAD_DRV_CNTL",
+        "ARC_RESET.GPIO2_PAD_RXEN_CNTL",
+        "ARC_RESET.SPI_CNTL",
+        "ARC_SPI.SPI_CTRLR0",
+        "ARC_SPI.SPI_CTRLR1",
+        "ARC_SPI.SPI_SSIENR",
+        "ARC_SPI.SPI_SER",
+        "ARC_SPI.SPI_SR",
+        "ARC_SPI.SPI_DR",
+        "ARC_SPI.SPI_BAUDR",
     ];
     parse_and_serialize_translation_singlelayer(
         "data/grayskull",

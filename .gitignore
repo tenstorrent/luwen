@@ -1,3 +1,4 @@
 /target
 /Cargo.lock
 .py03-env
+/data

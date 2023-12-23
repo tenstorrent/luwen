@@ -75,6 +75,7 @@ impl DmaBuffer {
         self.0.physical_address
     }
 }
+
 #[pyclass]
 pub struct Telemetry {
     #[pyo3(get)]
@@ -576,6 +577,30 @@ impl PciGrayskull {
             ));
         }
     }
+
+    pub fn spi_read(&self, addr: u32, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
+        Python::with_gil(|_py| {
+            let ptr: *mut u8 = data.buf_ptr().cast();
+            let len = data.len_bytes();
+
+            let data = unsafe { std::slice::from_raw_parts_mut(ptr, len) };
+            self.0
+                .spi_read(addr, data)
+                .map_err(|v| PyException::new_err(v.to_string()))
+        })
+    }
+
+    pub fn spi_write(&self, addr: u32, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
+        Python::with_gil(|_py| {
+            let ptr: *mut u8 = data.buf_ptr().cast();
+            let len = data.len_bytes();
+
+            let data = unsafe { std::slice::from_raw_parts(ptr, len) };
+            self.0
+                .spi_write(addr, data)
+                .map_err(|v| PyException::new_err(v.to_string()))
+        })
+    }
 }
 
 common_chip_comms_impls!(PciGrayskull);
@@ -829,6 +854,30 @@ impl PciWormhole {
             ));
         }
     }
+
+    pub fn spi_read(&self, addr: u32, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
+        Python::with_gil(|_py| {
+            let ptr: *mut u8 = data.buf_ptr().cast();
+            let len = data.len_bytes();
+
+            let data = unsafe { std::slice::from_raw_parts_mut(ptr, len) };
+            self.0
+                .spi_read(addr, data)
+                .map_err(|v| PyException::new_err(v.to_string()))
+        })
+    }
+
+    pub fn spi_write(&self, addr: u32, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
+        Python::with_gil(|_py| {
+            let ptr: *mut u8 = data.buf_ptr().cast();
+            let len = data.len_bytes();
+
+            let data = unsafe { std::slice::from_raw_parts(ptr, len) };
+            self.0
+                .spi_write(addr, data)
+                .map_err(|v| PyException::new_err(v.to_string()))
+        })
+    }
 }
 
 common_chip_comms_impls!(PciWormhole);
@@ -837,6 +886,32 @@ common_chip_comms_impls!(PciWormhole);
 pub struct RemoteWormhole(luwen_if::chip::Wormhole);
 
 common_chip_comms_impls!(RemoteWormhole);
+
+impl RemoteWormhole {
+    pub fn spi_read(&self, addr: u32, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
+        Python::with_gil(|_py| {
+            let ptr: *mut u8 = data.buf_ptr().cast();
+            let len = data.len_bytes();
+
+            let data = unsafe { std::slice::from_raw_parts_mut(ptr, len) };
+            self.0
+                .spi_read(addr, data)
+                .map_err(|v| PyException::new_err(v.to_string()))
+        })
+    }
+
+    pub fn spi_write(&self, addr: u32, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
+        Python::with_gil(|_py| {
+            let ptr: *mut u8 = data.buf_ptr().cast();
+            let len = data.len_bytes();
+
+            let data = unsafe { std::slice::from_raw_parts(ptr, len) };
+            self.0
+                .spi_write(addr, data)
+                .map_err(|v| PyException::new_err(v.to_string()))
+        })
+    }
+}
 
 #[pyfunction]
 pub fn detect_chips() -> Vec<PciChip> {

@@ -117,6 +117,26 @@ impl Grayskull {
         // We should never get here, every case should be handled above.
         return Ok(());
     }
+
+    pub fn spi_write(&self, addr: u32, value: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+        // Grayskull doesn't have support for arc based spi read/write. The messages are
+        // unpopulated, but I am explicily setting it to false out of an abundence of caution.
+        let spi = super::spi::ActiveSpi::new(self, false)?;
+
+        spi.write(self, addr, value)?;
+
+        Ok(())
+    }
+
+    pub fn spi_read(&self, addr: u32, value: &mut [u8]) -> Result<(), Box<dyn std::error::Error>> {
+        // Grayskull doesn't have support for arc based spi read/write. The messages are
+        // unpopulated, but I am explicily setting it to false out of an abundence of caution.
+        let spi = super::spi::ActiveSpi::new(self, false)?;
+
+        spi.read(self, addr, value)?;
+
+        Ok(())
+    }
 }
 
 impl HlComms for Grayskull {

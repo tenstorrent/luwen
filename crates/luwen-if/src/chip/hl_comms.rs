@@ -114,7 +114,6 @@ pub trait HlCommsInterface: HlComms {
         let (arc_if, chip_if) = self.comms_obj();
 
         let addr = addr.as_ref();
-
         let addr = arc_if.axi_translate(addr)?;
 
         if value.len() < addr.size as usize {
@@ -123,7 +122,46 @@ pub trait HlCommsInterface: HlComms {
 
         arc_if.axi_read(chip_if, addr.addr, &mut value[..addr.size as usize])?;
 
-        Ok(&value[..addr.size as usize])
+        let value = if let Some((lower, upper)) = addr.bits {
+            // We are going to apply (value >> lower) & ((1 << upper) - 1);
+            // First determine the shift that we need to apply, if we are shifting by more than 1
+            // byte we can just slice off the bottom elements of the array.
+
+            let (array_shift, element_shift) = if lower == 0 {
+                (0, 0)
+            } else {
+                (lower / 8, lower % 8)
+            };
+
+            let value = &mut value[array_shift as usize..];
+
+            if element_shift > 0 && element_shift < 8 {
+                let mut carry = 0;
+                for v in value.iter_mut() {
+                    let out_shift = *v & ((1 << element_shift) - 1);
+
+                    *v >>= element_shift;
+                    *v |= carry << (8 - element_shift);
+
+                    carry = out_shift;
+                }
+            }
+
+            let array_upper_mask = (upper + 7) / 8 - array_shift;
+            let element_upper_mask = (upper - element_shift) % 8 + 1;
+
+            let value = &mut value[..array_upper_mask as usize];
+
+            if element_upper_mask < 8 {
+                value[(array_upper_mask - 1) as usize] &= (1 << element_upper_mask) - 1;
+            }
+
+            value
+        } else {
+            &mut value[..addr.size as usize]
+        };
+
+        Ok(&*value)
     }
 
     fn axi_sread_to_vec(&self, addr: impl AsRef<str>) -> Result<Vec<u8>, PlatformError> {
@@ -139,15 +177,25 @@ pub trait HlCommsInterface: HlComms {
 
         arc_if.axi_read(chip_if, addr.addr, &mut value[..addr.size as usize])?;
 
+        unsafe {
+            output.set_len(addr.size as usize);
+        }
+
         Ok(output)
     }
 
     fn axi_sread32(&self, addr: impl AsRef<str>) -> Result<u32, PlatformError> {
-        let mut output = [0; 4];
+        let mut value = [0; 4];
 
-        self.axi_sread(addr, &mut output)?;
+        let value = self.axi_sread(addr, &mut value)?;
 
-        Ok(u32::from_le_bytes(output))
+        let mut output = 0;
+        for o in value.iter().rev() {
+            output <<= 8;
+            output |= *o as u32;
+        }
+
+        Ok(output)
     }
 
     fn axi_swrite(&self, addr: impl AsRef<str>, value: &[u8]) -> Result<(), PlatformError> {
