@@ -440,6 +440,14 @@ impl PciChip {
         self.0.as_gs().map(|v| PciGrayskull(v.clone()))
     }
 
+    pub fn is_remote(&self) -> bool {
+        if let Some(wh) = self.0.as_wh() {
+            wh.is_remote
+        } else {
+            false
+        }
+    }
+
     #[new]
     pub fn new(pci_interface: Option<usize>) -> Self {
         let pci_interface = pci_interface.unwrap();
