@@ -49,7 +49,7 @@ pub enum ArcMsg {
     GetAiclk,
     TriggerReset,
     GetHarvesting,
-
+    TriggerSpiCopyLtoR,
     GetSpiDumpAddr,
     SpiRead { addr: u32 },
     SpiWrite,
@@ -62,6 +62,7 @@ impl ArcMsg {
             ArcMsg::ArcGoToSleep => 0x55,
             ArcMsg::Test { .. } => 0x90,
             ArcMsg::GetSmbusTelemetryAddr => 0x2C,
+            ArcMsg::TriggerSpiCopyLtoR => 0x50,
             ArcMsg::SetPowerState(state) => match state {
                 PowerState::Busy => 0x52,
                 PowerState::ShortIdle => 0x53,
@@ -106,6 +107,7 @@ impl ArcMsg {
             | ArcMsg::TriggerReset
             | ArcMsg::GetHarvesting
             | ArcMsg::GetSpiDumpAddr
+            | ArcMsg::TriggerSpiCopyLtoR
             | ArcMsg::SetArcState { .. } => (0, 0),
             ArcMsg::FwVersion(ty) => match ty {
                 FwType::ArcL2 => (0, 0),
@@ -125,6 +127,7 @@ impl ArcMsg {
             0xbb => ArcMsg::ResetSafeClks { arg },
             0xaf => ArcMsg::ToggleTensixReset { arg },
             0xba => ArcMsg::DeassertRiscVReset,
+            0x50 => ArcMsg::TriggerSpiCopyLtoR,
             0x52 => ArcMsg::SetPowerState(PowerState::Busy),
             0x53 => ArcMsg::SetPowerState(PowerState::ShortIdle),
             0x54 => ArcMsg::SetPowerState(PowerState::LongIdle),
