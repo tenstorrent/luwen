@@ -17,16 +17,16 @@ pub use communication::chip_comms::{
 pub use communication::chip_interface::ChipInterface;
 pub use grayskull::Grayskull;
 pub use hl_comms::{HlComms, HlCommsInterface};
-pub use init::{wait_for_init, CallReason, ChipDetectState};
+pub use init::status::InitStatus;
+pub use init::{
+    status::{CommsStatus, ComponentStatusInfo},
+    wait_for_init, CallReason, ChipDetectState,
+};
 use luwen_core::Arch;
 pub use wormhole::Wormhole;
 
-use crate::{arc_msg::ArcMsgAddr, error::PlatformError, DeviceInfo};
-use std::fmt;
-
 pub use crate::arc_msg::{ArcMsg, ArcMsgOk};
-
-use self::init::{EthernetInitError, DramInitError, CpuInitError, ArcInitError, DramPartiallyInitError, CpuPartiallyInitError, ArcPartiallyInitError, EthernetPartiallyInitError};
+use crate::{arc_msg::ArcMsgAddr, error::PlatformError, DeviceInfo};
 
 /// Arc message interface
 #[derive(Debug)]
@@ -55,310 +55,6 @@ pub struct NeighbouringChip {
     pub local_noc_addr: (u8, u8),
     pub remote_noc_addr: (u8, u8),
     pub eth_addr: crate::EthAddr,
-}
-
-pub enum ArcStatus {
-    ArcError(String),
-    DramTraining,
-    ArcOk,
-}
-
-#[derive(Debug, Clone)]
-pub enum WaitStatus<E, M>
-where
-    E: std::fmt::Display,
-    M: std::fmt::Display,
- {
-    Waiting {
-        start: std::time::Instant,
-        timeout: std::time::Duration,
-    },
-
-    JustFinished,
-
-    Timeout(std::time::Duration),
-    Done,
-    NotPresent,
-    Error(E),
-    PartialInit(M),
-}
-
-impl<E, M> WaitStatus<E, M> 
-where
-    E: std::fmt::Display,
-    M: std::fmt::Display,
-{
-    pub fn is_done(&self) -> bool {
-        match self {
-            WaitStatus::Done => true,
-            _ => false,
-        }
-    }
-
-    pub fn make_dyn(&self) -> WaitStatus<&dyn std::fmt::Display, &dyn std::fmt::Display> {
-        match self {
-            WaitStatus::Waiting { start, timeout } => WaitStatus::Waiting {
-                start: *start,
-                timeout: *timeout,
-            },
-            WaitStatus::JustFinished => WaitStatus::JustFinished,
-            WaitStatus::Timeout(timeout) => WaitStatus::Timeout(*timeout),
-            WaitStatus::Done => WaitStatus::Done,
-            WaitStatus::NotPresent => WaitStatus::NotPresent,
-            WaitStatus::Error(e) => WaitStatus::Error(e),
-            WaitStatus::PartialInit(m) => WaitStatus::PartialInit(m),
-        }
-    }
-
-}
-
-impl <E: std::fmt::Display, M: std::fmt::Display> fmt::Display for WaitStatus<E, M> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            WaitStatus::Waiting { start, timeout } => {
-                let elapsed = start.elapsed();
-                let remaining = timeout.checked_sub(elapsed).unwrap_or_default();
-                write!(f, "Waiting for {}s", remaining.as_secs())
-            }
-            WaitStatus::JustFinished => write!(f, "Just finished"),
-            WaitStatus::Timeout(timeout) => write!(f, "Timeout after {}s", timeout.as_secs()),
-            WaitStatus::Done => write!(f, "Done"),
-            WaitStatus::NotPresent => write!(f, "Not Present"),
-            WaitStatus::Error(e) => write!(f, "Error: {}", e),
-            WaitStatus::PartialInit(m) => write!(f, "Partial Init: {}", m),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct StatusInfo<E, M>
-where 
-    E: std::fmt::Display,
-    M: std::fmt::Display,
- {
-    pub ready: usize,
-    pub total: usize,
-    pub wait_status: WaitStatus<E, M>,
-    pub status: String,
-}
-
-impl <E: std::fmt::Display, M: std::fmt::Display> fmt::Display for StatusInfo<E, M> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.wait_status {
-            WaitStatus::Waiting { start, timeout } => {
-                let format_message =
-                format!("({}/{})", start.elapsed().as_secs(), timeout.as_secs());
-                
-                Ok(())
-            }
-            _ => {
-                if self.total > 1 {
-                    let format_message =
-                            format!("[{}/{}]", self.ready, self.total);
-                }
-
-                if !self.status.is_empty() {
-                    let format_message =
-                            format!("{}", self.status);
-                            Ok(())
-                } else {
-                    Err(fmt::Error::default())
-                }
-            }
-        }
-    }
-}
-
-impl<E, M> StatusInfo<E, M> 
-where
-    E: std::fmt::Display,
-    M: std::fmt::Display,
-{   
-    pub fn make_dyn(&self) -> StatusInfo<&dyn std::fmt::Display, &dyn std::fmt::Display> {
-        StatusInfo {
-            ready: self.ready,
-            total: self.total,
-            wait_status: self.wait_status.make_dyn(),
-            status: self.status.clone(),
-        }
-    }
-
-    pub fn not_present() -> Self {
-        Self {
-            wait_status: WaitStatus::NotPresent,
-            ready: 0,
-            total: 0,
-            status: String::new(),
-        }
-    }
-
-    pub fn get_status(&self) -> String {
-        match &self.wait_status {
-            WaitStatus::Waiting{ .. } => {
-                let status_line = if !self.status.is_empty() {
-                    format!(": {}", self.status)
-                } else {
-                    format!("")
-                };
-
-                let total_line = if self.total > 0 {
-                    format!("[{}/{}]", self.ready, self.total)
-                } else {
-                    format!("")
-                };
-
-                format!("{total_line}{status_line}")
-            }
-            WaitStatus::Timeout(timeout) => {
-                let status_line = if !self.status.is_empty() {
-                    format!(": {}", self.status)
-                } else {
-                    format!("")
-                };
-
-                let timeout_line = format!("Timeout after {}", timeout.as_secs());
-
-                format!("{timeout_line}{status_line}")
-            }
-            WaitStatus::JustFinished | WaitStatus::Done => {
-                let status_line = if !self.status.is_empty() {
-                    format!(": {}", self.status)
-                } else {
-                    format!("")
-                };
-
-                format!("Completed{status_line}")
-            }
-            WaitStatus::NotPresent => String::from("No Present"),
-            WaitStatus::Error(_) | WaitStatus::PartialInit(_) => {
-                let status_line = if !self.status.is_empty() {
-                    format!(": {}", self.status)
-                } else {
-                    format!("")
-                };
-
-                let error_line = format!("Error occurs");
-
-                format!("{error_line}{status_line}")
-            }
-        }
-    }
-
-    pub fn is_waiting(&self) -> bool {
-        match &self.wait_status {
-            WaitStatus::Waiting { .. } => true,
-            
-            WaitStatus::Done 
-            | WaitStatus::JustFinished 
-            | WaitStatus::Timeout(_) 
-            | WaitStatus::NotPresent
-            | WaitStatus::PartialInit(_) 
-            | WaitStatus::Error(_) => false,
-        }
-    }
-
-    pub fn is_error(&self) -> bool {
-        match &self.wait_status {
-            WaitStatus::Error(_) | WaitStatus::Timeout(_) => true,
-
-            WaitStatus::JustFinished | WaitStatus::Done => self.ready != self.total,
-
-            WaitStatus::NotPresent 
-            | WaitStatus::Waiting { .. } 
-            | WaitStatus::PartialInit(_) => false,
-        }
-    }
-
-    pub fn is_completed(&self) -> bool {
-        match &self.wait_status {
-            WaitStatus::Timeout(_) 
-            | WaitStatus::Done 
-            | WaitStatus::JustFinished 
-            | WaitStatus::Error(_) 
-            | WaitStatus::PartialInit(_) => true,
-            // Not present shouldn't hold up the complete check
-            WaitStatus::NotPresent => true,
-
-            WaitStatus::Waiting { .. } => false,
-        }
-    }
-
-    pub fn just_finished(&self) -> bool {
-        match &self.wait_status {
-            WaitStatus::JustFinished => true,
-            
-            WaitStatus::Done 
-            | WaitStatus::Timeout(_) 
-            | WaitStatus::NotPresent 
-            | WaitStatus::Waiting { .. }
-            | WaitStatus::Error(_) 
-            | WaitStatus::PartialInit(_) => false,
-        }
-    }
-
-    pub fn init_partially(&self) -> bool {
-        match &self.wait_status {
-            WaitStatus::PartialInit(_) | WaitStatus::Done | WaitStatus::JustFinished => true,
-            // Not present shouldn't hold up the complete check
-            WaitStatus::NotPresent => true,
-            
-            WaitStatus::Timeout(_) | WaitStatus::Waiting { .. } | WaitStatus::Error(_)  => false,
-        }
-    }
-
-}
-
-#[derive(Clone, Debug)]
-pub struct InitOptions {
-    /// If false, then we will not try to initialize anything that would require talking on the NOC
-    noc_safe: bool,
-}
-
-#[derive(Clone, Debug)]
-pub struct InitStatus {
-    pub dram_status: StatusInfo<DramInitError, DramPartiallyInitError>,
-    pub cpu_status: StatusInfo<CpuInitError, CpuPartiallyInitError>,
-    pub arc_status: StatusInfo<ArcInitError, ArcPartiallyInitError>,
-    pub eth_status: StatusInfo<EthernetInitError, EthernetPartiallyInitError>,
-
-    pub init_options: InitOptions,
-}
-
-impl InitStatus {
-    pub fn is_waiting(&self) -> bool {
-        self.arc_status.is_waiting()
-            && self.dram_status.is_waiting()
-            && self.eth_status.is_waiting()
-            && self.cpu_status.is_waiting()
-    }
-
-    pub fn init_complete(&self) -> bool {
-        self.arc_status.is_completed()
-            && self.dram_status.is_completed()
-            && self.eth_status.is_completed()
-            && self.cpu_status.is_completed()
-    }
-
-    pub fn init_partially(&self) -> bool {
-        self.arc_status.init_partially()
-            || self.dram_status.init_partially()
-            || self.eth_status.init_partially()
-            || self.cpu_status.init_partially()
-    }
-
-    pub fn init_error(&self) -> bool {
-        self.arc_status.is_error()
-            || self.dram_status.is_error()
-            || self.eth_status.is_error()
-            || self.cpu_status.is_error()
-    }
-}
-
-pub enum InitType {
-    Arc,
-    Dram,
-    Eth,
-    Cpu,
 }
 
 #[derive(Default, Debug)]
@@ -549,10 +245,6 @@ pub enum ChipInitResult {
 /// explicity stated that they want to enumerate remote chips, then we won't even start looking at remote readiness.
 /// This is to avoid situations where a problematic state is reached and causes an abort even if that capability is not needed.
 pub trait ChipImpl: HlComms + Send + Sync + 'static {
-    /// Check if the chip has been initialized.
-    /// This is also the starting point for the chip initialization process.
-    fn is_inititalized(&self) -> Result<InitStatus, PlatformError>;
-
     /// Update the initialization state of the chip.
     /// The primary purpose of this function is to tell the caller when it is safe to starting interacting with the chip.
     ///
@@ -560,7 +252,10 @@ pub trait ChipImpl: HlComms + Send + Sync + 'static {
     /// For example if the arc is not ready, then we should not try to send an arc message.
     /// Or in a more complex example, if the arc is ready, but the ethernet is not (for example the ethernet fw is hung)
     /// then we will be able to access the local arc, but won't be able to access any remote chips.
-    fn update_init_state(&self, status: &mut InitStatus) -> Result<ChipInitResult, PlatformError>;
+    fn update_init_state(
+        &mut self,
+        status: &mut InitStatus,
+    ) -> Result<ChipInitResult, PlatformError>;
 
     /// Returns the current arch of the chip, can be used to avoid
     /// needing to ducktype when downcasting.
@@ -618,11 +313,10 @@ impl HlComms for Chip {
 }
 
 impl ChipImpl for Chip {
-    fn is_inititalized(&self) -> Result<InitStatus, PlatformError> {
-        self.inner.is_inititalized()
-    }
-
-    fn update_init_state(&self, status: &mut InitStatus) -> Result<ChipInitResult, PlatformError> {
+    fn update_init_state(
+        &mut self,
+        status: &mut InitStatus,
+    ) -> Result<ChipInitResult, PlatformError> {
         self.inner.update_init_state(status)
     }
 

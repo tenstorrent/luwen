@@ -1,5 +1,7 @@
+use luwen_if::ChipImpl;
+
 fn main() {
-    let partial_chips = match luwen_ref::detect_chips() {
+    let partial_chips = match luwen_ref::detect_chips_fallible() {
         Ok(chips) => chips,
         Err(err) => panic!("{}", err),
     };
@@ -16,6 +18,7 @@ fn main() {
                     false
                 };
                 (
+                    v.get_arch(),
                     remote,
                     status,
                     eth_status,

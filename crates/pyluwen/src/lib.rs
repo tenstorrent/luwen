@@ -450,24 +450,29 @@ impl PciChip {
     }
 
     #[new]
-    pub fn new(pci_interface: Option<usize>) -> Self {
+    pub fn new(pci_interface: Option<usize>) -> PyResult<Self> {
         let pci_interface = pci_interface.unwrap();
 
         let chip = luwen_ref::ExtendedPciDevice::open(pci_interface).unwrap();
 
         let arch = chip.borrow().device.arch;
 
-        PciChip(luwen_if::chip::Chip::open(
-            arch,
-            luwen_if::CallbackStorage {
-                callback: luwen_ref::comms_callback,
-                user_data: chip,
-            },
+        Ok(PciChip(
+            luwen_if::chip::Chip::open(
+                arch,
+                luwen_if::CallbackStorage {
+                    callback: luwen_ref::comms_callback,
+                    user_data: chip,
+                },
+            )
+            .map_err(|v| {
+                PyException::new_err(format!("Could not initialize chip: {}", v.to_string()))
+            })?,
         ))
     }
 
-    pub fn init(&self) -> PyResult<()> {
-        wait_for_init(&self.0, &mut |_| {}, false, false).map_err(|v| {
+    pub fn init(&mut self) -> PyResult<()> {
+        wait_for_init(&mut self.0, &mut |_| {}, false, false).map_err(|v| {
             PyException::new_err(format!("Could not initialize chip: {}", v.to_string()))
         })?;
 
@@ -943,7 +948,7 @@ impl UninitPciChip {
     }
 }
 
-//silent callback (import), stdout (print) 
+//silent callback (import), stdout (print)
 //add arguments, (own or from luwen)
 //from luwen, multiple points to different callback functions
 
@@ -982,7 +987,7 @@ pub fn detect_chips_fallible(
 
     let mut root_chips = Vec::with_capacity(interfaces.len());
     for interface in interfaces {
-        root_chips.push(PciChip::new(Some(interface)).0);
+        root_chips.push(PciChip::new(Some(interface))?.0);
     }
 
     let chip_filter = chip_filter.unwrap_or_default();

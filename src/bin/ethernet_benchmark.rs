@@ -79,7 +79,7 @@ fn read_write_test(
 }
 
 pub fn main() -> Result<(), LuwenError> {
-    let chips = luwen_ref::detect_initialized_chips()?;
+    let chips = luwen_ref::detect_chips()?;
 
     for (chip_index, chip) in chips.into_iter().enumerate() {
         println!("Running on {chip_index}");

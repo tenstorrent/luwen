@@ -13,8 +13,8 @@ use crate::{
 };
 
 use super::{
-    ArcMsgOptions, ChipComms, ChipInitResult, ChipInterface, HlComms, InitStatus, NeighbouringChip,
-    StatusInfo, WaitStatus,
+    init::status::{ComponentStatusInfo, InitOptions, WaitStatus},
+    ArcMsgOptions, ChipComms, ChipInitResult, ChipInterface, HlComms, InitStatus, NeighbouringChip, CommsStatus,
 };
 
 #[derive(Clone)]
@@ -23,11 +23,6 @@ pub struct Grayskull {
     pub arc_if: Arc<dyn ChipComms + Send + Sync>,
 
     pub arc_addrs: ArcMsgAddr,
-}
-
-pub enum ArcReady {
-    Ready,
-    NotReady(ArcMsgProtocolError),
 }
 
 impl Grayskull {
@@ -161,102 +156,121 @@ impl HlComms for &Grayskull {
     }
 }
 
-impl ChipImpl for Grayskull {
-    fn is_inititalized(&self) -> Result<InitStatus, PlatformError> {
-        let mut status = InitStatus {
-            arc_status: StatusInfo {
-                total: 1,
-                ready: 0,
-                wait_status: WaitStatus::Waiting {
-                    start: std::time::Instant::now(),
-                    timeout: std::time::Duration::from_secs(10),
-                },
-                status: String::new(),
-            },
-            dram_status: StatusInfo {
-                total: 4,
-                ready: 0,
-                wait_status: WaitStatus::Waiting {
-                    start: std::time::Instant::now(),
-                    timeout: std::time::Duration::from_secs(10),
-                },
-                status: String::new(),
-            },
-            eth_status: StatusInfo::not_present(),
-            cpu_status: StatusInfo::not_present(),
+fn default_status() -> InitStatus {
+    InitStatus {
+        comms_status: super::CommsStatus::CanCommunicate,
+        arc_status: ComponentStatusInfo {
+            wait_status: Box::new([WaitStatus::Waiting]),
+            status: String::new(),
 
-            init_options: super::InitOptions { noc_safe: false },
-        };
-        self.update_init_state(&mut status)?;
+            start_time: std::time::Instant::now(),
+            timeout: std::time::Duration::from_secs(10),
+        },
+        dram_status: ComponentStatusInfo::init_waiting(
+            String::new(),
+            std::time::Duration::from_secs(10),
+            4,
+        ),
+        eth_status: ComponentStatusInfo::not_present(),
+        cpu_status: ComponentStatusInfo::not_present(),
 
-        Ok(status)
+        init_options: InitOptions { noc_safe: false },
+
+        unknown_state: false
     }
+}
 
-    fn update_init_state(&self, status: &mut InitStatus) -> Result<ChipInitResult, PlatformError> {
+impl ChipImpl for Grayskull {
+    fn update_init_state(
+        &mut self,
+        status: &mut InitStatus,
+    ) -> Result<ChipInitResult, PlatformError> {
+        if status.unknown_state {
+            *status = default_status();
+        }
+
+        let comms = &mut status.comms_status;
+
         {
             let status = &mut status.arc_status;
-            match status.wait_status {
-                WaitStatus::Waiting { start, timeout } => {
-                    match self.check_arc_msg_safe(5, 3) {
-                        Ok(_) => status.wait_status = WaitStatus::JustFinished,
-                        Err(err) => match err {
-                            PlatformError::ArcNotReady(reason, _) => match reason {
-                                crate::error::ArcReadyError::NoAccess => {
-                                    return Ok(ChipInitResult::ErrorAbort);
-                                }
-                                crate::error::ArcReadyError::WatchdogTriggered
-                                | crate::error::ArcReadyError::Asleep => {
-                                    status.wait_status = WaitStatus::JustFinished;
-                                    status.status = reason.to_string();
-                                }
-                                crate::error::ArcReadyError::BootIncomplete
-                                | crate::error::ArcReadyError::OutstandingPcieDMA
-                                | crate::error::ArcReadyError::MessageQueued(_)
-                                | crate::error::ArcReadyError::HandlingMessage(_)
-                                | crate::error::ArcReadyError::PostCodeBusy(_) => {
-                                    if start.elapsed() > timeout {
-                                        status.wait_status = WaitStatus::Timeout(timeout);
-                                        status.status = reason.to_string();
+            if let Some(arc_status) = status.wait_status.get_mut(0) {
+                match arc_status {
+                    WaitStatus::Waiting => {
+                        match self.check_arc_msg_safe(5, 3) {
+                            Ok(_) => *arc_status = WaitStatus::JustFinished,
+                            Err(err) => match err {
+                                PlatformError::ArcNotReady(reason, _) => {
+                                    // There are three possibilities when trying to get a response
+                                    // here. 1. 0xffffffff in this case we want to assume this is some
+                                    // sort of AxiError and abort the init. 2. An error we may
+                                    // eventually recover from, i.e. arc booting... 3. we have hit an
+                                    // error that won't resolve but isn't indicative of further
+                                    // problems. For example watchdog triggered.
+                                    match reason {
+                                        // This is triggered when the s5 or pc registers readback
+                                        // 0xffffffff. I am treating it like an AXI error and will
+                                        // assume something has gone terribly wrong and abort.
+                                        crate::error::ArcReadyError::NoAccess => {
+                                            *comms = CommsStatus::CommunicationError("Failed to access ARC".to_string());
+                                            return Ok(ChipInitResult::ErrorAbort);
+                                        }
+                                        crate::error::ArcReadyError::WatchdogTriggered
+                                        | crate::error::ArcReadyError::Asleep => {
+                                            *arc_status = WaitStatus::JustFinished;
+                                            status.status = reason.to_string();
+                                        }
+                                        crate::error::ArcReadyError::BootIncomplete
+                                        | crate::error::ArcReadyError::OutstandingPcieDMA
+                                        | crate::error::ArcReadyError::MessageQueued(_)
+                                        | crate::error::ArcReadyError::HandlingMessage(_)
+                                        | crate::error::ArcReadyError::PostCodeBusy(_) => {
+                                            if status.start_time.elapsed() > status.timeout {
+                                                *arc_status = WaitStatus::Timeout(status.timeout);
+                                            }
+                                        }
                                     }
                                 }
+
+                                // The fact that this is here means that our result is too generic, for now we just ignore it.
+                                PlatformError::ArcMsgError(_) => {
+                                    return Ok(ChipInitResult::ErrorContinue);
+                                }
+
+                                // This is fine to hit at this stage (though it should have been already verified to not be the case).
+                                // For now we just ignore it and hope that it will be resolved by the time the timeout expires...
+                                PlatformError::EthernetTrainingNotComplete(_) => {
+                                    return Ok(ChipInitResult::ErrorContinue);
+                                }
+
+                                // This is an "expected error" but we probably can't recover from it, so we should abort the init.
+                                PlatformError::AxiError(_) => {
+                                    return Ok(ChipInitResult::ErrorAbort)
+                                }
+
+                                // We don't expect to hit these cases so if we do, we should assume that something went terribly
+                                // wrong and abort the init.
+                                PlatformError::UnsupportedFwVersion { .. }
+                                | PlatformError::WrongChipArch { .. }
+                                | PlatformError::WrongChipArchs { .. }
+                                | PlatformError::Generic(_, _)
+                                | PlatformError::GenericError(_, _) => {
+                                    return Ok(ChipInitResult::ErrorAbort)
+                                }
                             },
-
-                            // The fact that this is here means that our result is too generic, for now we just ignore it.
-                            PlatformError::ArcMsgError(err) => {
-                                return Ok(ChipInitResult::ErrorContinue);
-                            }
-
-                            // This is fine to hit at this stage (though it should have been already verrified to not be the case).
-                            // For now we just ignore it and hope that it will be resolved by the time the timeout expires...
-                            PlatformError::EthernetTrainingNotComplete(_) => {
-                                return Ok(ChipInitResult::ErrorContinue);
-                            }
-
-                            // This is an "expected error" but we probably can't recover from it, so we should abort the init.
-                            PlatformError::AxiError(_) => return Ok(ChipInitResult::ErrorAbort),
-
-                            // We don't expect to hit these cases so if we do, we should assume that something went terribly
-                            // wrong and abort the init.
-                            PlatformError::UnsupportedFwVersion { .. }
-                            | PlatformError::WrongChipArch { .. }
-                            | PlatformError::WrongChipArchs { .. }
-                            | PlatformError::Generic(_, _)
-                            | PlatformError::GenericError(_, _) => {
-                                return Ok(ChipInitResult::ErrorAbort)
-                            }
-                        },
+                        }
+                        {}
                     }
+                    WaitStatus::JustFinished => {
+                        *arc_status = WaitStatus::Done;
+                    }
+                    WaitStatus::Done | WaitStatus::Timeout(_) | WaitStatus::NotPresent => {}
+                    _ => {}
                 }
-                WaitStatus::JustFinished => {
-                    status.wait_status = WaitStatus::Done;
-                }
-                WaitStatus::Done | WaitStatus::Timeout(_) | WaitStatus::NotPresent  => {}
-                _ => {}
             }
         }
 
         {
-            // Should be covered by the above.
+            // TODO(drosen): Explicitly check against the telemetry info
             let status = &mut status.dram_status;
             // match status.wait_status {
             //     WaitStatus::Waiting(start) => {
@@ -272,7 +286,11 @@ impl ChipImpl for Grayskull {
             //     }
             //     WaitStatus::Done | WaitStatus::Timeout(_) | WaitStatus::NotPresent => {}
             // }
-            status.wait_status = WaitStatus::Done;
+
+            // For now assume that if ARC is good, then so is dram
+            for dram_status in status.wait_status.iter_mut() {
+                *dram_status = WaitStatus::Done;
+            }
         }
 
         {

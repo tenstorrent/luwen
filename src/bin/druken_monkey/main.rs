@@ -1,15 +1,16 @@
 use luwen_if::{
     chip::{Chip, HlComms, HlCommsInterface, InitStatus},
-    ArcState, ChipImpl, error::{PlatformError, BtWrapper}, ArcMsgError, ArcMsgProtocolError,
+    error::{BtWrapper, PlatformError},
+    ArcMsgError, ArcMsgProtocolError, ArcState, ChipImpl,
 };
-use luwen_ref::{detect_initialized_chips, error::LuwenError};
-use std::{backtrace::{Backtrace}, time::Duration};
-use std::process::Command;
+use luwen_ref::error::LuwenError;
 use std::any::Any;
-use std::thread;
 use std::panic;
+use std::process::Command;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::thread;
+use std::{backtrace::Backtrace, time::Duration};
 
 pub enum ArcHangMethod {
     OverwriteFwCode,
@@ -127,9 +128,9 @@ fn hang_eth(
     Ok(())
 }
 
-fn run_detect_test() -> Result<Option<Vec<(bool, Option<InitStatus>)>>, LuwenError>{
+fn run_detect_test() -> Result<Option<Vec<(bool, Option<InitStatus>)>>, LuwenError> {
     let mut chip_details = Vec::new();
-    let partial_chips = match luwen_ref::detect_chips() {
+    let partial_chips = match luwen_ref::detect_chips_fallible() {
         Ok(chips) => chips,
         Err(err) => return Err(err),
     };
@@ -148,7 +149,6 @@ fn run_detect_test() -> Result<Option<Vec<(bool, Option<InitStatus>)>>, LuwenErr
             };
             chip_details.push((remote, status));
         });
-
     }
 
     if !chip_details.is_empty() {
@@ -158,7 +158,7 @@ fn run_detect_test() -> Result<Option<Vec<(bool, Option<InitStatus>)>>, LuwenErr
     }
 }
 
-fn compare_and_reset(expected:&dyn Any) {
+fn compare_and_reset(expected: &dyn Any) {
     println!("Running detect test");
     if expected.is::<PlatformError>() {
         // Handling PlatformError
@@ -172,7 +172,7 @@ fn compare_and_reset(expected:&dyn Any) {
                 println!("Actual: {:?}", err);
                 println!("Expected: {:?}", platform_error);
             }
-            _ => panic!("Expected error not found")
+            _ => panic!("Expected error not found"),
         }
     } else if expected.is::<BtWrapper>() {
         // Handling Backtrace
@@ -187,9 +187,9 @@ fn compare_and_reset(expected:&dyn Any) {
                 println!("Actual: {:?}", err);
                 println!("Expected: {:?}", backtrace);
             }
-            _ => panic!("Expected error not found")
+            _ => panic!("Expected error not found"),
         }
-    } else if expected.is::<Vec<Chip>>(){
+    } else if expected.is::<Vec<Chip>>() {
         // Unsupported type
         match run_detect_test() {
             Ok(Some(chip_details)) => {
@@ -200,23 +200,25 @@ fn compare_and_reset(expected:&dyn Any) {
                     println!("Chip is fully initialized");
                 }
             }
-            _ => panic!("Expected error not found")
+            _ => panic!("Expected error not found"),
         }
-    } 
+    }
 
     // Trigger the command in the terminal
-    
+
     reset_board();
 }
 
 fn reset_board() {
     let _ = Command::new("/bin/bash")
         .arg("-c")
-        .arg(r#"
-            cd ~/work/syseng/src/t6ifc/t6py && 
-            . bin/venv-activate.sh my-env && 
+        .arg(
+            r#"
+            cd ~/work/syseng/src/t6ifc/t6py &&
+            . bin/venv-activate.sh my-env &&
             reset-board
-        "#)
+        "#,
+        )
         .spawn();
 
     println!("waiting for ddr training to complete");
@@ -224,12 +226,19 @@ fn reset_board() {
     thread::sleep(duration);
 
     //delay time seconds
-    
+
     println!("warm reset triggered");
 }
 
 fn main() {
-    let commands = vec!["arc a5", "arc hault", "noc cg", "noc oob", "eth ver 1", "eth fw 1"];
+    let commands = vec![
+        "arc a5",
+        "arc hault",
+        "noc cg",
+        "noc oob",
+        "eth ver 1",
+        "eth fw 1",
+    ];
     // let commands = vec!["noc cg", "noc oob", "eth ver 1", "eth fw 1"];
     for cmd in commands {
         let args = cmd.split(" ").collect::<Vec<_>>();
@@ -237,7 +246,7 @@ fn main() {
         let option = args.get(1);
         println!("Command: {} Option: {}", command, option.unwrap_or(&"None"));
 
-        let mut chips = detect_initialized_chips().unwrap();
+        let mut chips = luwen_ref::detect_chips().unwrap();
 
         match (command, option) {
             ("arc", Some(opt)) => {
@@ -255,7 +264,6 @@ fn main() {
 
                 hang_arc(method, chips.pop().unwrap()).unwrap();
                 compare_and_reset(&expected);
-                
             }
             ("noc", Some(opt)) => {
                 let method = match *opt {
@@ -273,7 +281,7 @@ fn main() {
                     let mut chips = chips_clone.lock().unwrap();
                     let _ = hang_noc(method, chips.pop().unwrap()).unwrap();
                 });
-            
+
                 // Wait for the thread to finish and handle any panics
                 let result = handle.join();
                 match result {
@@ -286,7 +294,6 @@ fn main() {
                             println!("Panic occurred: {}", s);
                         } else {
                             println!("Panic occurred");
-                            
                         }
                         // Continue with the rest of your logic
                     }
@@ -300,10 +307,12 @@ fn main() {
                     "ver" => EthHangMethod::OverwriteFwVersion,
                     "fw" => EthHangMethod::OverwriteEthFw,
                     other => {
-                        unimplemented!("Have not yet implementd support for eth hang method {other}");
+                        unimplemented!(
+                            "Have not yet implementd support for eth hang method {other}"
+                        );
                     }
                 };
-                
+
                 let core = args.get(2).map(|v| v.parse()).unwrap_or(Ok(0)).unwrap();
                 let _ = hang_eth(method, core, chips.pop().unwrap()).unwrap();
                 compare_and_reset(&Some(chips.pop()));
@@ -312,4 +321,3 @@ fn main() {
         }
     }
 }
-

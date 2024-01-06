@@ -60,7 +60,7 @@ impl Clone for UninitChip {
 impl UninitChip {
     pub fn new(status: InitStatus, chip: &Chip) -> Self {
         let chip = clone_chip(chip);
-        if status.init_complete() && !status.init_partially() {
+        if status.init_complete() && !status.has_error() {
             UninitChip::Initialized(chip)
         } else {
             UninitChip::Partially {
@@ -81,11 +81,11 @@ impl UninitChip {
     /// instead of an UninitChip.
     pub fn init(
         self,
-        init_callback: &mut impl FnMut(crate::chip::ChipDetectState<'_, &dyn std::fmt::Display, &dyn std::fmt::Display>),
+        init_callback: &mut impl FnMut(crate::chip::ChipDetectState),
     ) -> Result<Chip, PlatformError> {
         match self {
-            UninitChip::Partially { underlying, .. } => {
-                wait_for_init(&underlying, init_callback, false, false)?;
+            UninitChip::Partially { mut underlying, .. } => {
+                wait_for_init(&mut underlying, init_callback, false, false)?;
 
                 Ok(underlying)
             }
@@ -103,10 +103,9 @@ impl UninitChip {
     pub fn try_upgrade(&self) -> Option<&Chip> {
         match self {
             UninitChip::Partially { status, underlying } => {
-                if status.init_partially() {
+                if status.init_complete() && !status.has_error() {
                     Some(underlying)
                 } else {
-                    println!("test");
                     None
                 }
             }
@@ -121,23 +120,51 @@ impl UninitChip {
         }
     }
 
+    pub fn is_healthy(&self) -> Option<bool> {
+        match self {
+            UninitChip::Partially { status, .. } => {
+                if status.init_complete() {
+                    Some(status.has_error())
+                } else {
+                    None
+                }
+            }
+            UninitChip::Initialized(_) => Some(true),
+        }
+    }
+
     pub fn arc_alive(&self) -> bool {
         match self {
-            UninitChip::Partially { status, .. } => status.arc_status.is_completed(),
+            UninitChip::Partially { status, .. } => {
+                !status.arc_status.is_waiting() && !status.arc_status.has_error()
+            }
             UninitChip::Initialized(_) => true,
         }
     }
 
     pub fn dram_safe(&self) -> bool {
         match self {
-            UninitChip::Partially { status, .. } => status.dram_status.is_completed(),
+            UninitChip::Partially { status, .. } => {
+                !status.dram_status.is_waiting() && !status.dram_status.has_error()
+            }
             UninitChip::Initialized(_) => true,
         }
     }
 
     pub fn eth_safe(&self) -> bool {
         match self {
-            UninitChip::Partially { status, .. } => status.eth_status.is_completed(),
+            UninitChip::Partially { status, .. } => {
+                !status.eth_status.is_waiting() && !status.eth_status.has_error()
+            }
+            UninitChip::Initialized(_) => true,
+        }
+    }
+
+    pub fn cpu_safe(&self) -> bool {
+        match self {
+            UninitChip::Partially { status, .. } => {
+                !status.cpu_status.is_waiting() && !status.cpu_status.has_error()
+            }
             UninitChip::Initialized(_) => true,
         }
     }
@@ -220,8 +247,8 @@ impl ChipDetectOptions {
 ///     a. This is catastrophic, we cannot continue searching for chips, because some of the chips in the mesh may no longer be accesible
 ///     b. We could recover from this by rerunning the search, but this is not implemented.
 pub fn detect_chips(
-    root_chips: Vec<Chip>,
-    init_callback: &mut impl FnMut(crate::chip::ChipDetectState<'_, &dyn std::fmt::Display, &dyn std::fmt::Display>),
+    mut root_chips: Vec<Chip>,
+    init_callback: &mut impl FnMut(crate::chip::ChipDetectState),
     options: ChipDetectOptions,
 ) -> Result<Vec<UninitChip>, PlatformError> {
     let ChipDetectOptions {
@@ -235,7 +262,7 @@ pub fn detect_chips(
     let mut seen_chips = HashSet::new();
 
     let mut output = Vec::new();
-    for (root_index, root_chip) in root_chips.iter().enumerate() {
+    for (root_index, root_chip) in root_chips.iter_mut().enumerate() {
         if !chip_filter.is_empty() && !chip_filter.contains(&root_chip.get_arch()) {
             return Err(PlatformError::WrongChipArchs {
                 actual: root_chip.get_arch(),
@@ -282,9 +309,7 @@ pub fn detect_chips(
         }
     }
 
-    for root_index in remotes_to_investigate {
-        let root_chip = &root_chips[root_index];
-
+    for root_chip in remotes_to_investigate.into_iter().map(|v| &root_chips[v]) {
         let mut to_check = root_chip.get_neighbouring_chips()?;
 
         let mut seen_coords = HashSet::new();
@@ -298,7 +323,7 @@ pub fn detect_chips(
             }
 
             if let Some(wh) = root_chip.as_wh() {
-                let wh = wh.open_remote(nchip.eth_addr)?;
+                let mut wh = wh.open_remote(nchip.eth_addr)?;
 
                 let local_coord = wh.get_local_chip_coord()?;
 
@@ -309,11 +334,11 @@ pub fn detect_chips(
                     ));
                 }
 
-                let status = wait_for_init(&wh, init_callback, continue_on_failure, noc_safe)?;
+                let status = wait_for_init(&mut wh, init_callback, continue_on_failure, noc_safe)?;
 
                 // If we cannot talk to the ARC then we cannot get the ident information so we
                 // will just return the chip and not continue to search.
-                if !status.arc_status.is_error() {
+                if !status.arc_status.has_error() {
                     let telem = wh.get_telemetry()?;
 
                     let ident = (
@@ -347,7 +372,7 @@ pub fn detect_chips(
 
 pub fn detect_initialized_chips(
     root_chips: Vec<Chip>,
-    init_callback: &mut impl FnMut(crate::chip::ChipDetectState<'_, &dyn std::fmt::Display, &dyn std::fmt::Display>),
+    init_callback: &mut impl FnMut(crate::chip::ChipDetectState),
     options: ChipDetectOptions,
 ) -> Result<Vec<Chip>, PlatformError> {
     let chips = detect_chips(root_chips, init_callback, options)?;

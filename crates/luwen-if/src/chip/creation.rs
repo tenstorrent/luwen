@@ -22,8 +22,8 @@ impl Chip {
         backend: CallbackStorage<T>,
     ) -> Result<Grayskull, PlatformError> {
         if let Arch::Grayskull = arch {
-            let mut version = [0u8; 4];
-            backend.axi_read(0x0000_0000, &mut version)?;
+            let version = [0u8; 4];
+            // backend.axi_read(0x0000_0000, &mut version)?;
             let version = u32::from_le_bytes(version);
 
             let arc_if = Arc::new(ArcIf {
@@ -51,8 +51,8 @@ impl Chip {
         backend: CallbackStorage<T>,
     ) -> Result<Wormhole, PlatformError> {
         if let Arch::Wormhole = arch {
-            let mut version = [0u8; 4];
-            backend.axi_read(0x0000_0000, &mut version)?;
+            let version = [0u8; 4];
+            // backend.axi_read(0x0000_0000, &mut version)?;
             let version = u32::from_le_bytes(version);
 
             let arc_if = ArcIf {
@@ -74,13 +74,16 @@ impl Chip {
         }
     }
 
-    pub fn open<T: Clone + Send + Sync + 'static>(arch: Arch, backend: CallbackStorage<T>) -> Chip {
-        Chip {
+    pub fn open<T: Clone + Send + Sync + 'static>(
+        arch: Arch,
+        backend: CallbackStorage<T>,
+    ) -> Result<Chip, PlatformError> {
+        Ok(Chip {
             inner: match arch {
-                Arch::Grayskull => Box::new(Self::gs_open(arch, backend).unwrap()),
-                Arch::Wormhole => Box::new(Self::wh_open(arch, backend).unwrap()),
+                Arch::Grayskull => Box::new(Self::gs_open(arch, backend)?),
+                Arch::Wormhole => Box::new(Self::wh_open(arch, backend)?),
                 _ => panic!("Unsupported chip"),
             },
-        }
+        })
     }
 }

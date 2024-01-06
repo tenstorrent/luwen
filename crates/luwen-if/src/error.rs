@@ -45,21 +45,6 @@ pub enum ArcReadyError {
     PostCodeBusy(u32),
 }
 
-impl ArcReadyError {
-    fn expect_recovert(&self) -> bool {
-        match self {
-            ArcReadyError::NoAccess => false,
-            ArcReadyError::WatchdogTriggered => false,
-            ArcReadyError::BootIncomplete => todo!(),
-            ArcReadyError::Asleep => todo!(),
-            ArcReadyError::OutstandingPcieDMA => todo!(),
-            ArcReadyError::MessageQueued(_) => todo!(),
-            ArcReadyError::HandlingMessage(_) => todo!(),
-            ArcReadyError::PostCodeBusy(_) => todo!(),
-        }
-    }
-}
-
 #[derive(Error, Debug)]
 pub enum PlatformError {
     #[error("Tried to initialize chip with the wrong architecture, expected {expected:?} but got {actual:?}\n{backtrace}")]
