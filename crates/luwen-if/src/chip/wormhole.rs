@@ -578,7 +578,7 @@ impl ChipImpl for Wormhole {
             .axi_read32(&self.chip_if, telemetry_struct_offset + (46 * 4))?;
 
         Ok(super::Telemetry {
-            board_id: ((smbus_tx_board_id_high as u64) << 32) | (smbus_tx_board_id_high as u64),
+            board_id: ((smbus_tx_board_id_high as u64) << 32) | (smbus_tx_board_id_low as u64),
             smbus_tx_enum_version,
             smbus_tx_device_id,
             smbus_tx_asic_ro,
