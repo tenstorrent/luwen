@@ -1,6 +1,6 @@
 # Luwen
 
-Named after Antonie van Leeuwenhoek who invested the microsope.
+Named after Antonie van Leeuwenhoek who invented the microsope.
 
 ## Official Repository
 

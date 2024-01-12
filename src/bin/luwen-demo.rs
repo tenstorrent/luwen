@@ -1,6 +1,6 @@
-// SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
+// SPDX-FileCopyrightText: © 2023-24 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
-
+#![allow(unused_imports)]
 use luwen_if::{
     chip::{ArcMsgOptions, Chip, HlComms, HlCommsInterface},
     detect_chips, ArcMsg, CallbackStorage, ChipImpl,
@@ -21,7 +21,7 @@ pub fn main() -> Result<(), LuwenError> {
         let chip = Chip::open(arch, CallbackStorage::new(comms_callback, ud));
 
         if let Some(wh) = chip.as_wh() {
-            let mut hi = wh
+            let hi = wh
                 .chip_if
                 .as_any()
                 .downcast_ref::<CallbackStorage<ExtendedPciDeviceWrapper>>()
@@ -44,7 +44,7 @@ pub fn main() -> Result<(), LuwenError> {
                     write_threshold: 0,
                 });
 
-                let (offset, size) = pci_interface.setup_tlb(
+                let (offset, _size) = pci_interface.setup_tlb(
                     168,
                     Tlb {
                         local_offset: 0x0,
