@@ -3,11 +3,12 @@
 
 use std::collections::HashMap;
 
-use luwen_if::chip::{axi_translate, MemorySlice, MemorySlices};
 use serde::{
     de::{value::SeqAccessDeserializer, Visitor},
     Deserialize, Deserializer, Serialize,
 };
+
+use luwen_if::chip::{axi_translate, MemorySlice, MemorySlices};
 
 #[derive(Debug, Serialize)]
 pub enum Fields {

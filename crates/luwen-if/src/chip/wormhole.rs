@@ -4,23 +4,23 @@
 use std::sync::Arc;
 
 use crate::{
-    arc_msg::{ArcMsgAddr, ArcMsgOk, ArcMsgProtocolError},
+    arc_msg::{ArcMsgAddr, ArcMsgOk},
+    ArcMsg,
     chip::{
         communication::{
-            chip_comms::{load_axi_table, ChipComms},
+            chip_comms::{ChipComms, load_axi_table},
             chip_interface::ChipInterface,
         },
         hl_comms::HlCommsInterface,
     },
-    error::PlatformError,
-    ArcMsg, ChipImpl, IntoChip,
+    ChipImpl, error::PlatformError, IntoChip,
 };
 
 use super::{
+    ArcMsgOptions,
+    ChipInitResult,
     eth_addr::EthAddr,
-    hl_comms::HlComms,
-    remote::{EthAddresses, RemoteArcIf},
-    ArcMsgOptions, ChipInitResult, InitStatus, NeighbouringChip, StatusInfo, WaitStatus,
+    hl_comms::HlComms, InitStatus, NeighbouringChip, remote::{EthAddresses, RemoteArcIf}, StatusInfo, WaitStatus,
 };
 
 /// Implementation of the interface for a Wormhole
@@ -248,11 +248,11 @@ impl ChipImpl for Wormhole {
 
                             // If we hit these, something has gone terribly wrong. We will therefore abort...
                             PlatformError::WrongChipArch {
-                                actual,
-                                expected,
-                                backtrace,
+                                actual: _,
+                                expected: _,
+                                backtrace: _,
                             } => todo!(),
-                            PlatformError::UnsupportedFwVersion { version, required } => todo!(),
+                            PlatformError::UnsupportedFwVersion { version: _, required: _ } => todo!(),
                             PlatformError::ArcMsgError(_) => todo!(),
                             PlatformError::EthernetTrainingNotComplete(_) => todo!(),
                             PlatformError::Generic(_, _) => todo!(),
@@ -270,7 +270,7 @@ impl ChipImpl for Wormhole {
 
         {
             // TODO(drosen): Explicitly check against the telemetry info
-            let status = &mut status.dram_status;
+            let _status = &mut status.dram_status;
             // match status.wait_status {
             //     WaitStatus::Waiting(start) => {
             //         let timeout = std::time::Duration::from_secs(10);

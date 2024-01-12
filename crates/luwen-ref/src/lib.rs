@@ -6,18 +6,16 @@ use std::{
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
+pub use detect::detect_chips;
 use error::LuwenError;
+pub use kmdif::{DmaBuffer, DmaConfig, PciDevice, Tlb};
 use kmdif::PciError;
 use luwen_if::{FnDriver, FnOptions};
+use wormhole::ethernet::{self, EthCommCoord};
 
 mod detect;
 pub mod error;
 mod wormhole;
-
-use wormhole::ethernet::{self, EthCommCoord};
-
-pub use detect::detect_chips;
-pub use kmdif::{DmaBuffer, DmaConfig, PciDevice, Tlb};
 
 #[derive(Clone)]
 pub struct ExtendedPciDeviceWrapper {

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{error::PlatformError, ChipImpl};
+use crate::{ChipImpl, error::PlatformError};
 
 use super::{InitStatus, StatusInfo};
 
@@ -17,6 +17,7 @@ pub struct ChipDetectState<'a> {
     pub call: CallReason<'a>,
 }
 
+#[allow(dead_code)]
 pub enum EthernetInitState {
     NotPresent,
     FwCorrupted,
@@ -24,6 +25,7 @@ pub enum EthernetInitState {
     Ready,
 }
 
+#[allow(dead_code)]
 pub enum ArcInitState {
     FwCorrupted,
     WaitingForInit,
@@ -31,6 +33,7 @@ pub enum ArcInitState {
     Ready,
 }
 
+#[allow(dead_code)]
 pub struct ChipInitState {
     pub can_access: bool,
     pub ethernet_state: EthernetInitState,
@@ -39,6 +42,7 @@ pub struct ChipInitState {
     underlying_chip: super::Chip,
 }
 
+#[allow(dead_code)]
 impl ChipInitState {
     pub fn get_chip(self) -> super::Chip {
         self.underlying_chip

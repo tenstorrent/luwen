@@ -9,18 +9,18 @@ use std::{
     sync::Arc,
 };
 
+pub use error::{PciError, PciOpenError};
+use ioctl::{
+    AllocateDmaBuffer, GetDeviceInfo, GetDeviceInfoOut, Mapping, query_mappings, QueryMappings,
+};
+use luwen_core::Arch;
+pub use tlb::{DeviceTlbInfo, Tlb};
+
 mod error;
 mod ioctl;
 mod kmdif;
 mod pci;
 pub mod tlb;
-
-pub use error::{PciError, PciOpenError};
-use ioctl::{
-    query_mappings, AllocateDmaBuffer, GetDeviceInfo, GetDeviceInfoOut, Mapping, QueryMappings,
-};
-use luwen_core::Arch;
-pub use tlb::{DeviceTlbInfo, Tlb};
 
 impl From<&GetDeviceInfoOut> for Arch {
     fn from(value: &GetDeviceInfoOut) -> Self {

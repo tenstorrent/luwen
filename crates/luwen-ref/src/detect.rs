@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use kmdif::PciDevice;
-use luwen_if::{chip::Chip, CallbackStorage};
+use luwen_if::{CallbackStorage, chip::Chip};
 
 use crate::{comms_callback, error::LuwenError, ExtendedPciDevice};
 

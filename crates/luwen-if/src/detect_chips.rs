@@ -4,9 +4,9 @@
 use std::collections::HashSet;
 
 use crate::{
-    chip::{wait_for_init, Chip},
-    error::PlatformError,
-    ChipImpl, EthAddr,
+    chip::{Chip, wait_for_init},
+    ChipImpl,
+    error::PlatformError, EthAddr,
 };
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
@@ -40,7 +40,10 @@ pub fn detect_chips(
         // If cont is false, then we cannot continue to interact with the chip
         // if it's true, then we can continue.
         let cont = wait_for_init(root_chip, init_callback, continue_on_failure)?;
-
+        if !cont  {
+           print!("Cannot initialize chip {} ... continuing to next.",root_index);
+           continue
+        }
         let ident = if let Some(wh) = root_chip.as_wh() {
             let telem = root_chip.get_telemetry()?;
             remotes_to_investigate.push(root_index);

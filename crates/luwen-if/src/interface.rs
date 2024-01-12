@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::chip::{eth_addr::EthAddr, ChipInterface};
+use crate::chip::{ChipInterface, eth_addr::EthAddr};
 
 #[derive(Debug)]
 pub enum FnNoc {

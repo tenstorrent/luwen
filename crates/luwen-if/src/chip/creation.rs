@@ -7,12 +7,12 @@ use luwen_core::Arch;
 
 use crate::{
     arc_msg::ArcMsgAddr,
-    error::{BtWrapper, PlatformError},
     CallbackStorage,
+    error::{BtWrapper, PlatformError},
 };
 
 use super::{
-    communication::chip_comms::load_axi_table, ArcIf, Chip, ChipComms, ChipInterface, Grayskull,
+    ArcIf, Chip, ChipComms, ChipInterface, communication::chip_comms::load_axi_table, Grayskull,
     Wormhole,
 };
 

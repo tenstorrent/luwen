@@ -1,6 +1,19 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+pub use communication::chip_comms::{
+    ArcIf, axi_translate, AxiData, AxiError, ChipComms, MemorySlice, MemorySlices,
+};
+pub use communication::chip_interface::ChipInterface;
+pub use grayskull::Grayskull;
+pub use hl_comms::{HlComms, HlCommsInterface};
+pub use init::{CallReason, ChipDetectState, wait_for_init};
+use luwen_core::Arch;
+pub use wormhole::Wormhole;
+
+use crate::{arc_msg::ArcMsgAddr, DeviceInfo, error::PlatformError};
+pub use crate::arc_msg::{ArcMsg, ArcMsgOk};
+
 mod communication;
 mod creation;
 pub mod eth_addr;
@@ -9,20 +22,6 @@ mod hl_comms;
 mod init;
 mod remote;
 mod wormhole;
-
-pub use communication::chip_comms::{
-    axi_translate, ArcIf, AxiData, AxiError, ChipComms, MemorySlice, MemorySlices,
-};
-pub use communication::chip_interface::ChipInterface;
-pub use grayskull::Grayskull;
-pub use hl_comms::{HlComms, HlCommsInterface};
-pub use init::{wait_for_init, CallReason, ChipDetectState};
-use luwen_core::Arch;
-pub use wormhole::Wormhole;
-
-use crate::{arc_msg::ArcMsgAddr, error::PlatformError, DeviceInfo};
-
-pub use crate::arc_msg::{ArcMsg, ArcMsgOk};
 
 /// Arc message interface
 #[derive(Debug)]

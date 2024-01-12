@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use luwen_if::{
-    chip::{ArcMsgOptions, Chip},
-    error::PlatformError,
-    ArcMsg, ArcMsgError, ArcMsgProtocolError, CallbackStorage, ChipImpl, FnOptions,
+    ArcMsg,
+    ArcMsgError,
+    ArcMsgProtocolError, CallbackStorage, chip::{ArcMsgOptions, Chip}, ChipImpl, error::PlatformError, FnOptions,
 };
 
 #[repr(C)]

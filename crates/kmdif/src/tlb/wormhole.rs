@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    tlb::{MemoryType, TlbInfo},
-    DeviceTlbInfo, PciDevice, PciError, Tlb,
+    DeviceTlbInfo,
+    PciDevice, PciError, tlb::{MemoryType, TlbInfo}, Tlb,
 };
 
 use super::Ordering;

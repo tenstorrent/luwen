@@ -1,9 +1,10 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use luwen_if::{chip::HlComms, CallbackStorage, ChipImpl};
-use luwen_ref::error::LuwenError;
 use rand::Rng;
+
+use luwen_if::{CallbackStorage, chip::HlComms, ChipImpl};
+use luwen_ref::error::LuwenError;
 
 fn read_write_test(
     chip: impl HlComms,

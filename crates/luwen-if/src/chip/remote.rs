@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{eth_addr::EthAddr, HlComms, MemorySlices, Wormhole};
 use crate::{
     chip::communication::{
         chip_comms::{axi_translate, AxiData, AxiError, ChipComms},
@@ -9,6 +8,8 @@ use crate::{
     },
     error::PlatformError,
 };
+
+use super::{eth_addr::EthAddr, HlComms, MemorySlices, Wormhole};
 
 pub struct RemoteArcIf {
     pub addr: EthAddr,

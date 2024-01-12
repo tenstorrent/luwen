@@ -3,13 +3,14 @@
 
 use std::ops::{Deref, DerefMut};
 
-use luwen_if::chip::{
-    wait_for_init, ArcMsg, ArcMsgOk, ArcMsgOptions, ChipImpl, HlComms, HlCommsInterface, StatusInfo,
-};
-use luwen_if::{CallbackStorage, DeviceInfo};
-use luwen_ref::{DmaConfig, ExtendedPciDeviceWrapper};
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
+
+use luwen_if::{CallbackStorage, DeviceInfo};
+use luwen_if::chip::{
+    ArcMsg, ArcMsgOk, ArcMsgOptions, ChipImpl, HlComms, HlCommsInterface, wait_for_init,
+};
+use luwen_ref::{DmaConfig, ExtendedPciDeviceWrapper};
 
 #[pyclass]
 pub struct PciChip(luwen_if::chip::Chip);
@@ -457,7 +458,7 @@ impl PciChip {
     }
 
     pub fn init(&self) {
-        wait_for_init(&self.0, &mut |_| {}, false);
+        let _= wait_for_init(&self.0, &mut |_| {}, false);
     }
 
     pub fn board_id(&self) -> u64 {
