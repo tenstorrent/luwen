@@ -254,7 +254,7 @@ impl ChipImpl for Wormhole {
             let status = &mut status.arc_status;
             match status.wait_status {
                 WaitStatus::Waiting(start) => {
-                    let timeout = std::time::Duration::from_secs(10);
+                    let timeout = std::time::Duration::from_secs(300);
                     match self.check_arg_msg_safe(5, 3) {
                         Ok(_) => status.wait_status = WaitStatus::JustFinished,
                         Err(err) => match err {
@@ -310,7 +310,7 @@ impl ChipImpl for Wormhole {
             let status = &mut status.eth_status;
             match status.wait_status {
                 WaitStatus::Waiting(start) => {
-                    let timeout = std::time::Duration::from_secs(10);
+                    let timeout = std::time::Duration::from_secs(300);
                     if let Ok(_) = self.check_ethernet_training_complete() {
                         status.wait_status = WaitStatus::JustFinished;
                     } else if start.elapsed() > timeout {
