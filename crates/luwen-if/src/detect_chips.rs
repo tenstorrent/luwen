@@ -273,6 +273,8 @@ pub fn detect_chips(
 
         let status = wait_for_init(root_chip, init_callback, continue_on_failure, noc_safe)?;
 
+        dbg!(&status);
+
         // We now want to convert to the uninitialized chip type.
         let chip = UninitChip::new(status, root_chip);
 

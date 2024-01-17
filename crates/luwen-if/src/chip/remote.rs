@@ -157,7 +157,7 @@ impl EthAddresses {
 
 impl Wormhole {
     pub fn get_local_chip_coord(&self) -> Result<EthAddr, PlatformError> {
-        let coord = self.noc_read32(0, 9, 0, 0x1108)?;
+        let coord = self.noc_read32(0, 9, 0, self.eth_addrs.node_info + 8)?;
 
         Ok(EthAddr {
             rack_x: (coord & 0xFF) as u8,

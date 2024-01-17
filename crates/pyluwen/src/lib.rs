@@ -873,6 +873,17 @@ impl PciWormhole {
         }
     }
 
+    pub fn pci_board_type(&self) -> PyResult<u16> {
+        let value = PciInterface::from_wh(self);
+        if let Some(value) = value {
+            Ok(value.pci_interface.borrow().device.physical.subsystem_id)
+        } else {
+            return Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ));
+        }
+    }
+
     pub fn spi_read(&self, addr: u32, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
         Python::with_gil(|_py| {
             let ptr: *mut u8 = data.buf_ptr().cast();
@@ -945,6 +956,17 @@ impl UninitPciChip {
                 .init(&mut |_| {})
                 .map_err(|v| PyException::new_err(v.to_string()))?,
         ))
+    }
+
+    pub fn have_comms(&self) -> bool {
+        self.chip
+            .status()
+            .map(|v| !v.unknown_state && v.comms_status.ok())
+            .unwrap_or(true)
+    }
+
+    pub fn force_upgrade(&self) -> PciChip {
+        PciChip(self.chip.clone().upgrade())
     }
 }
 

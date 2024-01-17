@@ -13,6 +13,8 @@ fn main() {
             chip.try_upgrade().map(|v| {
                 let eth_status = chip.eth_safe();
                 let remote = if let Some(wh) = v.as_wh() {
+                    println!("{:X}", wh.get_telemetry().unwrap().smbus_tx_board_id_low);
+
                     wh.is_remote
                 } else {
                     false

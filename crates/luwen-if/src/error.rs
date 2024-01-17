@@ -25,7 +25,7 @@ impl Display for BtWrapper {
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(Clone, Error, Debug)]
 pub enum ArcReadyError {
     #[error("scratch register access failed")]
     NoAccess,

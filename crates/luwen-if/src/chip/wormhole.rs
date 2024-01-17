@@ -400,7 +400,7 @@ impl ChipImpl for Wormhole {
                                         | crate::error::ArcReadyError::HandlingMessage(_)
                                         | crate::error::ArcReadyError::PostCodeBusy(_) => {
                                             if status.start_time.elapsed() > status.timeout {
-                                                *arc_status = WaitStatus::Timeout(status.timeout);
+                                                *arc_status = WaitStatus::Error(super::init::status::ArcInitError::WaitingForInit(reason));
                                             }
                                         }
                                     }
@@ -414,7 +414,9 @@ impl ChipImpl for Wormhole {
                                 // This is fine to hit at this stage (though it should have been already verified to not be the case).
                                 // For now we just ignore it and hope that it will be resolved by the time the timeout expires...
                                 PlatformError::EthernetTrainingNotComplete(_) => {
-                                    return Ok(ChipInitResult::ErrorContinue);
+                                    if status.start_time.elapsed() > status.timeout {
+                                        *arc_status = WaitStatus::Timeout(status.timeout);
+                                    }
                                 }
 
                                 // This is an "expected error" but we probably can't recover from it, so we should abort the init.
@@ -433,59 +435,47 @@ impl ChipImpl for Wormhole {
                                 }
                             },
                         }
-                        {}
                     }
                     WaitStatus::JustFinished => {
                         *arc_status = WaitStatus::Done;
                     }
-                    WaitStatus::Done | WaitStatus::Timeout(_) | WaitStatus::NotPresent => {}
                     _ => {}
                 }
             }
         }
 
+        // If something went wrong with ARC then we probably don't have DRAM
         if !status.arc_status.has_error() {
-            // TODO(drosen): Explicitly check against the telemetry info
             let status = &mut status.dram_status;
-            // match status.wait_status {
-            //     WaitStatus::Waiting(start) => {
-            //         let timeout = std::time::Duration::from_secs(10);
-            //         if let Ok(_) = self.check_arc_msg_safe(5, 3) {
-            //             status.wait_status = WaitStatus::JustFinished;
-            //         } else if start.elapsed() > timeout {
-            //             status.wait_status = WaitStatus::Timeout(timeout);
-            //         }
-            //     }
-            //     WaitStatus::JustFinished => {
-            //         status.wait_status = WaitStatus::Done;
-            //     }
-            //     WaitStatus::Done | WaitStatus::Timeout(_) | WaitStatus::NotPresent => {}
-            // }
 
-            // For now assume that if ARC is good, then so is dram
-            for dram_status in status.wait_status.iter_mut() {
-                *dram_status = WaitStatus::Done;
-            }
-        }
-
-        // We need arc to be alive so that we can check which cores are enabled
-        if !status.arc_status.has_error() {
-            // Only try to initiliaze the ethernet if we are not in noc_safe mode.
-            if !status.init_options.noc_safe {
-                let status = &mut status.eth_status;
-
-                let eth_training_status = match self.check_ethernet_training_complete() {
-                    Ok(eth_status) => eth_status,
+            // We don't need to get the telemetry if we aren't waiting to see if dram has
+            // trained...
+            if status.is_waiting() {
+                // Hitting an error here implies that the something changed and we no longer have arc
+                // access. We will abort, but allow other chips to continue or not using the typical
+                // switch block.
+                let telem = match self.get_telemetry() {
+                    Ok(telem) => Some(telem),
                     Err(err) => match err {
-                        // ARC should be initialized at this point, hitting an error here means
-                        // that we can no longer progress in the init.
-                        PlatformError::ArcMsgError(_) | PlatformError::ArcNotReady(_, _) => {
-                            return Ok(ChipInitResult::ErrorContinue);
+                        // Something did go wrong here, but we'll assume that this is a result of
+                        // some temporary issue
+                        PlatformError::ArcNotReady(_, _)
+                        // Not really expected but ethernet training may not yet be complete so
+                        // we'll just ignore it for now.
+                        | PlatformError::EthernetTrainingNotComplete(_) => {
+                            for dram_status in status.wait_status.iter_mut() {
+                                if status.start_time.elapsed() > status.timeout {
+                                    *dram_status = WaitStatus::Timeout(status.timeout);
+                                }
+                            }
+
+                            None
                         }
 
-                        // This is fine to hit at this stage (though it should have been already verified to not be the case).
-                        // For now we just ignore it and hope that it will be resolved by the time the timeout expires...
-                        PlatformError::EthernetTrainingNotComplete(_) => {
+                        // Arc should be ready here...
+                        // This means that ARC hung, we should stop initializing this chip in case
+                        // we hit something like a noc hang.
+                        PlatformError::ArcMsgError(_err) => {
                             return Ok(ChipInitResult::ErrorContinue);
                         }
 
@@ -503,28 +493,110 @@ impl ChipImpl for Wormhole {
                         }
                     },
                 };
-                for (eth_status, training_complete) in
-                    status.wait_status.iter_mut().zip(eth_training_status)
-                {
-                    match eth_status {
-                        WaitStatus::Waiting => {
-                            if training_complete {
-                                if let Err(_err) = self.check_ethernet_fw_version() {
-                                    *eth_status = WaitStatus::NotInitialized(
-                                        EthernetPartialInitError::FwOverwritten,
-                                    );
-                                } else {
-                                    *eth_status = WaitStatus::JustFinished;
+
+                if let Some(telem) = telem {
+                    let dram_status = telem.smbus_tx_ddr_status;
+
+                    let mut channels = [None; 6];
+                    for i in 0..6 {
+                        let status = (dram_status >> (i * 4)) & 0xF;
+                        let status = status as u8;
+
+                        channels[i] = super::init::status::DramChannelStatus::try_from(status).ok();
+                    }
+
+                    for (dram_status, channel_status) in status.wait_status.iter_mut().zip(channels)
+                    {
+                        match dram_status {
+                            WaitStatus::Waiting => {
+                                if let Some(super::init::status::DramChannelStatus::TrainingPass) =
+                                    channel_status
+                                {
+                                    *dram_status = WaitStatus::Done;
+                                } else if status.start_time.elapsed() > status.timeout {
+                                    if let Some(status) = channel_status {
+                                        *dram_status = WaitStatus::Error(
+                                            super::init::status::DramInitError::NotTrained(status),
+                                        );
+                                    } else {
+                                        *dram_status = WaitStatus::Timeout(status.timeout);
+                                    }
                                 }
-                            } else if status.start_time.elapsed() > status.timeout {
-                                *eth_status = WaitStatus::Timeout(status.timeout);
                             }
+                            WaitStatus::JustFinished => {
+                                *dram_status = WaitStatus::Done;
+                            }
+                            _ => {}
                         }
-                        WaitStatus::JustFinished => {
-                            *eth_status = WaitStatus::Done;
+                    }
+                }
+            }
+        } else {
+            for dram_status in status.dram_status.wait_status.iter_mut() {
+                *dram_status = WaitStatus::NoCheck;
+            }
+        }
+
+        // We need arc to be alive so that we can check which cores are enabled
+        if !status.arc_status.has_error() {
+            // Only try to initiliaze the ethernet if we are not in noc_safe mode.
+            if !status.init_options.noc_safe {
+                let status = &mut status.eth_status;
+
+                // We don't need to get the eth training status if we aren't waiting to see if dram has
+                // trained...
+                if status.is_waiting() {
+                    let eth_training_status = match self.check_ethernet_training_complete() {
+                        Ok(eth_status) => eth_status,
+                        Err(err) => match err {
+                            // ARC should be initialized at this point, hitting an error here means
+                            // that we can no longer progress in the init.
+                            PlatformError::ArcMsgError(_) | PlatformError::ArcNotReady(_, _) => {
+                                return Ok(ChipInitResult::ErrorContinue);
+                            }
+
+                            // We are checking for ethernet training to complete... if we hit this than
+                            // something has gone terribly wrong
+                            PlatformError::EthernetTrainingNotComplete(_) => {
+                                return Ok(ChipInitResult::ErrorContinue);
+                            }
+
+                            // This is an "expected error" but we probably can't recover from it, so we should abort the init.
+                            PlatformError::AxiError(_) => return Ok(ChipInitResult::ErrorAbort),
+
+                            // We don't expect to hit these cases so if we do, we should assume that something went terribly
+                            // wrong and abort the init.
+                            PlatformError::UnsupportedFwVersion { .. }
+                            | PlatformError::WrongChipArch { .. }
+                            | PlatformError::WrongChipArchs { .. }
+                            | PlatformError::Generic(_, _)
+                            | PlatformError::GenericError(_, _) => {
+                                return Ok(ChipInitResult::ErrorAbort)
+                            }
+                        },
+                    };
+                    for (eth_status, training_complete) in
+                        status.wait_status.iter_mut().zip(eth_training_status)
+                    {
+                        match eth_status {
+                            WaitStatus::Waiting => {
+                                if training_complete {
+                                    if let Err(_err) = self.check_ethernet_fw_version() {
+                                        *eth_status = WaitStatus::NotInitialized(
+                                            EthernetPartialInitError::FwOverwritten,
+                                        );
+                                    } else {
+                                        *eth_status = WaitStatus::JustFinished;
+                                    }
+                                } else if status.start_time.elapsed() > status.timeout {
+                                    *eth_status = WaitStatus::Timeout(status.timeout);
+                                }
+                            }
+                            WaitStatus::JustFinished => {
+                                *eth_status = WaitStatus::Done;
+                            }
+                            _ => {}
                         }
-                        WaitStatus::Done | WaitStatus::Timeout(_) | WaitStatus::NotPresent => {}
-                        _ => {}
                     }
                 }
             } else {
@@ -532,6 +604,11 @@ impl ChipImpl for Wormhole {
                 for eth_status in status.wait_status.iter_mut() {
                     *eth_status = WaitStatus::Done;
                 }
+            }
+        } else {
+            let status = &mut status.eth_status;
+            for eth_status in status.wait_status.iter_mut() {
+                *eth_status = WaitStatus::NoCheck;
             }
         }
 

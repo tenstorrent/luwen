@@ -1,0 +1,9 @@
+[package]
+name = "drunken-monkey"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = "4.4.14"
+
+luwen-if = {path = "../luwen-if"}

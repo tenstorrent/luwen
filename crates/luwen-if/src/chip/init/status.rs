@@ -5,6 +5,8 @@ use std::{convert::Infallible, fmt};
 
 use thiserror::Error;
 
+use crate::error::ArcReadyError;
+
 #[derive(Clone, Debug)]
 pub enum EthernetInitError {
     FwCorrupted,
@@ -38,7 +40,7 @@ impl fmt::Display for EthernetPartialInitError {
 #[derive(Clone, Debug)]
 pub enum ArcInitError {
     FwCorrupted,
-    WaitingForInit,
+    WaitingForInit(ArcReadyError),
     Hung,
 }
 
@@ -46,21 +48,51 @@ impl fmt::Display for ArcInitError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ArcInitError::FwCorrupted => f.write_str("ARC firmware is corrupted"),
-            ArcInitError::WaitingForInit => f.write_str("ARC is waiting for initialization"),
+            ArcInitError::WaitingForInit(err) => write!(f, "ARC is waiting for initialization; {err}"),
             ArcInitError::Hung => f.write_str("ARC is hung"),
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum DramChannelStatus {
+    TrainingNone,
+    TrainingFail,
+    TrainingPass,
+    TrainingSkip,
+    PhyOff,
+    ReadEye,
+    BistEye,
+    CaDebug,
+}
+
+impl TryFrom<u8> for DramChannelStatus {
+    type Error = ();
+
+    fn try_from(value: u8) -> Result<Self, ()> {
+        match value {
+            0 => Ok(DramChannelStatus::TrainingNone),
+            1 => Ok(DramChannelStatus::TrainingFail),
+            2 => Ok(DramChannelStatus::TrainingPass),
+            3 => Ok(DramChannelStatus::TrainingSkip),
+            4 => Ok(DramChannelStatus::PhyOff),
+            5 => Ok(DramChannelStatus::ReadEye),
+            6 => Ok(DramChannelStatus::BistEye),
+            7 => Ok(DramChannelStatus::CaDebug),
+            _ => Err(()),
         }
     }
 }
 
 #[derive(Clone, Debug)]
 pub enum DramInitError {
-    NotTrained,
+    NotTrained(DramChannelStatus),
 }
 
 impl fmt::Display for DramInitError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DramInitError::NotTrained => f.write_str("DRAM was not able to train"),
+            DramInitError::NotTrained(_) => f.write_str("DRAM was not able to train"),
         }
     }
 }
@@ -309,8 +341,8 @@ impl InitStatus {
     }
 
     pub fn has_error(&self) -> bool {
-        !self.comms_status.ok() ||
-        self.arc_status.has_error()
+        !self.comms_status.ok()
+            || self.arc_status.has_error()
             || self.dram_status.has_error()
             || self.eth_status.has_error()
             || self.cpu_status.has_error()
