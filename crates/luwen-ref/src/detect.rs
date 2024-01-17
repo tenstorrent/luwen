@@ -70,7 +70,7 @@ pub fn detect_chips_fallible() -> Result<Vec<UninitChip>, LuwenError> {
 
         if let Some(bar) = bar {
             if status.is_waiting() && status.is_present() {
-                bar.set_message(format!("{}", status));
+                bar.set_message(status.to_string());
             }
         }
     }

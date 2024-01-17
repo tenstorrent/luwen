@@ -13,8 +13,9 @@ use crate::{
 };
 
 use super::{
-    init::status::{ComponentStatusInfo, InitOptions, WaitStatus},
-    ArcMsgOptions, ChipComms, ChipInitResult, ChipInterface, HlComms, InitStatus, NeighbouringChip, CommsStatus,
+    init::status::{ArcInitError, ComponentStatusInfo, InitOptions, WaitStatus},
+    ArcMsgOptions, ChipComms, ChipInitResult, ChipInterface, CommsStatus, HlComms, InitStatus,
+    NeighbouringChip,
 };
 
 #[derive(Clone)]
@@ -113,7 +114,7 @@ impl Grayskull {
                 return Ok(());
             } else {
                 return Err(PlatformError::ArcNotReady(
-                    crate::error::ArcReadyError::PostCodeBusy(pc),
+                    crate::error::ArcReadyError::OldPostCode(pc),
                     BtWrapper::capture(),
                 ))?;
             }
@@ -160,23 +161,23 @@ fn default_status() -> InitStatus {
     InitStatus {
         comms_status: super::CommsStatus::CanCommunicate,
         arc_status: ComponentStatusInfo {
-            wait_status: Box::new([WaitStatus::Waiting]),
-            status: String::new(),
+            name: "ARC".to_string(),
+            wait_status: Box::new([WaitStatus::Waiting(None)]),
 
             start_time: std::time::Instant::now(),
             timeout: std::time::Duration::from_secs(10),
         },
         dram_status: ComponentStatusInfo::init_waiting(
-            String::new(),
+            "DRAM".to_string(),
             std::time::Duration::from_secs(10),
             4,
         ),
-        eth_status: ComponentStatusInfo::not_present(),
-        cpu_status: ComponentStatusInfo::not_present(),
+        eth_status: ComponentStatusInfo::not_present("ETH".to_string()),
+        cpu_status: ComponentStatusInfo::not_present("CPU".to_string()),
 
         init_options: InitOptions { noc_safe: false },
 
-        unknown_state: false
+        unknown_state: false,
     }
 }
 
@@ -195,7 +196,7 @@ impl ChipImpl for Grayskull {
             let status = &mut status.arc_status;
             if let Some(arc_status) = status.wait_status.get_mut(0) {
                 match arc_status {
-                    WaitStatus::Waiting => {
+                    WaitStatus::Waiting(status_string) => {
                         match self.check_arc_msg_safe(5, 3) {
                             Ok(_) => *arc_status = WaitStatus::JustFinished,
                             Err(err) => match err {
@@ -211,21 +212,28 @@ impl ChipImpl for Grayskull {
                                         // 0xffffffff. I am treating it like an AXI error and will
                                         // assume something has gone terribly wrong and abort.
                                         crate::error::ArcReadyError::NoAccess => {
-                                            *comms = CommsStatus::CommunicationError("Failed to access ARC".to_string());
+                                            *comms = CommsStatus::CommunicationError(
+                                                "Failed to access ARC".to_string(),
+                                            );
                                             return Ok(ChipInitResult::ErrorAbort);
                                         }
                                         crate::error::ArcReadyError::WatchdogTriggered
-                                        | crate::error::ArcReadyError::Asleep => {
-                                            *arc_status = WaitStatus::JustFinished;
-                                            status.status = reason.to_string();
+                                        | crate::error::ArcReadyError::Asleep
+                                        | crate::error::ArcReadyError::OldPostCode(_) => {
+                                            *arc_status = WaitStatus::Error(
+                                                ArcInitError::WaitingForInit(reason),
+                                            );
                                         }
                                         crate::error::ArcReadyError::BootIncomplete
                                         | crate::error::ArcReadyError::OutstandingPcieDMA
                                         | crate::error::ArcReadyError::MessageQueued(_)
-                                        | crate::error::ArcReadyError::HandlingMessage(_)
-                                        | crate::error::ArcReadyError::PostCodeBusy(_) => {
+                                        | crate::error::ArcReadyError::HandlingMessage(_) => {
                                             if status.start_time.elapsed() > status.timeout {
-                                                *arc_status = WaitStatus::Timeout(status.timeout);
+                                                *arc_status = WaitStatus::Error(
+                                                    ArcInitError::WaitingForInit(reason),
+                                                );
+                                            } else {
+                                                *status_string = Some(reason.to_string());
                                             }
                                         }
                                     }
@@ -269,27 +277,131 @@ impl ChipImpl for Grayskull {
             }
         }
 
-        {
-            // TODO(drosen): Explicitly check against the telemetry info
-            let status = &mut status.dram_status;
-            // match status.wait_status {
-            //     WaitStatus::Waiting(start) => {
-            //         let timeout = std::time::Duration::from_secs(10);
-            //         if let Ok(_) = self.check_arc_msg_safe(5, 3) {
-            //             status.wait_status = WaitStatus::JustFinished;
-            //         } else if start.elapsed() > timeout {
-            //             status.wait_status = WaitStatus::Timeout(timeout);
-            //         }
-            //     }
-            //     WaitStatus::JustFinished => {
-            //         status.wait_status = WaitStatus::Done;
-            //     }
-            //     WaitStatus::Done | WaitStatus::Timeout(_) | WaitStatus::NotPresent => {}
-            // }
+        // If ARC has not finished initialization then we shouldn't init eth or dram.
+        if !status.arc_status.is_waiting() {
+            // If something went wrong with ARC then we probably don't have DRAM
+            if !status.arc_status.has_error() {
+                let status = &mut status.dram_status;
 
-            // For now assume that if ARC is good, then so is dram
-            for dram_status in status.wait_status.iter_mut() {
-                *dram_status = WaitStatus::Done;
+                // We don't need to get the telemetry if we aren't waiting to see if dram has
+                // trained...
+                if status.is_waiting() {
+                    // Hitting an error here implies that the something changed and we no longer have arc
+                    // access. We will abort, but allow other chips to continue or not using the typical
+                    // switch block.
+                    let telem = match self.get_telemetry() {
+                        Ok(telem) => Some(telem),
+                        Err(err) => match err {
+                            // Something did go wrong here, but we'll assume that this is a result of
+                            // some temporary issue
+                            PlatformError::ArcNotReady(_, _)
+                            // Not really expected but ethernet training may not yet be complete so
+                            // we'll just ignore it for now.
+                            | PlatformError::EthernetTrainingNotComplete(_) => {
+                                for dram_status in status.wait_status.iter_mut() {
+                                    if let WaitStatus::Waiting(status_string) = dram_status {
+                                        if status.start_time.elapsed() > status.timeout {
+                                            *dram_status = WaitStatus::Timeout(status.timeout);
+                                        } else {
+                                            *status_string = Some("Waiting on arc/ethernet; this is unexpected but we'll assume that things will clear up if we wait.".to_string());
+                                        }
+                                    }
+                                }
+
+                                None
+                            }
+
+                            // Arc should be ready here...
+                            // This means that ARC hung, we should stop initializing this chip in case
+                            // we hit something like a noc hang.
+                            PlatformError::ArcMsgError(_err) => {
+                                return Ok(ChipInitResult::ErrorContinue);
+                            }
+
+                            // This is an "expected error" but we probably can't recover from it, so we should abort the init.
+                            PlatformError::AxiError(_) => return Ok(ChipInitResult::ErrorAbort),
+
+                            // We don't expect to hit these cases so if we do, we should assume that something went terribly
+                            // wrong and abort the init.
+                            PlatformError::UnsupportedFwVersion { .. }
+                            | PlatformError::WrongChipArch { .. }
+                            | PlatformError::WrongChipArchs { .. }
+                            | PlatformError::Generic(_, _)
+                            | PlatformError::GenericError(_, _) => {
+                                return Ok(ChipInitResult::ErrorAbort)
+                            }
+                        },
+                    };
+
+                    if let Some(telem) = telem {
+                        let dram_status = telem.smbus_tx_ddr_status;
+
+                        let mut channels = [None; 6];
+                        for i in 0..6 {
+                            let status = (dram_status >> (i * 4)) & 0xF;
+                            let status = status as u8;
+
+                            // In the firmware these are just magic values, we'll translate them to
+                            // something meaningful here (but it should be noted that these are
+                            // based on wormhole definitions).
+                            if status == 1 {
+                                channels[i] =
+                                    Some(super::init::status::DramChannelStatus::TrainingPass);
+                            } else if status == 0 {
+                                channels[i] =
+                                    Some(super::init::status::DramChannelStatus::TrainingFail);
+                            } else {
+                                channels[i] = None;
+                            }
+                        }
+
+                        for (dram_status, channel_status) in
+                            status.wait_status.iter_mut().zip(channels)
+                        {
+                            match dram_status {
+                                WaitStatus::Waiting(status_string) => {
+                                    if let Some(
+                                        super::init::status::DramChannelStatus::TrainingPass,
+                                    ) = channel_status
+                                    {
+                                        *dram_status = WaitStatus::Done;
+                                    } else {
+                                        *status_string = Some(
+                                            channel_status
+                                                .map(|v| v.to_string())
+                                                .unwrap_or("Unknown".to_string()),
+                                        );
+                                        if status.start_time.elapsed() > status.timeout {
+                                            if let Some(status) = channel_status {
+                                                *dram_status = WaitStatus::Error(
+                                                    super::init::status::DramInitError::NotTrained(
+                                                        status,
+                                                    ),
+                                                );
+                                            } else {
+                                                *dram_status = WaitStatus::Timeout(status.timeout);
+                                            }
+                                        }
+                                    }
+                                }
+                                WaitStatus::JustFinished => {
+                                    *dram_status = WaitStatus::Done;
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+            } else {
+                for dram_status in status.dram_status.wait_status.iter_mut() {
+                    *dram_status = WaitStatus::NoCheck;
+                }
+            }
+        } else {
+            for dram_status in status.dram_status.wait_status.iter_mut() {
+                if let WaitStatus::Waiting(status_string) = dram_status {
+                    *status_string = Some("Waiting for ARC".to_string());
+                }
             }
         }
 

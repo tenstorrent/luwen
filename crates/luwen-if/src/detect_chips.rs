@@ -273,27 +273,33 @@ pub fn detect_chips(
 
         let status = wait_for_init(root_chip, init_callback, continue_on_failure, noc_safe)?;
 
-        dbg!(&status);
-
         // We now want to convert to the uninitialized chip type.
         let chip = UninitChip::new(status, root_chip);
 
         // At this point we may not be able to talk to the chip over ethernet, there should have been an error output to the terminal,
         // so we will just not perform remote chip detection.
         let remote_ready = chip.eth_safe();
+        let arc_ready = chip.arc_alive();
 
         output.push(chip);
 
         let ident = if let Some(wh) = root_chip.as_wh() {
-            let telem = root_chip.get_telemetry()?;
-            if !local_only && remote_ready {
-                remotes_to_investigate.push(root_index);
-            }
+            if arc_ready {
+                if let Ok(telem) = root_chip.get_telemetry() {
+                    if !local_only && remote_ready {
+                        remotes_to_investigate.push(root_index);
+                    }
 
-            (
-                Some(telem.board_id),
-                Some(InterfaceIdOrCoord::Coord(wh.get_local_chip_coord()?)),
-            )
+                    (
+                        Some(telem.board_id),
+                        Some(InterfaceIdOrCoord::Coord(wh.get_local_chip_coord()?)),
+                    )
+                } else {
+                    continue;
+                }
+            } else {
+                continue;
+            }
         } else {
             (
                 // Can't fetch board id from old gs chips

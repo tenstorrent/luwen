@@ -48,7 +48,9 @@ impl fmt::Display for ArcInitError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ArcInitError::FwCorrupted => f.write_str("ARC firmware is corrupted"),
-            ArcInitError::WaitingForInit(err) => write!(f, "ARC is waiting for initialization; {err}"),
+            ArcInitError::WaitingForInit(err) => {
+                write!(f, "ARC is waiting for initialization; {err}")
+            }
             ArcInitError::Hung => f.write_str("ARC is hung"),
         }
     }
@@ -64,6 +66,22 @@ pub enum DramChannelStatus {
     ReadEye,
     BistEye,
     CaDebug,
+}
+
+impl ToString for DramChannelStatus {
+    fn to_string(&self) -> String {
+        match self {
+            DramChannelStatus::TrainingNone => "in pre-training",
+            DramChannelStatus::TrainingFail => "failed to train",
+            DramChannelStatus::TrainingPass => "passed training",
+            DramChannelStatus::TrainingSkip => "skipped training",
+            DramChannelStatus::PhyOff => "phy is off",
+            DramChannelStatus::ReadEye => "read eye",
+            DramChannelStatus::BistEye => "bist eye",
+            DramChannelStatus::CaDebug => "ca debug",
+        }
+        .to_string()
+    }
 }
 
 impl TryFrom<u8> for DramChannelStatus {
@@ -110,7 +128,7 @@ pub enum CpuInitError {
 #[derive(Debug, Clone)]
 pub enum WaitStatus<P, E> {
     NotPresent,
-    Waiting,
+    Waiting(Option<String>),
 
     JustFinished,
 
@@ -141,7 +159,7 @@ pub struct ComponentStatusInfo<P, E> {
     pub wait_status: Box<[WaitStatus<P, E>]>,
     pub timeout: std::time::Duration,
     pub start_time: std::time::Instant,
-    pub status: String,
+    pub name: String,
 }
 
 impl<P: fmt::Display, E: fmt::Display> fmt::Display for ComponentStatusInfo<P, E> {
@@ -169,47 +187,82 @@ impl<P: fmt::Display, E: fmt::Display> fmt::Display for ComponentStatusInfo<P, E
         };
 
         let message = if self.wait_status.len() > 1 {
-            format!("{message} [{}/{}]", completed_count, self.wait_status.len())
+            format!("{message} [{}/{}]", completed_count, self.wait_status.len(),)
         } else {
             message
         };
 
-        let message = if !self.status.is_empty() {
-            format!("{message} {}", self.status)
-        } else {
-            message
-        };
+        let message = format!("{message} {}", self.name);
 
-        let mut detailed_messages = String::new();
-        for status in self.wait_status.iter() {
-            if let WaitStatus::Error(e) = status {
-                detailed_messages = format!("{detailed_messages}\n\t{e}");
+        let mut message_options: Vec<(Vec<_>, String)> = Vec::with_capacity(self.wait_status.len());
+        let mut force_oneline = true;
+        for (index, status) in self.wait_status.iter().enumerate() {
+            if let WaitStatus::Waiting(Some(status)) = status {
+                if let Some(value) = message_options
+                    .iter_mut()
+                    .filter(|(_, v)| v == status)
+                    .next()
+                {
+                    value.0.push(index);
+                } else {
+                    message_options.push((vec![index], status.clone()));
+                }
+            } else if let WaitStatus::Error(e) = status {
+                let e = e.to_string();
+                if let Some(value) = message_options.iter_mut().filter(|v| v.1 == e).next() {
+                    value.0.push(index);
+                } else {
+                    message_options.push((vec![index], e));
+                }
             } else if let WaitStatus::NotInitialized(e) = status {
-                detailed_messages = format!("{detailed_messages}\n\t{e}");
+                let e = e.to_string();
+                if let Some(value) = message_options.iter_mut().filter(|v| v.1 == e).next() {
+                    value.0.push(index);
+                } else {
+                    message_options.push((vec![index], e));
+                }
+            } else {
+                force_oneline = false;
             }
         }
 
-        let message = format!("{message}{detailed_messages}");
+        let message = if message_options.len() == 1 && force_oneline {
+            format!("{message}: {}", message_options[0].1)
+        } else {
+            let mut message = format!("{message}\n");
+            for (indexes, option) in message_options {
+                message = format!("\t{message}[");
+                for index in indexes[..indexes.len().saturating_sub(1)].iter().copied() {
+                    message = format!("{message}{index};");
+                }
+                if let Some(index) = indexes.last() {
+                    message = format!("{message}{index}");
+                }
+                message = format!("{message}]: {option}\n");
+            }
+
+            message
+        };
 
         f.write_str(message.as_str())
     }
 }
 
 impl<P, E> ComponentStatusInfo<P, E> {
-    pub fn not_present() -> Self {
+    pub fn not_present(name: String) -> Self {
         Self {
+            name,
             wait_status: Box::new([]),
-            status: "No components present".to_string(),
             timeout: std::time::Duration::default(),
             start_time: std::time::Instant::now(),
         }
     }
 
-    pub fn init_waiting(status: String, timeout: std::time::Duration, count: usize) -> Self {
-        let wait_status = (0..count).map(|_| WaitStatus::Waiting).collect();
+    pub fn init_waiting(name: String, timeout: std::time::Duration, count: usize) -> Self {
+        let wait_status = (0..count).map(|_| WaitStatus::Waiting(None)).collect();
         Self {
+            name,
             wait_status,
-            status,
 
             start_time: std::time::Instant::now(),
             timeout,
@@ -219,7 +272,7 @@ impl<P, E> ComponentStatusInfo<P, E> {
     pub fn is_waiting(&self) -> bool {
         for status in self.wait_status.iter() {
             match status {
-                WaitStatus::Waiting => {
+                WaitStatus::Waiting(_) => {
                     return true;
                 }
 
@@ -233,13 +286,13 @@ impl<P, E> ComponentStatusInfo<P, E> {
             }
         }
 
-        return false;
+        false
     }
 
     pub fn is_present(&self) -> bool {
         for status in self.wait_status.iter() {
             match status {
-                WaitStatus::Waiting
+                WaitStatus::Waiting(_)
                 | WaitStatus::JustFinished
                 | WaitStatus::Done
                 | WaitStatus::NotInitialized(_)
@@ -259,12 +312,11 @@ impl<P, E> ComponentStatusInfo<P, E> {
     pub fn has_error(&self) -> bool {
         for status in self.wait_status.iter() {
             match status {
-                WaitStatus::Error(_) | WaitStatus::Timeout(_) => {
+                WaitStatus::Error(_) | WaitStatus::Timeout(_) | WaitStatus::NoCheck => {
                     return true;
                 }
 
                 WaitStatus::NotPresent
-                | WaitStatus::NoCheck
                 | WaitStatus::JustFinished
                 | WaitStatus::Done
                 | WaitStatus::Waiting { .. }
@@ -316,10 +368,10 @@ impl InitStatus {
     pub fn new_unknown() -> Self {
         InitStatus {
             comms_status: CommsStatus::CommunicationError("Haven't checked".to_string()),
-            dram_status: ComponentStatusInfo::not_present(),
-            cpu_status: ComponentStatusInfo::not_present(),
-            arc_status: ComponentStatusInfo::not_present(),
-            eth_status: ComponentStatusInfo::not_present(),
+            dram_status: ComponentStatusInfo::not_present("DRAM".to_string()),
+            cpu_status: ComponentStatusInfo::not_present("CPU".to_string()),
+            arc_status: ComponentStatusInfo::not_present("ARC".to_string()),
+            eth_status: ComponentStatusInfo::not_present("ETH".to_string()),
             init_options: InitOptions::default(),
             unknown_state: true,
         }
@@ -331,9 +383,9 @@ impl InitStatus {
 
     pub fn is_waiting(&self) -> bool {
         self.arc_status.is_waiting()
-            && self.dram_status.is_waiting()
-            && self.eth_status.is_waiting()
-            && self.cpu_status.is_waiting()
+            || self.dram_status.is_waiting()
+            || self.eth_status.is_waiting()
+            || self.cpu_status.is_waiting()
     }
 
     pub fn init_complete(&self) -> bool {
