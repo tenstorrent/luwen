@@ -25,6 +25,7 @@ pub struct Grayskull {
     pub arc_addrs: ArcMsgAddr,
 }
 
+#[allow(dead_code)]
 pub enum ArcReady {
     Ready,
     NotReady(ArcMsgProtocolError),
@@ -174,7 +175,7 @@ impl ChipImpl for Grayskull {
         {
             let status = &mut status.arc_status;
             match status.wait_status {
-                WaitStatus::Waiting(start) => {
+                WaitStatus::Waiting(_start) => {
                     let timeout = std::time::Duration::from_secs(10);
                     match self.check_arg_msg_safe(5, 3) {
                         Ok(_) => status.wait_status = WaitStatus::JustFinished,
@@ -184,7 +185,7 @@ impl ChipImpl for Grayskull {
                             }
 
                             // The fact that this is here means that our result is too generic, for now we just ignore it.
-                            PlatformError::ArcMsgError(err) => {
+                            PlatformError::ArcMsgError(_err) => {
                                 return Ok(ChipInitResult::ErrorContinue);
                             }
 

@@ -267,11 +267,11 @@ impl ChipImpl for Wormhole {
 
                             // If we hit these, something has gone terribly wrong. We will therefore abort...
                             PlatformError::WrongChipArch {
-                                actual,
-                                expected,
-                                backtrace,
+                                actual: _,
+                                expected: _,
+                                backtrace: _,
                             } => todo!(),
-                            PlatformError::UnsupportedFwVersion { version, required } => todo!(),
+                            PlatformError::UnsupportedFwVersion { version: _, required: _ } => todo!(),
                             PlatformError::ArcMsgError(_) => todo!(),
                             PlatformError::EthernetTrainingNotComplete(_) => todo!(),
                             PlatformError::Generic(_, _) => todo!(),
@@ -289,7 +289,7 @@ impl ChipImpl for Wormhole {
 
         {
             // TODO(drosen): Explicitly check against the telemetry info
-            let status = &mut status.dram_status;
+            let _status = &mut status.dram_status;
             // match status.wait_status {
             //     WaitStatus::Waiting(start) => {
             //         let timeout = std::time::Duration::from_secs(10);

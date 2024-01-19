@@ -1,10 +1,11 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
-
+#![crate_type = "lib"]
 /// Luwen-if implements all high level functions in a backend agnostic way.
 /// In the simplest terms this includes everything defined in `ChipImpl`, `HlComms` and `detect_chips`.
 /// But this also includes chip specific functions which can be found in `Wormhole` and `Grayskull` chips.
 ///
+
 mod arc_msg;
 pub mod chip;
 mod detect_chips;
