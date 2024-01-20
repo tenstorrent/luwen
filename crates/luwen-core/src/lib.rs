@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::str::FromStr;
+
 #[derive(Clone, Hash, Copy, Debug, PartialEq, Eq)]
 pub enum Arch {
     Grayskull,
@@ -22,12 +24,16 @@ impl Arch {
             _ => false,
         }
     }
+}
 
-    pub fn from_string(s: &str) -> Option<Self> {
+impl FromStr for Arch {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "grayskull" => Some(Arch::Grayskull),
-            "wormhole" => Some(Arch::Wormhole),
-            _ => None,
+            "grayskull" => Ok(Arch::Grayskull),
+            "wormhole" => Ok(Arch::Wormhole),
+            err => Err(err.to_string()),
         }
     }
 }

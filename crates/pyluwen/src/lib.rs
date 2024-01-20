@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::ops::{Deref, DerefMut};
+use std::str::FromStr;
 
 use luwen_core::Arch;
 use luwen_if::chip::{
@@ -1015,8 +1016,11 @@ pub fn detect_chips_fallible(
     let chip_filter = chip_filter.unwrap_or_default();
     let mut converted_chip_filter = Vec::with_capacity(chip_filter.len());
     for filter in chip_filter {
-        converted_chip_filter.push(Arch::from_string(&filter).ok_or_else(|| {
-            PyException::new_err(format!("Could not parse chip arch: {}", filter))
+        converted_chip_filter.push(Arch::from_str(&filter).or_else(|value| {
+            Err(PyException::new_err(format!(
+                "Could not parse chip arch: {}",
+                value
+            )))
         })?);
     }
 

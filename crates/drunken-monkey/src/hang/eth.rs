@@ -12,26 +12,10 @@ pub fn hang_eth(
     core: u32,
     chip: &Wormhole,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let eth_locations = [
-        (9, 0),
-        (1, 0),
-        (8, 0),
-        (2, 0),
-        (7, 0),
-        (3, 0),
-        (6, 0),
-        (4, 0),
-        (9, 6),
-        (1, 6),
-        (8, 6),
-        (2, 6),
-        (7, 6),
-        (3, 6),
-        (6, 6),
-        (4, 6),
-    ];
-
-    let (noc_x, noc_y) = eth_locations[core as usize];
+    let (noc_x, noc_y) = (
+        chip.eth_locations[core as usize].x,
+        chip.eth_locations[core as usize].y,
+    );
 
     match method {
         EthHangMethod::OverwriteFwVersion => {

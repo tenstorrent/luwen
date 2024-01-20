@@ -186,6 +186,14 @@ impl Wormhole {
 
         let start_time = std::time::Instant::now();
 
+        // During initial training the erisc cores aren't running their heartbeats. In addition
+        // ethernet needs active retraining after initial training has completed. This retraining
+        // can only occur if the heartbeat is running. Therefore if the heartbeat is not running I
+        // assume that the link is not retrained.
+        //
+        // This procedure will block for 100 ms because I did not want to add state to the Wormhole
+        // struct to track the last time a heartbeat was incremented on each core because this
+        // function is only called during initialization.
         let mut heartbeat = Vec::with_capacity(self.eth_locations.len());
         loop {
             heartbeat.clear();

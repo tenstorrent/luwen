@@ -12,3 +12,4 @@ memmap2 = "0.7.0"
 bitfield-struct = "0.4.4"
 
 thiserror = "1.0.40"
+tracing = "0.1.40"
