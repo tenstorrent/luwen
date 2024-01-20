@@ -7,7 +7,7 @@ pub enum NocHangMethod {
     AccessNonExistantEndpoint,
 }
 
-fn hang_noc(method: NocHangMethod, chip: Chip) -> Result<(), Box<dyn std::error::Error>> {
+pub fn hang_noc(method: NocHangMethod, chip: Chip) -> Result<(), Box<dyn std::error::Error>> {
     match method {
         NocHangMethod::AccessCgRow => {
             let noc_x = 18;

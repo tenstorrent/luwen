@@ -1,4 +1,5 @@
 use clap::ValueEnum;
+
 use luwen_if::{
     chip::{ArcMsgOptions, Chip, HlCommsInterface},
     ArcMsg, ArcState, ChipImpl,
@@ -11,7 +12,7 @@ pub enum ArcHangMethod {
     CoreHault,
 }
 
-fn hang_arc(method: ArcHangMethod, chip: Chip) -> Result<(), Box<dyn std::error::Error>> {
+pub fn hang_arc(method: ArcHangMethod, chip: Chip) -> Result<(), Box<dyn std::error::Error>> {
     match method {
         ArcHangMethod::OverwriteFwCode => {
             unimplemented!("Haven't implemented fw overrwrite");

@@ -1,5 +1,5 @@
 use clap::ValueEnum;
-use luwen_if::chip::{Chip, HlComms};
+use luwen_if::chip::{HlComms, Wormhole};
 
 #[derive(Debug, Clone, ValueEnum)]
 pub enum EthHangMethod {
@@ -7,10 +7,10 @@ pub enum EthHangMethod {
     OverwriteEthFw,
 }
 
-fn hang_eth(
+pub fn hang_eth(
     method: EthHangMethod,
     core: u32,
-    chip: Chip,
+    chip: &Wormhole,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let eth_locations = [
         (9, 0),
