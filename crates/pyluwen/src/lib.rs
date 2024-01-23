@@ -4,7 +4,7 @@
 use std::ops::{Deref, DerefMut};
 
 use luwen_if::chip::{
-    wait_for_init, ArcMsg, ArcMsgOk, ArcMsgOptions, ChipImpl, HlComms, HlCommsInterface, StatusInfo,
+    wait_for_init, ArcMsg, ArcMsgOk, ArcMsgOptions, ChipImpl, HlComms, HlCommsInterface,
 };
 use luwen_if::{CallbackStorage, DeviceInfo};
 use luwen_ref::{DmaConfig, ExtendedPciDeviceWrapper};
@@ -739,6 +739,29 @@ impl PciInterface<'_> {
     }
 }
 
+#[pyclass]
+pub struct EthAddr {
+    #[pyo3(get)]
+    pub shelf_x: u8,
+    #[pyo3(get)]
+    pub shelf_y: u8,
+    #[pyo3(get)]
+    pub rack_x: u8,
+    #[pyo3(get)]
+    pub rack_y: u8,
+}
+
+impl From<luwen_if::EthAddr> for EthAddr {
+    fn from(value: luwen_if::EthAddr) -> Self {
+        Self {
+            shelf_x: value.shelf_x,
+            shelf_y: value.shelf_y,
+            rack_x: value.rack_x,
+            rack_y: value.rack_y,
+        }
+    }
+}
+
 #[pymethods]
 impl PciWormhole {
     pub fn open_remote(
@@ -886,6 +909,13 @@ impl PciWormhole {
                 .map_err(|v| PyException::new_err(v.to_string()))
         })
     }
+
+    pub fn get_local_coord(&self) -> PyResult<EthAddr> {
+        self.0
+            .get_local_chip_coord()
+            .map(|v| v.into())
+            .map_err(|v| PyException::new_err(v.to_string()))
+    }
 }
 
 common_chip_comms_impls!(PciWormhole);
@@ -918,6 +948,13 @@ impl RemoteWormhole {
                 .spi_write(addr, data)
                 .map_err(|v| PyException::new_err(v.to_string()))
         })
+    }
+
+    pub fn get_local_coord(&self) -> PyResult<EthAddr> {
+        self.0
+            .get_local_chip_coord()
+            .map(|v| v.into())
+            .map_err(|v| PyException::new_err(v.to_string()))
     }
 }
 
