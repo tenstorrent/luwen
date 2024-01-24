@@ -14,7 +14,7 @@ pub enum MappingId {
     Resource1Wc = 4,
     Resource2Uc = 5,
     Resource2Wc = 6,
-    Unknown(u32)
+    Unknown(u32),
 }
 
 impl MappingId {
@@ -37,24 +37,26 @@ impl MappingId {
 }
 
 pub fn getpagesize() -> Option<i64> {
-   nix::unistd::sysconf(nix::unistd::SysconfVar::PAGE_SIZE).ok().flatten()
+    nix::unistd::sysconf(nix::unistd::SysconfVar::PAGE_SIZE)
+        .ok()
+        .flatten()
 }
 
 #[bitfield_struct::bitfield(u32)]
 pub struct DmaPack {
     #[bits(28)]
-    pub size_bytes: u32,                    // Transfer size in bytes
-    pub write: bool,                        // 0 = Chip -> Host, 1 = Host -> Chip
-    pub pcie_msi_on_done: bool,             // Whether to configure DMA engine to send MSI on completion. pcie_msi_on_done and pcie_write_on_done are exclusive.
-    pub pcie_write_on_done: bool,           // Instead of triggering an MSI, write to a location stored in pcie_config_t.completion_flag_phys_addr. pcie_msi_on_done and pcie_write_on_done are exclusive.
-    pub trigger: bool,                      // 1 = Start transfer. The handler should reset it to 0.
+    pub size_bytes: u32, // Transfer size in bytes
+    pub write: bool,              // 0 = Chip -> Host, 1 = Host -> Chip
+    pub pcie_msi_on_done: bool, // Whether to configure DMA engine to send MSI on completion. pcie_msi_on_done and pcie_write_on_done are exclusive.
+    pub pcie_write_on_done: bool, // Instead of triggering an MSI, write to a location stored in pcie_config_t.completion_flag_phys_addr. pcie_msi_on_done and pcie_write_on_done are exclusive.
+    pub trigger: bool,            // 1 = Start transfer. The handler should reset it to 0.
 }
 
 #[repr(C)]
 pub struct ArcPcieCtrlDmaRequest {
-    pub chip_addr: u32,                     // Local address (on the device)
-    pub host_phys_addr_lo: u32,             // Host physical address (this is physical address)
-    pub completion_flag_phys_addr: u32,     // Pointer to the completion flag - the dma engine will write to this address to report completion
+    pub chip_addr: u32,                 // Local address (on the device)
+    pub host_phys_addr_lo: u32,         // Host physical address (this is physical address)
+    pub completion_flag_phys_addr: u32, // Pointer to the completion flag - the dma engine will write to this address to report completion
     pub dma_pack: DmaPack,
-    pub repeat: u32,                        // How many times to repeat the oparation (for debug only) bit31 indicates whether the request is 64 bit transfer
+    pub repeat: u32, // How many times to repeat the oparation (for debug only) bit31 indicates whether the request is 64 bit transfer
 } // 5 * 4 = 20B

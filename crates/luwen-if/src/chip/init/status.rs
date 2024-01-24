@@ -169,7 +169,11 @@ impl<P: fmt::Display, E: fmt::Display> fmt::Display for ComponentStatusInfo<P, E
         for status in self.wait_status.iter() {
             if let WaitStatus::Waiting { .. } = status {
                 waiting_count += 1;
-            } else if let WaitStatus::NoCheck | WaitStatus::JustFinished | WaitStatus::Done | WaitStatus::NotPresent = status {
+            } else if let WaitStatus::NoCheck
+            | WaitStatus::JustFinished
+            | WaitStatus::Done
+            | WaitStatus::NotPresent = status
+            {
                 completed_count += 1;
             }
         }

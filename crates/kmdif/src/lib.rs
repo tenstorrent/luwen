@@ -452,7 +452,7 @@ impl PciDevice {
 
     pub fn scan() -> Vec<usize> {
         let output = std::fs::read_dir("/dev/tenstorrent");
-        let output=  match output {
+        let output = match output {
             Ok(output) => output,
             Err(err) => {
                 tracing::debug!("When reading /dev/tenstorrent for a scan hit error: {err}");

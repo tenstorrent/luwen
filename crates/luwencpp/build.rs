@@ -29,19 +29,23 @@ fn get_cargo_target_dir() -> Result<std::path::PathBuf, Box<dyn std::error::Erro
     Ok(target_dir.to_path_buf())
 }
 
-
 fn main() {
     let result = cbindgen::Builder::new()
         .with_pragma_once(true)
         .with_namespace("luwen")
         .with_crate(std::env::var("CARGO_MANIFEST_DIR").unwrap())
-        .generate().expect("Unable to generate bindings");
+        .generate()
+        .expect("Unable to generate bindings");
 
     // Cargo deb can't access the OUT_DIR variable, so we need to copy it to the directory
     // that this file will end up in.
     // let include_dir = std::env::var("OUT_DIR").unwrap();
     let include_dir = std::env::var("CARGO_TARGET_DIR").unwrap_or_else(|_| {
-        get_cargo_target_dir().unwrap().to_str().unwrap().to_string()
+        get_cargo_target_dir()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string()
     });
     let include_dir = std::path::Path::new(&include_dir);
 
