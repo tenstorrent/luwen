@@ -56,10 +56,22 @@ fn main() -> Result<(), LuwenError> {
                         coord: Some(eth_addr),
                     };
 
+                    let local_id = wh
+                        .eth_locations
+                        .iter()
+                        .position(|v| (v.x, v.y) == local_noc_addr)
+                        .unwrap();
+
+                    let remote_id = wh
+                        .eth_locations
+                        .iter()
+                        .position(|v| (v.x, v.y) == remote_noc_addr)
+                        .unwrap();
+
                     connection_info
                         .entry(next_ident)
                         .or_default()
-                        .push((local_noc_addr, remote_noc_addr));
+                        .push((local_id, remote_id));
                 }
                 connection_map.insert(ident.clone(), connection_info);
             }
@@ -86,25 +98,6 @@ fn main() -> Result<(), LuwenError> {
         }
     }
 
-    let eth_locations = [
-        (9u8, 0u8),
-        (1, 0),
-        (8, 0),
-        (2, 0),
-        (7, 0),
-        (3, 0),
-        (6, 0),
-        (4, 0),
-        (9, 6),
-        (1, 6),
-        (8, 6),
-        (2, 6),
-        (7, 6),
-        (3, 6),
-        (6, 6),
-        (4, 6),
-    ];
-
     let mut connections = Vec::new();
 
     let mut ident_order = Vec::new();
@@ -118,17 +111,7 @@ fn main() -> Result<(), LuwenError> {
     for chip in &ident_order {
         if let Some(connection_info) = connection_map.get(&chip) {
             for (remote_chip, connection) in connection_info {
-                for (local_noc_addr, next_noc_addr) in connection {
-                    let current_eth_id = eth_locations
-                        .iter()
-                        .position(|v| v == local_noc_addr)
-                        .unwrap();
-
-                    let next_eth_id = eth_locations
-                        .iter()
-                        .position(|v| v == next_noc_addr)
-                        .unwrap();
-
+                for (current_eth_id, next_eth_id) in connection {
                     let local = (chips[chip], current_eth_id);
                     let remote = (chips[remote_chip], next_eth_id);
 

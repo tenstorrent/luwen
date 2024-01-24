@@ -280,13 +280,17 @@ pub extern "C" fn luwen_open(arch: Arch, glue: LuwenGlue) -> *mut Chip {
         Arch::WORMHOLE => luwen_core::Arch::Wormhole,
     };
 
-    Box::leak(Box::new(Chip::open(
+    if let Ok(chip) = Chip::open(
         arch,
         CallbackStorage {
             callback: callback_glue,
             user_data: glue,
         },
-    )))
+    ) {
+        Box::leak(Box::new(chip))
+    } else {
+        std::ptr::null_mut()
+    }
 }
 
 #[no_mangle]

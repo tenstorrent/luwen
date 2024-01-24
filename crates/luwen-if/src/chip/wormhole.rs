@@ -12,15 +12,16 @@ use crate::{
         },
         hl_comms::HlCommsInterface,
     },
-    error::PlatformError,
+    error::{BtWrapper, PlatformError},
     ArcMsg, ChipImpl, IntoChip,
 };
 
 use super::{
     eth_addr::EthAddr,
     hl_comms::HlComms,
+    init::status::{ComponentStatusInfo, EthernetPartialInitError, InitOptions, WaitStatus},
     remote::{EthAddresses, RemoteArcIf},
-    ArcMsgOptions, ChipInitResult, InitStatus, NeighbouringChip, StatusInfo, WaitStatus,
+    ArcMsgOptions, ChipInitResult, InitStatus, NeighbouringChip,
 };
 
 /// Implementation of the interface for a Wormhole
@@ -34,8 +35,8 @@ pub struct Wormhole {
     pub use_arc_for_spi: bool,
 
     pub arc_addrs: ArcMsgAddr,
-    pub eth_addres: EthAddresses,
-    pub eth_locations: [(u8, u8); 16],
+    pub eth_locations: [EthCore; 16],
+    pub eth_addrs: EthAddresses,
 }
 
 impl HlComms for Wormhole {
@@ -47,6 +48,23 @@ impl HlComms for Wormhole {
 impl HlComms for &Wormhole {
     fn comms_obj(&self) -> (&dyn ChipComms, &dyn ChipInterface) {
         (self.arc_if.as_ref(), self.chip_if.as_ref())
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct EthCore {
+    pub x: u8,
+    pub y: u8,
+    pub enabled: bool,
+}
+
+impl Default for EthCore {
+    fn default() -> Self {
+        Self {
+            x: 0,
+            y: 0,
+            enabled: true,
+        }
     }
 }
 
@@ -65,10 +83,6 @@ impl Wormhole {
         // let version = u32::from_le_bytes(version);
         let _version = 0x0;
 
-        let mut fw_version = [0; 4];
-        arc_if.noc_read(&chip_if, 0, 1, 0, 0x210, &mut fw_version)?;
-        let fw_version = u32::from_le_bytes(fw_version);
-
         let output = Wormhole {
             chip_if: Arc::new(chip_if),
 
@@ -78,29 +92,103 @@ impl Wormhole {
             arc_addrs: ArcMsgAddr::try_from(&arc_if as &dyn ChipComms)?,
 
             arc_if: Arc::new(arc_if),
+            eth_addrs: EthAddresses::default(),
 
-            eth_addres: EthAddresses::new(fw_version),
             eth_locations: [
-                (9, 0),
-                (1, 0),
-                (8, 0),
-                (2, 0),
-                (7, 0),
-                (3, 0),
-                (6, 0),
-                (4, 0),
-                (9, 6),
-                (1, 6),
-                (8, 6),
-                (2, 6),
-                (7, 6),
-                (3, 6),
-                (6, 6),
-                (4, 6),
+                EthCore {
+                    x: 9,
+                    y: 0,
+                    ..Default::default()
+                },
+                EthCore {
+                    x: 1,
+                    y: 0,
+                    ..Default::default()
+                },
+                EthCore {
+                    x: 8,
+                    y: 0,
+                    ..Default::default()
+                },
+                EthCore {
+                    x: 2,
+                    y: 0,
+                    ..Default::default()
+                },
+                EthCore {
+                    x: 7,
+                    y: 0,
+                    ..Default::default()
+                },
+                EthCore {
+                    x: 3,
+                    y: 0,
+                    ..Default::default()
+                },
+                EthCore {
+                    x: 6,
+                    y: 0,
+                    ..Default::default()
+                },
+                EthCore {
+                    x: 4,
+                    y: 0,
+                    ..Default::default()
+                },
+                EthCore {
+                    x: 9,
+                    y: 6,
+                    ..Default::default()
+                },
+                EthCore {
+                    x: 1,
+                    y: 6,
+                    ..Default::default()
+                },
+                EthCore {
+                    x: 8,
+                    y: 6,
+                    ..Default::default()
+                },
+                EthCore {
+                    x: 2,
+                    y: 6,
+                    ..Default::default()
+                },
+                EthCore {
+                    x: 7,
+                    y: 6,
+                    ..Default::default()
+                },
+                EthCore {
+                    x: 3,
+                    y: 6,
+                    ..Default::default()
+                },
+                EthCore {
+                    x: 6,
+                    y: 6,
+                    ..Default::default()
+                },
+                EthCore {
+                    x: 4,
+                    y: 6,
+                    ..Default::default()
+                },
             ],
         };
 
         Ok(output)
+    }
+
+    pub fn init_eth_addrs(&mut self) -> Result<(), PlatformError> {
+        if self.eth_addrs.masked_version == 0 {
+            let telemetry = self.get_telemetry()?;
+
+            self.eth_addrs = EthAddresses::new(telemetry.smbus_tx_eth_fw_version);
+        }
+
+        Ok(())
     }
 
     pub fn get_if<T: ChipInterface>(&self) -> Option<&T> {
@@ -122,7 +210,7 @@ impl Wormhole {
     //     0x29
     // }
 
-    fn check_arg_msg_safe(&self, msg_reg: u64, _return_reg: u64) -> Result<(), PlatformError> {
+    fn check_arc_msg_safe(&self, msg_reg: u64, _return_reg: u64) -> Result<(), PlatformError> {
         const POST_CODE_INIT_DONE: u32 = 0xC0DE0001;
         const _POST_CODE_ARC_MSG_HANDLE_START: u32 = 0xC0DE0030;
         const POST_CODE_ARC_MSG_HANDLE_DONE: u32 = 0xC0DE003F;
@@ -134,25 +222,31 @@ impl Wormhole {
 
         if pc == 0xFFFFFFFF {
             return Err(PlatformError::ArcNotReady(
-                "scratch register access failed".to_string(),
+                crate::error::ArcReadyError::NoAccess,
+                BtWrapper::capture(),
             ))?;
         }
 
         if s5 == 0xDEADC0DE {
             return Err(PlatformError::ArcNotReady(
-                "ARC watchdog has triggered".to_string(),
+                crate::error::ArcReadyError::WatchdogTriggered,
+                BtWrapper::capture(),
             ))?;
         }
 
         // Still booting and it will later wipe SCRATCH[5/2].
         if s5 == 0x00000060 || pc == 0x11110000 {
             return Err(PlatformError::ArcNotReady(
-                "ARC FW has not yet booted".to_string(),
+                crate::error::ArcReadyError::BootIncomplete,
+                BtWrapper::capture(),
             ))?;
         }
 
         if s5 == 0x0000AA00 || s5 == ArcMsg::ArcGoToSleep.msg_code() as u32 {
-            return Err(PlatformError::ArcNotReady("ARC is asleep".to_string()))?;
+            return Err(PlatformError::ArcNotReady(
+                crate::error::ArcReadyError::Asleep,
+                BtWrapper::capture(),
+            ))?;
         }
 
         // PCIE DMA writes SCRATCH[5] on exit, so it's not safe.
@@ -160,22 +254,25 @@ impl Wormhole {
         // (The former is only relevant when msg_reg==5, but the latter is always relevant.)
         if dma != 0 {
             return Err(PlatformError::ArcNotReady(
-                "there is an outstanding PCIE DMA request".to_string(),
+                crate::error::ArcReadyError::OutstandingPcieDMA,
+                BtWrapper::capture(),
             ))?;
         }
 
         if s5 & 0xFFFFFF00 == 0x0000AA00 {
             let message_id = s5 & 0xFF;
-            return Err(PlatformError::ArcNotReady(format!(
-                "another message is queued (0x{message_id:02x})"
-            )))?;
+            return Err(PlatformError::ArcNotReady(
+                crate::error::ArcReadyError::MessageQueued(message_id),
+                BtWrapper::capture(),
+            ))?;
         }
 
         if s5 & 0xFF00FFFF == 0xAA000000 {
             let message_id = (s5 >> 16) & 0xFF;
-            return Err(PlatformError::ArcNotReady(format!(
-                "another message is being procesed (0x{message_id:02x})"
-            )))?;
+            return Err(PlatformError::ArcNotReady(
+                crate::error::ArcReadyError::HandlingMessage(message_id),
+                BtWrapper::capture(),
+            ))?;
         }
 
         // Boot complete (new FW only), message not recognized,
@@ -200,9 +297,10 @@ impl Wormhole {
             if pc_idle {
                 return Ok(());
             } else {
-                return Err(PlatformError::ArcNotReady(format!(
-                    "post code 0x{pc:08x} indicates ARC is not ready"
-                )))?;
+                return Err(PlatformError::ArcNotReady(
+                    crate::error::ArcReadyError::OldPostCode(pc),
+                    BtWrapper::capture(),
+                ))?;
             }
         }
 
@@ -227,100 +325,337 @@ impl Wormhole {
     }
 }
 
-impl ChipImpl for Wormhole {
-    fn is_inititalized(&self) -> Result<InitStatus, PlatformError> {
-        let mut status = InitStatus {
-            arc_status: StatusInfo {
-                total: 1,
-                ..Default::default()
-            },
-            dram_status: StatusInfo {
-                total: 4,
-                ..Default::default()
-            },
-            eth_status: StatusInfo {
-                total: 16,
-                ..Default::default()
-            },
-            cpu_status: StatusInfo::not_present(),
-        };
-        self.update_init_state(&mut status)?;
+fn default_status() -> InitStatus {
+    InitStatus {
+        comms_status: super::CommsStatus::CanCommunicate,
+        arc_status: ComponentStatusInfo {
+            name: "ARC".to_string(),
+            wait_status: Box::new([WaitStatus::Waiting(None)]),
 
-        Ok(status)
+            start_time: std::time::Instant::now(),
+            timeout: std::time::Duration::from_secs(300),
+        },
+        dram_status: ComponentStatusInfo::init_waiting(
+            "DRAM".to_string(),
+            std::time::Duration::from_secs(300),
+            4,
+        ),
+        eth_status: ComponentStatusInfo::init_waiting(
+            "ETH".to_string(),
+            std::time::Duration::from_secs(15 * 60),
+            16,
+        ),
+        cpu_status: ComponentStatusInfo::not_present("CPU".to_string()),
+
+        init_options: InitOptions { noc_safe: false },
+
+        unknown_state: false,
     }
+}
 
-    fn update_init_state(&self, status: &mut InitStatus) -> Result<ChipInitResult, PlatformError> {
+impl ChipImpl for Wormhole {
+    fn update_init_state(
+        &mut self,
+        status: &mut InitStatus,
+    ) -> Result<ChipInitResult, PlatformError> {
+        if status.unknown_state {
+            *status = default_status();
+        }
+
+        let comms = &mut status.comms_status;
+
         {
             let status = &mut status.arc_status;
-            match status.wait_status {
-                WaitStatus::Waiting(start) => {
-                    let timeout = std::time::Duration::from_secs(300);
-                    match self.check_arg_msg_safe(5, 3) {
-                        Ok(_) => status.wait_status = WaitStatus::JustFinished,
-                        Err(err) => match err {
-                            PlatformError::ArcNotReady(_) => {
-                                if start.elapsed() > timeout {
-                                    status.wait_status = WaitStatus::Timeout(timeout)
+            for arc_status in status.wait_status.iter_mut() {
+                match arc_status {
+                    WaitStatus::Waiting(status_string) => {
+                        match self.check_arc_msg_safe(5, 3) {
+                            Ok(_) => *arc_status = WaitStatus::JustFinished,
+                            Err(err) => {
+                                match err {
+                                    PlatformError::ArcNotReady(reason, _) => {
+                                        // There are three possibilities when trying to get a response
+                                        // here. 1. 0xffffffff in this case we want to assume this is some
+                                        // sort of AxiError and abort the init. 2. An error we may
+                                        // eventually recover from, i.e. arc booting... 3. we have hit an
+                                        // error that won't resolve but isn't indicative of further
+                                        // problems. For example watchdog triggered.
+                                        match reason {
+                                            // This is triggered when the s5 or pc registers readback
+                                            // 0xffffffff. I am treating it like an AXI error and will
+                                            // assume something has gone terribly wrong and abort.
+                                            crate::error::ArcReadyError::NoAccess => {
+                                                *comms = super::CommsStatus::CommunicationError(
+                                                    "Failed to access ARC".to_string(),
+                                                );
+                                                return Ok(ChipInitResult::ErrorAbort);
+                                            }
+                                            crate::error::ArcReadyError::WatchdogTriggered
+                                            | crate::error::ArcReadyError::Asleep
+                                            | crate::error::ArcReadyError::OldPostCode(_) => {
+                                                *arc_status = WaitStatus::Error(super::init::status::ArcInitError::WaitingForInit(reason));
+                                            }
+                                            crate::error::ArcReadyError::BootIncomplete
+                                            | crate::error::ArcReadyError::OutstandingPcieDMA
+                                            | crate::error::ArcReadyError::MessageQueued(_)
+                                            | crate::error::ArcReadyError::HandlingMessage(_) => {
+                                                *status_string = Some(reason.to_string());
+                                                if status.start_time.elapsed() > status.timeout {
+                                                    *arc_status = WaitStatus::Error(super::init::status::ArcInitError::WaitingForInit(reason));
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // The fact that this is here means that our result is too generic, for now we just ignore it.
+                                    PlatformError::ArcMsgError(_) => {
+                                        return Ok(ChipInitResult::ErrorContinue);
+                                    }
+
+                                    // This is fine to hit at this stage (though it should have been already verified to not be the case).
+                                    // For now we just ignore it and hope that it will be resolved by the time the timeout expires...
+                                    PlatformError::EthernetTrainingNotComplete(_) => {
+                                        if let WaitStatus::Waiting(status_string) = arc_status {
+                                            if status.start_time.elapsed() > status.timeout {
+                                                *arc_status = WaitStatus::Timeout(status.timeout);
+                                            } else {
+                                                *status_string = Some("Waiting on arc/ethernet; this is unexpected but we'll assume that things will clear up if we wait.".to_string());
+                                            }
+                                        }
+                                    }
+
+                                    // This is an "expected error" but we probably can't recover from it, so we should abort the init.
+                                    PlatformError::AxiError(_) => {
+                                        return Ok(ChipInitResult::ErrorAbort)
+                                    }
+
+                                    // We don't expect to hit these cases so if we do, we should assume that something went terribly
+                                    // wrong and abort the init.
+                                    PlatformError::UnsupportedFwVersion { .. }
+                                    | PlatformError::WrongChipArch { .. }
+                                    | PlatformError::WrongChipArchs { .. }
+                                    | PlatformError::Generic(_, _)
+                                    | PlatformError::GenericError(_, _) => {
+                                        return Ok(ChipInitResult::ErrorAbort)
+                                    }
                                 }
                             }
-                            PlatformError::AxiError(_) => todo!(),
-
-                            // If we hit these, something has gone terribly wrong. We will therefore abort...
-                            PlatformError::WrongChipArch {
-                                actual,
-                                expected,
-                                backtrace,
-                            } => todo!(),
-                            PlatformError::UnsupportedFwVersion { version, required } => todo!(),
-                            PlatformError::ArcMsgError(_) => todo!(),
-                            PlatformError::EthernetTrainingNotComplete(_) => todo!(),
-                            PlatformError::Generic(_, _) => todo!(),
-                            PlatformError::GenericError(_, _) => todo!(),
-                        },
+                        }
                     }
-                    {}
+                    WaitStatus::JustFinished => {
+                        *arc_status = WaitStatus::Done;
+                    }
+                    _ => {}
                 }
-                WaitStatus::JustFinished => {
-                    status.wait_status = WaitStatus::Done;
-                }
-                WaitStatus::Done | WaitStatus::Timeout(_) | WaitStatus::NotPresent => {}
             }
         }
 
-        {
-            // TODO(drosen): Explicitly check against the telemetry info
-            let status = &mut status.dram_status;
-            // match status.wait_status {
-            //     WaitStatus::Waiting(start) => {
-            //         let timeout = std::time::Duration::from_secs(10);
-            //         if let Ok(_) = self.check_arg_msg_safe(5, 3) {
-            //             status.wait_status = WaitStatus::JustFinished;
-            //         } else if start.elapsed() > timeout {
-            //             status.wait_status = WaitStatus::Timeout(timeout);
-            //         }
-            //     }
-            //     WaitStatus::JustFinished => {
-            //         status.wait_status = WaitStatus::Done;
-            //     }
-            //     WaitStatus::Done | WaitStatus::Timeout(_) | WaitStatus::NotPresent => {}
-            // }
-        }
+        // If ARC has not finished initialization then we shouldn't init eth or dram.
+        if !status.arc_status.is_waiting() {
+            // If something went wrong with ARC then we probably don't have DRAM
+            if !status.arc_status.has_error() {
+                let status = &mut status.dram_status;
 
-        {
-            let status = &mut status.eth_status;
-            match status.wait_status {
-                WaitStatus::Waiting(start) => {
-                    let timeout = std::time::Duration::from_secs(300);
-                    if let Ok(_) = self.check_ethernet_training_complete() {
-                        status.wait_status = WaitStatus::JustFinished;
-                    } else if start.elapsed() > timeout {
-                        status.wait_status = WaitStatus::Timeout(timeout);
+                // We don't need to get the telemetry if we aren't waiting to see if dram has
+                // trained...
+                if status.is_waiting() {
+                    // Hitting an error here implies that the something changed and we no longer have arc
+                    // access. We will abort, but allow other chips to continue or not using the typical
+                    // switch block.
+                    let telem = match self.get_telemetry() {
+                        Ok(telem) => Some(telem),
+                        Err(err) => match err {
+                            // Something did go wrong here, but we'll assume that this is a result of
+                            // some temporary issue
+                            PlatformError::ArcNotReady(_, _)
+                            // Not really expected but ethernet training may not yet be complete so
+                            // we'll just ignore it for now.
+                            | PlatformError::EthernetTrainingNotComplete(_) => {
+                                for dram_status in status.wait_status.iter_mut() {
+                                    if let WaitStatus::Waiting(status_string) = dram_status {
+                                        if status.start_time.elapsed() > status.timeout {
+                                            *dram_status = WaitStatus::Timeout(status.timeout);
+                                        } else {
+                                            *status_string = Some("Waiting on arc/ethernet; this is unexpected but we'll assume that things will clear up if we wait.".to_string());
+                                        }
+                                    }
+                                }
+
+                                None
+                            }
+
+                            // Arc should be ready here...
+                            // This means that ARC hung, we should stop initializing this chip in case
+                            // we hit something like a noc hang.
+                            PlatformError::ArcMsgError(_err) => {
+                                return Ok(ChipInitResult::ErrorContinue);
+                            }
+
+                            // This is an "expected error" but we probably can't recover from it, so we should abort the init.
+                            PlatformError::AxiError(_) => return Ok(ChipInitResult::ErrorAbort),
+
+                            // We don't expect to hit these cases so if we do, we should assume that something went terribly
+                            // wrong and abort the init.
+                            PlatformError::UnsupportedFwVersion { .. }
+                            | PlatformError::WrongChipArch { .. }
+                            | PlatformError::WrongChipArchs { .. }
+                            | PlatformError::Generic(_, _)
+                            | PlatformError::GenericError(_, _) => {
+                                return Ok(ChipInitResult::ErrorAbort)
+                            }
+                        },
+                    };
+
+                    if let Some(telem) = telem {
+                        let dram_status = telem.smbus_tx_ddr_status;
+
+                        let mut channels = [None; 6];
+                        for i in 0..6 {
+                            let status = (dram_status >> (i * 4)) & 0xF;
+                            let status = status as u8;
+
+                            channels[i] =
+                                super::init::status::DramChannelStatus::try_from(status).ok();
+                        }
+
+                        for (dram_status, channel_status) in
+                            status.wait_status.iter_mut().zip(channels)
+                        {
+                            match dram_status {
+                                WaitStatus::Waiting(status_string) => {
+                                    if let Some(
+                                        super::init::status::DramChannelStatus::TrainingPass,
+                                    ) = channel_status
+                                    {
+                                        *dram_status = WaitStatus::Done;
+                                    } else {
+                                        *status_string = Some(
+                                            channel_status
+                                                .map(|v| v.to_string())
+                                                .unwrap_or("Unknown".to_string()),
+                                        );
+                                        if status.start_time.elapsed() > status.timeout {
+                                            if let Some(status) = channel_status {
+                                                *dram_status = WaitStatus::Error(
+                                                    super::init::status::DramInitError::NotTrained(
+                                                        status,
+                                                    ),
+                                                );
+                                            } else {
+                                                *dram_status = WaitStatus::Timeout(status.timeout);
+                                            }
+                                        }
+                                    }
+                                }
+                                WaitStatus::JustFinished => {
+                                    *dram_status = WaitStatus::Done;
+                                }
+                                _ => {}
+                            }
+                        }
                     }
                 }
-                WaitStatus::JustFinished => {
-                    status.wait_status = WaitStatus::Done;
+            } else {
+                for dram_status in status.dram_status.wait_status.iter_mut() {
+                    *dram_status = WaitStatus::NoCheck;
                 }
-                WaitStatus::Done | WaitStatus::Timeout(_) | WaitStatus::NotPresent => {}
+            }
+        } else {
+            for dram_status in status.dram_status.wait_status.iter_mut() {
+                if let WaitStatus::Waiting(status_string) = dram_status {
+                    *status_string = Some("Waiting for ARC".to_string());
+                }
+            }
+        }
+
+        // If ARC has not finished initialization then we shouldn't init eth.
+        if !status.arc_status.is_waiting() {
+            // We need arc to be alive so that we can check which cores are enabled
+            if !status.arc_status.has_error() {
+                // Only try to initiliaze the ethernet if we are not in noc_safe mode.
+                if !status.init_options.noc_safe {
+                    let status = &mut status.eth_status;
+
+                    // We don't need to get the eth training status if we aren't waiting to see if dram has
+                    // trained...
+                    if status.is_waiting() {
+                        let eth_training_status = match self.check_ethernet_training_complete() {
+                            Ok(eth_status) => eth_status,
+                            Err(err) => match err {
+                                // ARC should be initialized at this point, hitting an error here means
+                                // that we can no longer progress in the init.
+                                PlatformError::ArcMsgError(_)
+                                | PlatformError::ArcNotReady(_, _) => {
+                                    return Ok(ChipInitResult::ErrorContinue);
+                                }
+
+                                // We are checking for ethernet training to complete... if we hit this than
+                                // something has gone terribly wrong
+                                PlatformError::EthernetTrainingNotComplete(_) => {
+                                    return Ok(ChipInitResult::ErrorContinue);
+                                }
+
+                                // This is an "expected error" but we probably can't recover from it, so we should abort the init.
+                                PlatformError::AxiError(_) => {
+                                    return Ok(ChipInitResult::ErrorAbort)
+                                }
+
+                                // We don't expect to hit these cases so if we do, we should assume that something went terribly
+                                // wrong and abort the init.
+                                PlatformError::UnsupportedFwVersion { .. }
+                                | PlatformError::WrongChipArch { .. }
+                                | PlatformError::WrongChipArchs { .. }
+                                | PlatformError::Generic(_, _)
+                                | PlatformError::GenericError(_, _) => {
+                                    return Ok(ChipInitResult::ErrorAbort)
+                                }
+                            },
+                        };
+                        for (eth_status, training_complete) in
+                            status.wait_status.iter_mut().zip(eth_training_status)
+                        {
+                            match eth_status {
+                                WaitStatus::Waiting(status_string) => {
+                                    if training_complete {
+                                        if let Err(_err) = self.check_ethernet_fw_version() {
+                                            *eth_status = WaitStatus::NotInitialized(
+                                                EthernetPartialInitError::FwOverwritten,
+                                            );
+                                        } else {
+                                            *eth_status = WaitStatus::JustFinished;
+                                        }
+                                    } else if status.start_time.elapsed() > status.timeout {
+                                        *eth_status = WaitStatus::Timeout(status.timeout);
+                                    } else {
+                                        *status_string = Some(
+                                            "Waiting for initial training to complete".to_string(),
+                                        );
+                                    }
+                                }
+                                WaitStatus::JustFinished => {
+                                    *eth_status = WaitStatus::Done;
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                } else {
+                    let status = &mut status.eth_status;
+                    for eth_status in status.wait_status.iter_mut() {
+                        *eth_status = WaitStatus::Done;
+                    }
+                }
+            } else {
+                let status = &mut status.eth_status;
+                for eth_status in status.wait_status.iter_mut() {
+                    *eth_status = WaitStatus::NoCheck;
+                }
+            }
+        } else {
+            for eth_status in status.eth_status.wait_status.iter_mut() {
+                if let WaitStatus::Waiting(status_string) = eth_status {
+                    *status_string = Some("Waiting for ARC".to_string());
+                }
             }
         }
 
@@ -343,7 +678,7 @@ impl ChipImpl for Wormhole {
             (5, 3)
         };
 
-        self.check_arg_msg_safe(msg_reg, return_reg)?;
+        self.check_arc_msg_safe(msg_reg, return_reg)?;
 
         crate::arc_msg::arc_msg(
             self,
@@ -365,13 +700,19 @@ impl ChipImpl for Wormhole {
 
         let mut output = Vec::with_capacity(self.eth_locations.len());
 
-        for (eth_id, (eth_x, eth_y)) in self.eth_locations.iter().copied().enumerate() {
+        for (
+            eth_id,
+            EthCore {
+                x: eth_x, y: eth_y, ..
+            },
+        ) in self.eth_locations.iter().copied().enumerate()
+        {
             let port_status = self.arc_if.noc_read32(
                 &self.chip_if,
                 0,
                 eth_x,
                 eth_y,
-                self.eth_addres.eth_conn_info + (eth_id as u64 * 4),
+                self.eth_addrs.eth_conn_info + (eth_id as u64 * 4),
             )?;
 
             if port_status == ETH_UNCONNECTED || port_status == ETH_UNKNOWN {
@@ -384,7 +725,7 @@ impl ChipImpl for Wormhole {
                 0,
                 eth_x,
                 eth_y,
-                self.eth_addres.node_info + (4 * RACK_OFFSET),
+                self.eth_addrs.node_info + (4 * RACK_OFFSET),
             )?;
             let remote_rack_x = remote_id & 0xFF;
             let remote_rack_y = (remote_id >> 8) & 0xFF;
@@ -393,7 +734,7 @@ impl ChipImpl for Wormhole {
                 0,
                 eth_x,
                 eth_y,
-                self.eth_addres.node_info + (4 * SHELF_OFFSET),
+                self.eth_addrs.node_info + (4 * SHELF_OFFSET),
             )?;
             let remote_shelf_x = (remote_id >> 16) & 0x3F;
             let remote_shelf_y = (remote_id >> 22) & 0x3F;

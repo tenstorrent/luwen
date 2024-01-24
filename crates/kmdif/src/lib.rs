@@ -451,8 +451,16 @@ impl PciDevice {
     }
 
     pub fn scan() -> Vec<usize> {
-        let mut output = std::fs::read_dir("/dev/tenstorrent")
-            .unwrap()
+        let output = std::fs::read_dir("/dev/tenstorrent");
+        let output = match output {
+            Ok(output) => output,
+            Err(err) => {
+                tracing::debug!("When reading /dev/tenstorrent for a scan hit error: {err}");
+                return Vec::new();
+            }
+        };
+
+        let mut output = output
             .filter_map(|entry| {
                 let entry = entry.ok()?;
 

@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::ops::{Deref, DerefMut};
+use std::str::FromStr;
 
+use luwen_core::Arch;
 use luwen_if::chip::{
     wait_for_init, ArcMsg, ArcMsgOk, ArcMsgOptions, ChipImpl, HlComms, HlCommsInterface,
 };
-use luwen_if::{CallbackStorage, DeviceInfo};
+use luwen_if::{CallbackStorage, ChipDetectOptions, DeviceInfo, UninitChip};
 use luwen_ref::{DmaConfig, ExtendedPciDeviceWrapper};
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
@@ -449,24 +451,33 @@ impl PciChip {
     }
 
     #[new]
-    pub fn new(pci_interface: Option<usize>) -> Self {
+    pub fn new(pci_interface: Option<usize>) -> PyResult<Self> {
         let pci_interface = pci_interface.unwrap();
 
         let chip = luwen_ref::ExtendedPciDevice::open(pci_interface).unwrap();
 
         let arch = chip.borrow().device.arch;
 
-        PciChip(luwen_if::chip::Chip::open(
-            arch,
-            luwen_if::CallbackStorage {
-                callback: luwen_ref::comms_callback,
-                user_data: chip,
-            },
+        Ok(PciChip(
+            luwen_if::chip::Chip::open(
+                arch,
+                luwen_if::CallbackStorage {
+                    callback: luwen_ref::comms_callback,
+                    user_data: chip,
+                },
+            )
+            .map_err(|v| {
+                PyException::new_err(format!("Could not initialize chip: {}", v.to_string()))
+            })?,
         ))
     }
 
-    pub fn init(&self) {
-        wait_for_init(&self.0, &mut |_| {}, false);
+    pub fn init(&mut self) -> PyResult<()> {
+        wait_for_init(&mut self.0, &mut |_| {}, false, false).map_err(|v| {
+            PyException::new_err(format!("Could not initialize chip: {}", v.to_string()))
+        })?;
+
+        Ok(())
     }
 
     pub fn board_id(&self) -> u64 {
@@ -886,6 +897,17 @@ impl PciWormhole {
         }
     }
 
+    pub fn pci_board_type(&self) -> PyResult<u16> {
+        let value = PciInterface::from_wh(self);
+        if let Some(value) = value {
+            Ok(value.pci_interface.borrow().device.physical.subsystem_id)
+        } else {
+            return Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ));
+        }
+    }
+
     pub fn spi_read(&self, addr: u32, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
         Python::with_gil(|_py| {
             let ptr: *mut u8 = data.buf_ptr().cast();
@@ -958,18 +980,129 @@ impl RemoteWormhole {
     }
 }
 
+#[pyclass]
+pub struct UninitPciChip {
+    pub chip: UninitChip,
+}
+
+#[pymethods]
+impl UninitPciChip {
+    pub fn init(&self) -> PyResult<PciChip> {
+        Ok(PciChip(
+            self.chip
+                .clone()
+                .init(&mut |_| {})
+                .map_err(|v| PyException::new_err(v.to_string()))?,
+        ))
+    }
+
+    pub fn have_comms(&self) -> bool {
+        self.chip
+            .status()
+            .map(|v| !v.unknown_state && v.comms_status.ok())
+            .unwrap_or(true)
+    }
+
+    pub fn force_upgrade(&self) -> PciChip {
+        PciChip(self.chip.clone().upgrade())
+    }
+}
+
+//silent callback (import), stdout (print)
+//add arguments, (own or from luwen)
+//from luwen, multiple points to different callback functions
+
 #[pyfunction]
-pub fn detect_chips() -> Vec<PciChip> {
-    luwen_ref::detect_chips()
-        .unwrap()
+#[pyo3(signature = (interfaces = None, local_only = false, continue_on_failure = false, chip_filter = None, noc_safe = false))]
+pub fn detect_chips_fallible(
+    interfaces: Option<Vec<usize>>,
+    local_only: bool,
+    continue_on_failure: bool,
+    chip_filter: Option<Vec<String>>,
+    noc_safe: bool,
+) -> PyResult<Vec<UninitPciChip>> {
+    let interfaces = interfaces.unwrap_or(Vec::new());
+
+    let all_devices = luwen_ref::PciDevice::scan();
+
+    let interfaces = if interfaces.len() == 0 {
+        all_devices
+    } else {
+        let mut error_interfaces = Vec::with_capacity(interfaces.len());
+        for interface in interfaces.iter().copied() {
+            if !all_devices.contains(&interface) {
+                error_interfaces.push(interface);
+            }
+        }
+
+        if error_interfaces.len() > 0 {
+            return Err(PyException::new_err(format!(
+                "Could not open TT-PCI device: {:?}; expected one of {:?}",
+                error_interfaces, all_devices
+            )));
+        }
+
+        interfaces
+    };
+
+    let mut root_chips = Vec::with_capacity(interfaces.len());
+    for interface in interfaces {
+        root_chips.push(PciChip::new(Some(interface))?.0);
+    }
+
+    let chip_filter = chip_filter.unwrap_or_default();
+    let mut converted_chip_filter = Vec::with_capacity(chip_filter.len());
+    for filter in chip_filter {
+        converted_chip_filter.push(Arch::from_str(&filter).or_else(|value| {
+            Err(PyException::new_err(format!(
+                "Could not parse chip arch: {}",
+                value
+            )))
+        })?);
+    }
+
+    let options = ChipDetectOptions {
+        continue_on_failure,
+        local_only,
+        chip_filter: converted_chip_filter,
+        noc_safe,
+    };
+
+    let chips = luwen_if::detect_chips(root_chips, &mut |_| {}, options)
+        .map_err(|v| PyException::new_err(v.to_string()))?;
+    Ok(chips
         .into_iter()
-        .map(|chip| PciChip(chip))
-        .collect()
+        .map(|chip| UninitPciChip { chip })
+        .collect())
+}
+
+#[pyfunction]
+#[pyo3(signature = (interfaces = None, local_only = false, continue_on_failure = false, chip_filter = None, noc_safe = false))]
+pub fn detect_chips(
+    interfaces: Option<Vec<usize>>,
+    local_only: bool,
+    continue_on_failure: bool,
+    chip_filter: Option<Vec<String>>,
+    noc_safe: bool,
+) -> PyResult<Vec<PciChip>> {
+    let chips = detect_chips_fallible(
+        interfaces,
+        local_only,
+        continue_on_failure,
+        chip_filter,
+        noc_safe,
+    )?;
+    let mut output = Vec::with_capacity(chips.len());
+    for chip in chips {
+        output.push(chip.init().map_err(|v| PyException::new_err(v))?);
+    }
+    Ok(output)
 }
 
 #[pymodule]
 fn pyluwen(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PciChip>()?;
+    m.add_class::<UninitPciChip>()?;
     m.add_class::<PciWormhole>()?;
     m.add_class::<RemoteWormhole>()?;
     m.add_class::<PciGrayskull>()?;
@@ -977,6 +1110,7 @@ fn pyluwen(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<AxiData>()?;
 
     m.add_wrapped(wrap_pyfunction!(detect_chips))?;
+    m.add_wrapped(wrap_pyfunction!(detect_chips_fallible))?;
 
     Ok(())
 }

@@ -25,6 +25,26 @@ impl Display for BtWrapper {
     }
 }
 
+#[derive(Clone, Error, Debug)]
+pub enum ArcReadyError {
+    #[error("scratch register access failed")]
+    NoAccess,
+    #[error("ARC watchdog has triggered")]
+    WatchdogTriggered,
+    #[error("ARC FW has not yet booted")]
+    BootIncomplete,
+    #[error("ARC is asleep")]
+    Asleep,
+    #[error("there is an outstanding PCIE DMA request")]
+    OutstandingPcieDMA,
+    #[error("another message is queued (0x{0:02x})")]
+    MessageQueued(u32),
+    #[error("another message is being procesed (0x{0:02x})")]
+    HandlingMessage(u32),
+    #[error("post code 0x{0:08x} indicates that you are running old fw... or that you aren't running any")]
+    OldPostCode(u32),
+}
+
 #[derive(Error, Debug)]
 pub enum PlatformError {
     #[error("Tried to initialize chip with the wrong architecture, expected {expected:?} but got {actual:?}\n{backtrace}")]
@@ -34,11 +54,18 @@ pub enum PlatformError {
         backtrace: BtWrapper,
     },
 
+    #[error("Tried to initialize chip with the wrong architecture, expected one of {expected:?} but got {actual:?}\n{backtrace}")]
+    WrongChipArchs {
+        actual: Arch,
+        expected: Vec<Arch>,
+        backtrace: BtWrapper,
+    },
+
     #[error("Unsupported fw version, got {version:x} but required {required:x}")]
     UnsupportedFwVersion { version: u32, required: u32 },
 
-    #[error("It is not currently safe to communicate with ARC because, {0}")]
-    ArcNotReady(String),
+    #[error("It is not currently safe to communicate with ARC because, {0}\n{1}")]
+    ArcNotReady(ArcReadyError, BtWrapper),
 
     #[error(transparent)]
     ArcMsgError(#[from] ArcMsgError),
@@ -60,5 +87,12 @@ impl From<Box<dyn std::error::Error>> for PlatformError {
     #[inline]
     fn from(e: Box<dyn std::error::Error>) -> Self {
         Self::GenericError(e, BtWrapper::capture())
+    }
+}
+
+impl From<String> for PlatformError {
+    #[inline]
+    fn from(e: String) -> Self {
+        Self::Generic(e, BtWrapper::capture())
     }
 }

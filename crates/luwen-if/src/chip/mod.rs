@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-mod spi;
 mod communication;
 mod creation;
 pub mod eth_addr;
@@ -9,6 +8,7 @@ mod grayskull;
 mod hl_comms;
 mod init;
 mod remote;
+mod spi;
 mod wormhole;
 
 pub use communication::chip_comms::{
@@ -17,13 +17,16 @@ pub use communication::chip_comms::{
 pub use communication::chip_interface::ChipInterface;
 pub use grayskull::Grayskull;
 pub use hl_comms::{HlComms, HlCommsInterface};
-pub use init::{wait_for_init, CallReason, ChipDetectState};
+pub use init::status::InitStatus;
+pub use init::{
+    status::{CommsStatus, ComponentStatusInfo},
+    wait_for_init, CallReason, ChipDetectState,
+};
 use luwen_core::Arch;
 pub use wormhole::Wormhole;
 
-use crate::{arc_msg::ArcMsgAddr, error::PlatformError, DeviceInfo};
-
 pub use crate::arc_msg::{ArcMsg, ArcMsgOk};
+use crate::{arc_msg::ArcMsgAddr, error::PlatformError, DeviceInfo};
 
 /// Arc message interface
 #[derive(Debug)]
@@ -52,162 +55,6 @@ pub struct NeighbouringChip {
     pub local_noc_addr: (u8, u8),
     pub remote_noc_addr: (u8, u8),
     pub eth_addr: crate::EthAddr,
-}
-
-pub enum ArcStatus {
-    ArcError(String),
-    DramTraining,
-    ArcOk,
-}
-
-#[derive(Debug)]
-pub enum WaitStatus {
-    Waiting(std::time::Instant),
-    Timeout(std::time::Duration),
-    JustFinished,
-    Done,
-    NotPresent,
-}
-
-impl WaitStatus {
-    pub fn is_done(&self) -> bool {
-        match self {
-            Self::Done => true,
-            _ => false,
-        }
-    }
-}
-
-impl Default for WaitStatus {
-    fn default() -> Self {
-        Self::NotPresent
-    }
-}
-
-#[derive(Default, Debug)]
-pub struct StatusInfo {
-    pub ready: usize,
-    pub total: usize,
-    pub wait_status: WaitStatus,
-    pub status: String,
-}
-
-impl StatusInfo {
-    pub fn not_present() -> Self {
-        Self {
-            wait_status: WaitStatus::NotPresent,
-            ..Default::default()
-        }
-    }
-
-    pub fn get_status(&self) -> String {
-        match &self.wait_status {
-            WaitStatus::Waiting(_) => {
-                let status_line = if !self.status.is_empty() {
-                    format!(": {}", self.status)
-                } else {
-                    format!("")
-                };
-
-                let total_line = if self.total > 0 {
-                    format!("[{}/{}]", self.ready, self.total)
-                } else {
-                    format!("")
-                };
-
-                format!("{total_line}{status_line}")
-            }
-            WaitStatus::Timeout(timeout) => {
-                let status_line = if !self.status.is_empty() {
-                    format!(": {}", self.status)
-                } else {
-                    format!("")
-                };
-
-                let timeout_line = format!("Timeout after {}", timeout.as_secs());
-
-                format!("{timeout_line}{status_line}")
-            }
-            WaitStatus::JustFinished | WaitStatus::Done => {
-                let status_line = if !self.status.is_empty() {
-                    format!(": {}", self.status)
-                } else {
-                    format!("")
-                };
-
-                format!("Completed{status_line}")
-            }
-            WaitStatus::NotPresent => String::from("No Present"),
-        }
-    }
-
-    pub fn is_waiting(&self) -> bool {
-        match &self.wait_status {
-            WaitStatus::Waiting(_) => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_error(&self) -> bool {
-        match &self.wait_status {
-            WaitStatus::Timeout(_) => true,
-            WaitStatus::JustFinished | WaitStatus::Done => self.ready != self.total,
-            _ => false,
-        }
-    }
-
-    pub fn is_completed(&self) -> bool {
-        match &self.wait_status {
-            WaitStatus::Timeout(_) | WaitStatus::Done | WaitStatus::JustFinished => true,
-            // Not present shouldn't hold up the complete check
-            WaitStatus::NotPresent => true,
-            _ => false,
-        }
-    }
-
-    pub fn just_finished(&self) -> bool {
-        match &self.wait_status {
-            WaitStatus::JustFinished => true,
-            _ => false,
-        }
-    }
-}
-
-pub struct InitStatus {
-    pub arc_status: StatusInfo,
-    pub dram_status: StatusInfo,
-    pub eth_status: StatusInfo,
-    pub cpu_status: StatusInfo,
-}
-
-impl InitStatus {
-    pub fn is_waiting(&self) -> bool {
-        self.arc_status.is_waiting()
-            && self.dram_status.is_waiting()
-            && self.eth_status.is_waiting()
-            && self.cpu_status.is_waiting()
-    }
-
-    pub fn init_complete(&self) -> bool {
-        self.arc_status.is_completed()
-            && self.dram_status.is_completed()
-            && self.eth_status.is_completed()
-            && self.cpu_status.is_completed()
-    }
-
-    pub fn init_error(&self) -> bool {
-        self.arc_status.is_error()
-            || self.dram_status.is_error()
-            || self.eth_status.is_error()
-            || self.cpu_status.is_error()
-    }
-}
-
-pub enum InitType {
-    Arc,
-    Dram,
-    Eth,
-    Cpu,
 }
 
 #[derive(Default, Debug)]
@@ -398,10 +245,6 @@ pub enum ChipInitResult {
 /// explicity stated that they want to enumerate remote chips, then we won't even start looking at remote readiness.
 /// This is to avoid situations where a problematic state is reached and causes an abort even if that capability is not needed.
 pub trait ChipImpl: HlComms + Send + Sync + 'static {
-    /// Check if the chip has been initialized.
-    /// This is also the starting point for the chip initialization process.
-    fn is_inititalized(&self) -> Result<InitStatus, PlatformError>;
-
     /// Update the initialization state of the chip.
     /// The primary purpose of this function is to tell the caller when it is safe to starting interacting with the chip.
     ///
@@ -409,7 +252,10 @@ pub trait ChipImpl: HlComms + Send + Sync + 'static {
     /// For example if the arc is not ready, then we should not try to send an arc message.
     /// Or in a more complex example, if the arc is ready, but the ethernet is not (for example the ethernet fw is hung)
     /// then we will be able to access the local arc, but won't be able to access any remote chips.
-    fn update_init_state(&self, status: &mut InitStatus) -> Result<ChipInitResult, PlatformError>;
+    fn update_init_state(
+        &mut self,
+        status: &mut InitStatus,
+    ) -> Result<ChipInitResult, PlatformError>;
 
     /// Returns the current arch of the chip, can be used to avoid
     /// needing to ducktype when downcasting.
@@ -437,6 +283,7 @@ pub trait ChipImpl: HlComms + Send + Sync + 'static {
 /// A wrapper around a chip that implements `ChipImpl`.
 /// This allows us to create and use chips without knowing their type,
 /// but we can still downcast to the concrete type if we need to.
+
 pub struct Chip {
     pub inner: Box<dyn ChipImpl>,
 }
@@ -466,11 +313,10 @@ impl HlComms for Chip {
 }
 
 impl ChipImpl for Chip {
-    fn is_inititalized(&self) -> Result<InitStatus, PlatformError> {
-        self.inner.is_inititalized()
-    }
-
-    fn update_init_state(&self, status: &mut InitStatus) -> Result<ChipInitResult, PlatformError> {
+    fn update_init_state(
+        &mut self,
+        status: &mut InitStatus,
+    ) -> Result<ChipInitResult, PlatformError> {
         self.inner.update_init_state(status)
     }
 

@@ -3,7 +3,7 @@
 
 use luwen_if::{
     chip::{ArcMsgOptions, Chip, HlComms, HlCommsInterface},
-    detect_chips, ArcMsg, CallbackStorage, ChipImpl,
+    ArcMsg, CallbackStorage, ChipImpl,
 };
 use luwen_ref::{
     comms_callback, error::LuwenError, DmaConfig, ExtendedPciDevice, ExtendedPciDeviceWrapper,
@@ -18,10 +18,10 @@ pub fn main() -> Result<(), LuwenError> {
         let ud = ExtendedPciDevice::open(device_id)?;
         let arch = ud.borrow().device.arch;
 
-        let chip = Chip::open(arch, CallbackStorage::new(comms_callback, ud));
+        let chip = Chip::open(arch, CallbackStorage::new(comms_callback, ud))?;
 
         if let Some(wh) = chip.as_wh() {
-            let mut hi = wh
+            let hi = wh
                 .chip_if
                 .as_any()
                 .downcast_ref::<CallbackStorage<ExtendedPciDeviceWrapper>>()
@@ -44,7 +44,7 @@ pub fn main() -> Result<(), LuwenError> {
                     write_threshold: 0,
                 });
 
-                let (offset, size) = pci_interface.setup_tlb(
+                let (offset, _size) = pci_interface.setup_tlb(
                     168,
                     Tlb {
                         local_offset: 0x0,
@@ -102,7 +102,7 @@ pub fn main() -> Result<(), LuwenError> {
         let ud = ExtendedPciDevice::open(device_id)?;
         let arch = ud.borrow().device.arch;
 
-        let chip = Chip::open(arch, CallbackStorage::new(comms_callback, ud));
+        let chip = Chip::open(arch, CallbackStorage::new(comms_callback, ud))?;
 
         chip.arc_msg(ArcMsgOptions {
             msg: ArcMsg::Test { arg: 101 },
@@ -121,7 +121,7 @@ pub fn main() -> Result<(), LuwenError> {
         chips.push(chip);
     }
 
-    let all_chips = luwen_if::detect_chips_silent(chips)?;
+    let all_chips = luwen_if::detect_chips_silent(chips, Default::default())?;
     for (chip_id, chip) in all_chips.into_iter().enumerate() {
         println!("Running on device {chip_id}");
         chip.arc_msg(ArcMsgOptions {
