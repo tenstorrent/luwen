@@ -355,6 +355,10 @@ pub fn detect_chips(
                     );
 
                     if !seen_chips.insert(ident) {
+                        init_callback(crate::chip::ChipDetectState {
+                            chip: root_chip,
+                            call: crate::chip::CallReason::NotNew,
+                        });
                         continue;
                     }
 

@@ -9,6 +9,7 @@ pub mod status;
 
 pub enum CallReason<'a> {
     NewChip,
+    NotNew,
     InitWait(&'a InitStatus),
     ChipInitCompleted(&'a InitStatus),
 }

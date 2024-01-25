@@ -105,6 +105,9 @@ pub fn detect_chips_fallible() -> Result<Vec<UninitChip>, LuwenError> {
 
     let mut init_callback = |status: ChipDetectState| {
         match status.call {
+            luwen_if::chip::CallReason::NotNew => {
+                chip_detect_bar.set_position(chip_detect_bar.position().saturating_sub(1));
+            }
             luwen_if::chip::CallReason::NewChip => {
                 chip_detect_bar.inc(1);
                 chip_init_bar = Some(add_bar(&bars));
