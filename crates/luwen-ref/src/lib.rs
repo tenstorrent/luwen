@@ -590,3 +590,14 @@ pub fn comms_callback_inner(
 
     Ok(())
 }
+
+pub fn open(interface_id: usize) -> Result<luwen_if::chip::Chip, LuwenError> {
+    let ud = ExtendedPciDevice::open(interface_id)?;
+
+    let arch = ud.borrow().device.arch;
+
+    Ok(luwen_if::chip::Chip::open(
+        arch,
+        luwen_if::CallbackStorage::new(comms_callback, ud.clone()),
+    )?)
+}

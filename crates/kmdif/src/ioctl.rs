@@ -174,3 +174,41 @@ nix::ioctl_readwrite_bad!(
     request_code_none!(TENSTORRENT_IOCTL_MAGIC, 5),
     GetDriverInfo
 );
+
+pub const RESET_DEVICE_RESTORE_STATE: u32 = 0;
+pub const RESET_DEVICE_RESET_PCIE_LINK: u32 = 1;
+
+#[repr(C)]
+pub struct ResetDeviceIn {
+    pub output_size_bytes: u32,
+    pub flags: u32,
+}
+
+impl Default for ResetDeviceIn {
+    fn default() -> Self {
+        Self {
+            output_size_bytes: std::mem::size_of::<Self>() as u32,
+            flags: 0,
+        }
+    }
+}
+
+#[derive(Default)]
+#[repr(C)]
+pub struct ResetDeviceOut {
+    pub output_size_bytes: u32,
+    pub result: u32,
+}
+
+#[derive(Default)]
+#[repr(C)]
+pub struct ResetDevice {
+    pub input: ResetDeviceIn,
+    pub output: ResetDeviceOut,
+}
+
+nix::ioctl_readwrite_bad!(
+    reset_device,
+    request_code_none!(TENSTORRENT_IOCTL_MAGIC, 6),
+    ResetDevice
+);
