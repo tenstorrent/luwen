@@ -10,7 +10,7 @@ use std::{
 };
 
 mod error;
-mod ioctl;
+pub mod ioctl;
 mod kmdif;
 mod pci;
 pub mod tlb;

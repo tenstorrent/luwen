@@ -10,6 +10,7 @@ license = "Apache-2.0"
 luwen-core = {path = "crates/luwen-core"}
 luwen-if = {path = "crates/luwen-if"}
 luwen-ref = {path = "crates/luwen-ref"}
+kmdif = {path = "crates/kmdif"}
 
 serde = {"version" = "1.0.164", features = ["derive"]}
 serde_yaml = "0.9.22"

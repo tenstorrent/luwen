@@ -333,6 +333,8 @@ pub fn detect_chips(
             if let Some(wh) = root_chip.as_wh() {
                 let mut wh = wh.open_remote(nchip.eth_addr)?;
 
+                let status = wait_for_init(&mut wh, init_callback, continue_on_failure, noc_safe)?;
+
                 let local_coord = wh.get_local_chip_coord()?;
 
                 if local_coord != nchip.eth_addr {
@@ -341,8 +343,6 @@ pub fn detect_chips(
                         crate::error::BtWrapper::capture(),
                     ));
                 }
-
-                let status = wait_for_init(&mut wh, init_callback, continue_on_failure, noc_safe)?;
 
                 // If we cannot talk to the ARC then we cannot get the ident information so we
                 // will just return the chip and not continue to search.
@@ -355,14 +355,14 @@ pub fn detect_chips(
                     );
 
                     if !seen_chips.insert(ident) {
+                        init_callback(crate::chip::ChipDetectState {
+                            chip: root_chip,
+                            call: crate::chip::CallReason::NotNew,
+                        });
                         continue;
                     }
 
                     for nchip in wh.get_neighbouring_chips()? {
-                        if !seen_coords.contains(&nchip.eth_addr) {
-                            continue;
-                        }
-
                         to_check.push(nchip);
                     }
                 }
