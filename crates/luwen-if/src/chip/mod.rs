@@ -20,7 +20,7 @@ pub use hl_comms::{HlComms, HlCommsInterface};
 pub use init::status::InitStatus;
 pub use init::{
     status::{CommsStatus, ComponentStatusInfo},
-    wait_for_init, CallReason, ChipDetectState,
+    wait_for_init, CallReason, ChipDetectState, InitError,
 };
 use luwen_core::Arch;
 pub use wormhole::Wormhole;

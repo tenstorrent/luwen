@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use luwen_core::Arch;
 
 use crate::{
-    chip::{wait_for_init, Chip, InitStatus},
+    chip::{wait_for_init, Chip, InitError, InitStatus},
     error::{BtWrapper, PlatformError},
     ChipImpl, EthAddr,
 };
@@ -79,10 +79,10 @@ impl UninitChip {
 
     /// Initialize the chip, if init fails at this point then we return a result
     /// instead of an UninitChip.
-    pub fn init(
+    pub fn init<E>(
         self,
-        init_callback: &mut impl FnMut(crate::chip::ChipDetectState),
-    ) -> Result<Chip, PlatformError> {
+        init_callback: &mut impl FnMut(crate::chip::ChipDetectState) -> Result<(), E>,
+    ) -> Result<Chip, InitError<E>> {
         match self {
             UninitChip::Partially { mut underlying, .. } => {
                 wait_for_init(&mut underlying, init_callback, false, false)?;
@@ -246,11 +246,11 @@ impl ChipDetectOptions {
 /// 5. 0xffffffff error, this means that the underlying transport is hung.
 ///     a. This is catastrophic, we cannot continue searching for chips, because some of the chips in the mesh may no longer be accesible
 ///     b. We could recover from this by rerunning the search, but this is not implemented.
-pub fn detect_chips(
+pub fn detect_chips<E>(
     mut root_chips: Vec<Chip>,
-    init_callback: &mut impl FnMut(crate::chip::ChipDetectState),
+    init_callback: &mut impl FnMut(crate::chip::ChipDetectState) -> Result<(), E>,
     options: ChipDetectOptions,
-) -> Result<Vec<UninitChip>, PlatformError> {
+) -> Result<Vec<UninitChip>, InitError<E>> {
     let ChipDetectOptions {
         continue_on_failure,
         local_only,
@@ -268,7 +268,7 @@ pub fn detect_chips(
                 actual: root_chip.get_arch(),
                 expected: chip_filter.clone(),
                 backtrace: BtWrapper::capture(),
-            });
+            })?;
         }
 
         let status = wait_for_init(root_chip, init_callback, continue_on_failure, noc_safe)?;
@@ -341,7 +341,7 @@ pub fn detect_chips(
                     return Err(PlatformError::Generic(
                         format!("When detecting chips in mesh found a mismatch between the expected chip coordinate {} and the actual {}", nchip.eth_addr, local_coord),
                         crate::error::BtWrapper::capture(),
-                    ));
+                    ))?;
                 }
 
                 // If we cannot talk to the ARC then we cannot get the ident information so we
@@ -358,7 +358,8 @@ pub fn detect_chips(
                         init_callback(crate::chip::ChipDetectState {
                             chip: root_chip,
                             call: crate::chip::CallReason::NotNew,
-                        });
+                        })
+                        .map_err(InitError::CallbackError)?;
                         continue;
                     }
 
@@ -378,11 +379,11 @@ pub fn detect_chips(
     Ok(output)
 }
 
-pub fn detect_initialized_chips(
+pub fn detect_initialized_chips<E>(
     root_chips: Vec<Chip>,
-    init_callback: &mut impl FnMut(crate::chip::ChipDetectState),
+    init_callback: &mut impl FnMut(crate::chip::ChipDetectState) -> Result<(), E>,
     options: ChipDetectOptions,
-) -> Result<Vec<Chip>, PlatformError> {
+) -> Result<Vec<Chip>, InitError<E>> {
     let chips = detect_chips(root_chips, init_callback, options)?;
 
     let mut output = Vec::with_capacity(chips.len());
@@ -390,7 +391,7 @@ pub fn detect_initialized_chips(
         if chip.is_initialized() {
             output.push(chip.upgrade());
         } else {
-            output.push(chip.init(&mut |_| {})?);
+            output.push(chip.init(&mut |_| Ok(()))?);
         }
     }
 
@@ -401,5 +402,9 @@ pub fn detect_chips_silent(
     root_chips: Vec<Chip>,
     options: ChipDetectOptions,
 ) -> Result<Vec<Chip>, PlatformError> {
-    detect_initialized_chips(root_chips, &mut |_| {}, options)
+    detect_initialized_chips::<std::convert::Infallible>(root_chips, &mut |_| Ok(()), options)
+        .map_err(|v| match v {
+            InitError::PlatformError(err) => err,
+            InitError::CallbackError(_) => unreachable!(),
+        })
 }

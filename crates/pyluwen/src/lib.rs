@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use luwen_core::Arch;
 use luwen_if::chip::{
-    wait_for_init, ArcMsg, ArcMsgOk, ArcMsgOptions, ChipImpl, HlComms, HlCommsInterface,
+    wait_for_init, ArcMsg, ArcMsgOk, ArcMsgOptions, ChipImpl, HlComms, HlCommsInterface, InitError,
 };
 use luwen_if::{CallbackStorage, ChipDetectOptions, DeviceInfo, UninitChip};
 use luwen_ref::{DmaConfig, ExtendedPciDeviceWrapper};
@@ -473,9 +473,19 @@ impl PciChip {
     }
 
     pub fn init(&mut self) -> PyResult<()> {
-        wait_for_init(&mut self.0, &mut |_| {}, false, false).map_err(|v| {
-            PyException::new_err(format!("Could not initialize chip: {}", v.to_string()))
-        })?;
+        match wait_for_init(
+            &mut self.0,
+            &mut |_| Python::with_gil(|py| py.check_signals()),
+            false,
+            false,
+        ) {
+            Err(InitError::PlatformError(err)) => Err(PyException::new_err(format!(
+                "Could not initialize chip: {}",
+                err.to_string()
+            ))),
+            Err(InitError::CallbackError(err)) => Err(err),
+            Ok(status) => Ok(status),
+        }?;
 
         Ok(())
     }
@@ -1010,12 +1020,19 @@ pub struct UninitPciChip {
 #[pymethods]
 impl UninitPciChip {
     pub fn init(&self) -> PyResult<PciChip> {
-        Ok(PciChip(
-            self.chip
-                .clone()
-                .init(&mut |_| {})
-                .map_err(|v| PyException::new_err(v.to_string()))?,
-        ))
+        let chip = self
+            .chip
+            .clone()
+            .init(&mut |_| Python::with_gil(|py| py.check_signals()));
+        match chip {
+            Ok(chip) => Ok(PciChip(chip)),
+            Err(InitError::PlatformError(err)) => {
+                return Err(PyException::new_err(err.to_string()));
+            }
+            Err(InitError::CallbackError(err)) => {
+                return Err(err);
+            }
+        }
     }
 
     pub fn have_comms(&self) -> bool {
@@ -1133,20 +1150,33 @@ pub fn detect_chips_fallible(
         }
     }
 
-    let mut callback: Box<dyn FnMut(luwen_if::chip::ChipDetectState)> =
+    let mut callback: Box<dyn FnMut(luwen_if::chip::ChipDetectState) -> Result<(), PyErr>> =
         if let Some(callback) = callback {
             Box::new(move |status| {
+                // Safety: This is extremly unsafe, the alternative would be to copy the status for
+                // every invocation.
                 let status = unsafe { std::mem::transmute(status) };
-                Python::with_gil(|py| callback.call1(py, (PyChipDetectState(status),))).unwrap();
+                if let Err(err) =
+                    Python::with_gil(|py| callback.call1(py, (PyChipDetectState(status),)))
+                {
+                    Err(err)
+                } else {
+                    Ok(())
+                }
             })
         } else {
-            Box::new(|_| {
-                Python::with_gil(|py| py.check_signals().unwrap());
-            })
+            Box::new(|_| Python::with_gil(|py| py.check_signals()))
         };
 
-    let mut chips = luwen_if::detect_chips(root_chips, &mut callback, options)
-        .map_err(|v| PyException::new_err(v.to_string()))?;
+    let mut chips = match luwen_if::detect_chips(root_chips, &mut callback, options) {
+        Ok(chips) => chips,
+        Err(InitError::PlatformError(err)) => {
+            return Err(PyException::new_err(err.to_string()))?;
+        }
+        Err(InitError::CallbackError(err)) => {
+            return Err(err)?;
+        }
+    };
 
     for (id, chip, err) in failed_chips.into_iter().rev() {
         let mut status = luwen_if::chip::InitStatus::new_unknown();
@@ -1187,7 +1217,7 @@ pub fn detect_chips(
     )?;
     let mut output = Vec::with_capacity(chips.len());
     for chip in chips {
-        output.push(chip.init().map_err(|v| PyException::new_err(v))?);
+        output.push(chip.init()?);
     }
     Ok(output)
 }
