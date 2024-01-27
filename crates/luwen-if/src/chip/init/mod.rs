@@ -67,7 +67,7 @@ pub fn wait_for_init(
             }
             super::ChipInitResult::ErrorAbort => {
                 return Err(PlatformError::Generic(
-                    "Chip initialization failed".to_string(),
+                    "Chip initialization failed (aborted)".to_string(),
                     crate::error::BtWrapper::capture(),
                 ));
             }

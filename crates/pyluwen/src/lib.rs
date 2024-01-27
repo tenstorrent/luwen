@@ -597,6 +597,17 @@ impl PciGrayskull {
         }
     }
 
+    pub fn pci_interface_id(&self) -> PyResult<usize> {
+        let value = PciInterface::from_gs(self);
+        if let Some(value) = value {
+            Ok(value.pci_interface.borrow().device.id)
+        } else {
+            return Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ));
+        }
+    }
+
     pub fn spi_read(&self, addr: u32, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
         Python::with_gil(|_py| {
             let ptr: *mut u8 = data.buf_ptr().cast();
@@ -908,6 +919,17 @@ impl PciWormhole {
         }
     }
 
+    pub fn pci_interface_id(&self) -> PyResult<usize> {
+        let value = PciInterface::from_wh(self);
+        if let Some(value) = value {
+            Ok(value.pci_interface.borrow().device.id)
+        } else {
+            return Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ));
+        }
+    }
+
     pub fn spi_read(&self, addr: u32, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
         Python::with_gil(|_py| {
             let ptr: *mut u8 = data.buf_ptr().cast();
@@ -1013,13 +1035,14 @@ impl UninitPciChip {
 //from luwen, multiple points to different callback functions
 
 #[pyfunction]
-#[pyo3(signature = (interfaces = None, local_only = false, continue_on_failure = false, chip_filter = None, noc_safe = false))]
+#[pyo3(signature = (interfaces = None, local_only = false, continue_on_failure = false, chip_filter = None, noc_safe = false, callback = None))]
 pub fn detect_chips_fallible(
     interfaces: Option<Vec<usize>>,
     local_only: bool,
     continue_on_failure: bool,
     chip_filter: Option<Vec<String>>,
     noc_safe: bool,
+    callback: Option<PyObject>,
 ) -> PyResult<Vec<UninitPciChip>> {
     let interfaces = interfaces.unwrap_or(Vec::new());
 
@@ -1046,8 +1069,19 @@ pub fn detect_chips_fallible(
     };
 
     let mut root_chips = Vec::with_capacity(interfaces.len());
+    let mut failed_chips = Vec::with_capacity(interfaces.len());
     for interface in interfaces {
-        root_chips.push(PciChip::new(Some(interface))?.0);
+        let chip = PciChip::new(Some(interface))?.0;
+
+        // First let's test basic pcie communication we may be in a hang state so it's
+        // important that we let the detect function know
+        let result = chip.axi_sread32("ARC_RESET.SCRATCH[0]");
+        if let Err(err) = result {
+            // Basic comms have failed... we should output a nice error message on the console
+            failed_chips.push((interface, chip, err));
+        } else {
+            root_chips.push(chip);
+        }
     }
 
     let chip_filter = chip_filter.unwrap_or_default();
@@ -1068,8 +1102,65 @@ pub fn detect_chips_fallible(
         noc_safe,
     };
 
-    let chips = luwen_if::detect_chips(root_chips, &mut |_| {}, options)
+    #[pyclass]
+    struct PyChipDetectState(luwen_if::chip::ChipDetectState<'static>);
+
+    #[pymethods]
+    impl PyChipDetectState {
+        pub fn new_chip(&self) -> bool {
+            match self.0.call {
+                luwen_if::chip::CallReason::NewChip => true,
+                _ => false,
+            }
+        }
+
+        pub fn correct_down(&self) -> bool {
+            match self.0.call {
+                luwen_if::chip::CallReason::NotNew => true,
+                _ => false,
+            }
+        }
+
+        pub fn status_string(&self) -> Option<String> {
+            match self.0.call {
+                luwen_if::chip::CallReason::NewChip | luwen_if::chip::CallReason::NotNew => None,
+                luwen_if::chip::CallReason::ChipInitCompleted(status)
+                | luwen_if::chip::CallReason::InitWait(status) => Some(format!(
+                    "{}\n{}\n{}",
+                    status.arc_status, status.dram_status, status.eth_status
+                )),
+            }
+        }
+    }
+
+    let mut callback: Box<dyn FnMut(luwen_if::chip::ChipDetectState)> =
+        if let Some(callback) = callback {
+            Box::new(move |status| {
+                let status = unsafe { std::mem::transmute(status) };
+                Python::with_gil(|py| callback.call1(py, (PyChipDetectState(status),))).unwrap();
+            })
+        } else {
+            Box::new(|_| {
+                Python::with_gil(|py| py.check_signals().unwrap());
+            })
+        };
+
+    let mut chips = luwen_if::detect_chips(root_chips, &mut callback, options)
         .map_err(|v| PyException::new_err(v.to_string()))?;
+
+    for (id, chip, err) in failed_chips.into_iter().rev() {
+        let mut status = luwen_if::chip::InitStatus::new_unknown();
+        status.comms_status = luwen_if::chip::CommsStatus::CommunicationError(err.to_string());
+        status.unknown_state = false;
+        chips.insert(
+            id,
+            UninitChip::Partially {
+                status,
+                underlying: chip,
+            },
+        );
+    }
+
     Ok(chips
         .into_iter()
         .map(|chip| UninitPciChip { chip })
@@ -1077,13 +1168,14 @@ pub fn detect_chips_fallible(
 }
 
 #[pyfunction]
-#[pyo3(signature = (interfaces = None, local_only = false, continue_on_failure = false, chip_filter = None, noc_safe = false))]
+#[pyo3(signature = (interfaces = None, local_only = false, continue_on_failure = false, chip_filter = None, noc_safe = false, callback = None))]
 pub fn detect_chips(
     interfaces: Option<Vec<usize>>,
     local_only: bool,
     continue_on_failure: bool,
     chip_filter: Option<Vec<String>>,
     noc_safe: bool,
+    callback: Option<PyObject>,
 ) -> PyResult<Vec<PciChip>> {
     let chips = detect_chips_fallible(
         interfaces,
@@ -1091,6 +1183,7 @@ pub fn detect_chips(
         continue_on_failure,
         chip_filter,
         noc_safe,
+        callback,
     )?;
     let mut output = Vec::with_capacity(chips.len());
     for chip in chips {
