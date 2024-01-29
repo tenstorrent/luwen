@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::convert::Infallible;
+
 use crate::{error::PlatformError, ChipImpl};
 
 use status::InitStatus;
@@ -20,6 +22,23 @@ pub struct ChipDetectState<'a> {
     pub call: CallReason<'a>,
 }
 
+#[derive(thiserror::Error)]
+pub enum InitError<E> {
+    #[error(transparent)]
+    PlatformError(#[from] PlatformError),
+
+    CallbackError(E),
+}
+
+impl Into<PlatformError> for InitError<Infallible> {
+    fn into(self) -> PlatformError {
+        match self {
+            InitError::PlatformError(err) => err,
+            InitError::CallbackError(_) => unreachable!(),
+        }
+    }
+}
+
 /// This function will wait for the chip to be initialized.
 /// It will return Ok(true) if the chip initialized successfully.
 /// It will return Ok(false) if the chip failed to initialize, but we can continue running.
@@ -30,17 +49,18 @@ pub struct ChipDetectState<'a> {
 /// This component makes a callback available which allows the init status to be updated if there
 /// is someone/something monitoring the init progress. The initial/driving purpose of this is to
 /// track the progress on the command line.
-pub fn wait_for_init(
+pub fn wait_for_init<E>(
     chip: &mut impl ChipImpl,
-    callback: &mut impl FnMut(ChipDetectState),
+    callback: &mut impl FnMut(ChipDetectState) -> Result<(), E>,
     allow_failure: bool,
     noc_safe: bool,
-) -> Result<InitStatus, PlatformError> {
+) -> Result<InitStatus, InitError<E>> {
     // We want to make sure that we always call the callback at least once so that the caller can mark the chip presence.
     callback(ChipDetectState {
         chip,
         call: CallReason::NewChip,
-    });
+    })
+    .map_err(|v| InitError::CallbackError(v))?;
 
     let mut status = InitStatus::new_unknown();
     status.init_options.noc_safe = noc_safe;
@@ -56,20 +76,21 @@ pub fn wait_for_init(
                     return Err(PlatformError::Generic(
                         "Chip initialization failed".to_string(),
                         crate::error::BtWrapper::capture(),
-                    ));
+                    ))?;
                 } else {
                     callback(ChipDetectState {
                         chip,
                         call: CallReason::ChipInitCompleted(&status),
-                    });
+                    })
+                    .map_err(InitError::CallbackError)?;
                     return Ok(status);
                 }
             }
             super::ChipInitResult::ErrorAbort => {
                 return Err(PlatformError::Generic(
-                    "Chip initialization failed".to_string(),
+                    "Chip initialization failed (aborted)".to_string(),
                     crate::error::BtWrapper::capture(),
-                ));
+                ))?;
             }
         }
 
@@ -81,10 +102,11 @@ pub fn wait_for_init(
             callback(ChipDetectState {
                 chip,
                 call: CallReason::ChipInitCompleted(&status),
-            });
+            })
+            .map_err(InitError::CallbackError)?;
             return Ok(status);
         };
 
-        callback(ChipDetectState { chip, call })
+        callback(ChipDetectState { chip, call }).map_err(InitError::CallbackError)?;
     }
 }

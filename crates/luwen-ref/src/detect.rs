@@ -1,10 +1,15 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::convert::Infallible;
+
 use indicatif::ProgressBar;
 use kmdif::PciDevice;
 use luwen_if::{
-    chip::{Chip, ChipDetectState, CommsStatus, ComponentStatusInfo, HlCommsInterface, InitStatus},
+    chip::{
+        Chip, ChipDetectState, CommsStatus, ComponentStatusInfo, HlCommsInterface, InitError,
+        InitStatus,
+    },
     CallbackStorage, ChipDetectOptions, UninitChip,
 };
 
@@ -140,10 +145,26 @@ pub fn detect_chips_fallible() -> Result<Vec<UninitChip>, LuwenError> {
                 }
             }
         };
+
+        Ok::<(), Infallible>(())
     };
 
     let options = ChipDetectOptions::default();
-    let mut chips = luwen_if::detect_chips(chips, &mut init_callback, options)?;
+    let mut chips = match luwen_if::detect_chips(chips, &mut init_callback, options) {
+        Err(InitError::CallbackError(err)) => {
+            chip_detect_bar
+                .finish_with_message(format!("Ran into error from status callback;\n{}", err));
+            return Err(luwen_if::error::PlatformError::Generic(
+                "Hit error from status callback".to_string(),
+                luwen_if::error::BtWrapper::capture(),
+            ))?;
+        }
+        Err(InitError::PlatformError(err)) => {
+            return Err(err)?;
+        }
+
+        Ok(chips) => chips,
+    };
 
     chip_detect_bar.finish_with_message("Chip detection complete (found {pos})");
 
@@ -170,7 +191,7 @@ pub fn detect_chips() -> Result<Vec<Chip>, LuwenError> {
 
     let mut output = Vec::with_capacity(chips.len());
     for chip in chips {
-        output.push(chip.init(&mut |_| {})?);
+        output.push(chip.init(&mut |_| Ok::<(), Infallible>(())).map_err(Into::<luwen_if::error::PlatformError>::into)?);
     }
 
     Ok(output)
