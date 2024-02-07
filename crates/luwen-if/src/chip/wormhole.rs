@@ -359,7 +359,9 @@ impl ChipImpl for Wormhole {
         status: &mut InitStatus,
     ) -> Result<ChipInitResult, PlatformError> {
         if status.unknown_state {
+            let init_options = std::mem::take(&mut status.init_options);
             *status = default_status();
+            status.init_options = init_options;
         }
 
         let comms = &mut status.comms_status;
