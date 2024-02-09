@@ -3,9 +3,19 @@
 
 use std::collections::{HashMap, HashSet};
 
+use clap::Parser;
+
 use luwen_core::Arch;
-use luwen_if::{chip::NeighbouringChip, ChipImpl, EthAddr};
+use luwen_if::{
+    chip::{ArcMsgOptions, HlComms, NeighbouringChip},
+    ChipImpl, EthAddr,
+};
 use luwen_ref::error::LuwenError;
+
+#[derive(Parser)]
+pub struct CmdArgs {
+    file: String,
+}
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct ChipIdent {
@@ -13,9 +23,13 @@ pub struct ChipIdent {
     pub board_id: Option<u64>,
     pub interface: Option<u32>,
     pub coord: Option<EthAddr>,
+    pub noc_translation_en: bool,
+    pub harvest_mask: u32,
 }
 
 fn main() -> Result<(), LuwenError> {
+    let args = CmdArgs::parse();
+
     let mut chips = HashMap::new();
     let mut mmio_chips = Vec::new();
     let mut connection_map = HashMap::new();
@@ -26,12 +40,29 @@ fn main() -> Result<(), LuwenError> {
         let ident = if let Some(wh) = chip.as_wh() {
             let coord = wh.get_local_chip_coord()?;
 
+            // Magic value referring to the location of the niu_cfg for a DRAM
+            let niu_cfg = wh.noc_read32(0, 0, 0, 0x1000A0000 + 0x100).unwrap();
+            let noc_translation_en = (niu_cfg & (1 << 14)) != 0;
+
+            let result = wh
+                .arc_msg(ArcMsgOptions {
+                    msg: luwen_if::ArcMsg::GetHarvesting,
+                    ..Default::default()
+                })
+                .unwrap();
+            let harvest_mask = match result {
+                luwen_if::ArcMsgOk::Ok { rc: _, arg } => arg,
+                luwen_if::ArcMsgOk::OkNoWait => unreachable!(),
+            };
+
             let ident = ChipIdent {
                 arch: Arch::Wormhole,
                 board_id: Some(telemetry.board_id),
                 // interface: wh.get_device_info().map(|v| v.interface_id),
                 interface: None,
                 coord: Some(coord),
+                noc_translation_en,
+                harvest_mask,
             };
 
             if !wh.is_remote {
@@ -48,12 +79,29 @@ fn main() -> Result<(), LuwenError> {
                 {
                     let next = wh.open_remote(eth_addr)?;
 
+                    // Magic value referring to the location of the niu_cfg for a DRAM
+                    let niu_cfg = wh.noc_read32(0, 0, 0, 0x1000A0000 + 0x100).unwrap();
+                    let noc_translation_en = (niu_cfg & (1 << 14)) != 0;
+
+                    let result = wh
+                        .arc_msg(ArcMsgOptions {
+                            msg: luwen_if::ArcMsg::GetHarvesting,
+                            ..Default::default()
+                        })
+                        .unwrap();
+                    let harvest_mask = match result {
+                        luwen_if::ArcMsgOk::Ok { arg, .. } => arg,
+                        luwen_if::ArcMsgOk::OkNoWait => unreachable!(),
+                    };
+
                     let next_ident = ChipIdent {
                         arch: Arch::Wormhole,
                         board_id: Some(next.get_telemetry()?.board_id),
                         // interface: next.get_device_info().map(|v| v.interface_id),
                         interface: None,
                         coord: Some(eth_addr),
+                        noc_translation_en,
+                        harvest_mask,
                     };
 
                     let local_id = wh
@@ -78,11 +126,24 @@ fn main() -> Result<(), LuwenError> {
 
             ident
         } else if let Some(gs) = chip.as_gs() {
+            let result = gs
+                .arc_msg(ArcMsgOptions {
+                    msg: luwen_if::ArcMsg::GetHarvesting,
+                    ..Default::default()
+                })
+                .unwrap();
+            let harvest_mask = match result {
+                luwen_if::ArcMsgOk::Ok { arg, .. } => arg,
+                luwen_if::ArcMsgOk::OkNoWait => unreachable!(),
+            };
+
             let ident = ChipIdent {
                 arch: Arch::Grayskull,
                 board_id: None,
                 interface: gs.get_device_info()?.map(|v| v.interface_id),
                 coord: None,
+                noc_translation_en: false,
+                harvest_mask,
             };
 
             chips.insert(ident.clone(), chips.len());
@@ -132,33 +193,56 @@ fn main() -> Result<(), LuwenError> {
 
     connections.sort();
 
-    println!("ARCH");
+    let mut output = String::new();
+
+    output.push_str("arch: {\n");
     for chip in &ident_order {
         let id = chips[chip];
-        println!("{}: {:?}", id, chip.arch);
+        output.push_str(&format!("   {}: {:?},\n", id, chip.arch));
     }
+    output.push_str("}\n\n");
 
-    println!("REMOTE CHIPS");
+    output.push_str("chips: {\n");
     for chip in &ident_order {
         let id = chips[chip];
         if let Some(coord) = &chip.coord {
-            println!("{}: {}", id, coord);
+            output.push_str(&format!("   {}: {},\n", id, coord));
         }
     }
+    output.push_str("}\n\n");
 
-    println!("CONNECTIONS");
+    output.push_str("ethernet_connections: [\n");
     for ((local_chip, local_port), (remote_chip, remote_port)) in connections {
-        println!("[{local_chip}; {local_port}] -> [{remote_chip}; {remote_port}]");
+        output.push_str(&format!("   [{{chip: {local_chip}, chan: {local_port}}}, {{chip: {remote_chip}, chan: {remote_port}}}],\n"));
     }
+    output.push_str("]\n\n");
 
-    println!("MMIO");
     mmio_chips.sort_by_key(|v| v.1);
 
+    output.push_str("chips_with_mmio: [\n");
     for (mmio, interface) in mmio_chips {
         if let Some(interface) = interface {
-            println!("{} -> {}", chips[&mmio], interface);
+            output.push_str(&format!("   {}: {},\n", chips[&mmio], interface));
         }
     }
+    output.push_str("]\n\n");
 
-    Ok(())
+    output.push_str("harvesting: [\n");
+    for chip in &ident_order {
+        let id = chips[chip];
+        output.push_str(&format!(
+            "   {}: {{noc_translation: {}, harvest_mask: {}}},\n",
+            id, chip.noc_translation_en, chip.harvest_mask
+        ));
+    }
+    output.push_str("]");
+
+    if let Err(_err) = std::fs::write(&args.file, output) {
+        Err(LuwenError::Custom(format!(
+            "Failed to write to {}",
+            args.file
+        )))
+    } else {
+        Ok(())
+    }
 }
