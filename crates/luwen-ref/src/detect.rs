@@ -168,7 +168,7 @@ pub fn detect_chips_fallible() -> Result<Vec<UninitChip>, LuwenError> {
 
     chip_detect_bar.finish_with_message("Chip detection complete (found {pos})");
 
-    for (id, chip, err) in failed_chips.into_iter().rev() {
+    for (id, chip, err) in failed_chips.into_iter() {
         let mut status = InitStatus::new_unknown();
         status.comms_status = CommsStatus::CommunicationError(err.to_string());
         status.unknown_state = false;
