@@ -1178,7 +1178,7 @@ pub fn detect_chips_fallible(
         }
     };
 
-    for (id, chip, err) in failed_chips.into_iter().rev() {
+    for (id, chip, err) in failed_chips.into_iter() {
         let mut status = luwen_if::chip::InitStatus::new_unknown();
         status.comms_status = luwen_if::chip::CommsStatus::CommunicationError(err.to_string());
         status.unknown_state = false;
