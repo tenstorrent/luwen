@@ -75,45 +75,45 @@ fn main() -> Result<(), LuwenError> {
 
             if !wh.is_remote {
                 mmio_chips.push((ident.clone(), wh.get_device_info()?.map(|v| v.interface_id)));
-            } else {
-                let neighbours = chip.get_neighbouring_chips()?;
-
-                let mut connection_info: HashMap<_, Vec<_>> = HashMap::new();
-                for NeighbouringChip {
-                    local_noc_addr,
-                    remote_noc_addr,
-                    eth_addr,
-                } in neighbours
-                {
-                    let next = wh.open_remote(eth_addr)?;
-
-                    let next_ident = ChipIdent {
-                        arch: Arch::Wormhole,
-                        board_id: Some(next.get_telemetry()?.board_id),
-                        // interface: next.get_device_info().map(|v| v.interface_id),
-                        interface: None,
-                        coord: Some(eth_addr),
-                    };
-
-                    let local_id = wh
-                        .eth_locations
-                        .iter()
-                        .position(|v| (v.x, v.y) == local_noc_addr)
-                        .unwrap();
-
-                    let remote_id = wh
-                        .eth_locations
-                        .iter()
-                        .position(|v| (v.x, v.y) == remote_noc_addr)
-                        .unwrap();
-
-                    connection_info
-                        .entry(next_ident)
-                        .or_default()
-                        .push((local_id, remote_id));
-                }
-                connection_map.insert(ident.clone(), connection_info);
             }
+
+            let neighbours = wh.get_neighbouring_chips()?;
+
+            let mut connection_info: HashMap<_, Vec<_>> = HashMap::new();
+            for NeighbouringChip {
+                local_noc_addr,
+                remote_noc_addr,
+                eth_addr,
+            } in neighbours
+            {
+                let next = wh.open_remote(eth_addr)?;
+
+                let next_ident = ChipIdent {
+                    arch: Arch::Wormhole,
+                    board_id: Some(next.get_telemetry()?.board_id),
+                    // interface: next.get_device_info().map(|v| v.interface_id),
+                    interface: None,
+                    coord: Some(eth_addr),
+                };
+
+                let local_id = wh
+                    .eth_locations
+                    .iter()
+                    .position(|v| (v.x, v.y) == local_noc_addr)
+                    .unwrap();
+
+                let remote_id = next
+                    .eth_locations
+                    .iter()
+                    .position(|v| (v.x, v.y) == remote_noc_addr)
+                    .unwrap();
+
+                connection_info
+                    .entry(next_ident)
+                    .or_default()
+                    .push((local_id, remote_id));
+            }
+            connection_map.insert(ident.clone(), connection_info);
 
             (ident, data)
         } else if let Some(gs) = chip.as_gs() {
@@ -221,6 +221,7 @@ fn main() -> Result<(), LuwenError> {
     }
     output.push_str("]\n\n");
 
+    output.push_str("# harvest_mask is the bit indicating which tensix row is harvested. So bit 0 = first tensix row; bit 1 = second tensix row etc...\n");
     output.push_str("harvesting: [\n");
     for chip in &ident_order {
         let id = chips[chip];
