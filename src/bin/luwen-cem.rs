@@ -200,7 +200,10 @@ fn main() -> Result<(), LuwenError> {
     for chip in &ident_order {
         let id = chips[chip];
         if let Some(coord) = &chip.coord {
-            output.push_str(&format!("   {}: {},\n", id, coord));
+            output.push_str(&format!(
+                "   {}: [{},{},{},{}],\n",
+                id, coord.shelf_x, coord.shelf_y, coord.rack_x, coord.rack_y
+            ));
         }
     }
     output.push_str("}\n\n");
