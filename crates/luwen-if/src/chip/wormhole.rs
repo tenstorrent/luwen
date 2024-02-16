@@ -51,7 +51,7 @@ impl HlComms for &Wormhole {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct EthCore {
     pub x: u8,
     pub y: u8,
