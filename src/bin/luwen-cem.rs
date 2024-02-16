@@ -29,6 +29,7 @@ pub struct ChipIdent {
 pub struct ChipData {
     pub noc_translation_en: bool,
     pub harvest_mask: u32,
+    pub boardtype: String,
 }
 
 fn main() -> Result<(), LuwenError> {
@@ -71,6 +72,7 @@ fn main() -> Result<(), LuwenError> {
             let data = ChipData {
                 noc_translation_en,
                 harvest_mask,
+                boardtype: telemetry.board_type().to_string(),
             };
 
             if !wh.is_remote {
@@ -138,6 +140,7 @@ fn main() -> Result<(), LuwenError> {
             let data = ChipData {
                 noc_translation_en: false,
                 harvest_mask,
+                boardtype: telemetry.board_type().to_string(),
             };
 
             mmio_chips.push((ident.clone(), gs.get_device_info()?.map(|v| v.interface_id)));
@@ -225,7 +228,7 @@ fn main() -> Result<(), LuwenError> {
     output.push_str("]\n\n");
 
     output.push_str("# harvest_mask is the bit indicating which tensix row is harvested. So bit 0 = first tensix row; bit 1 = second tensix row etc...\n");
-    output.push_str("harvesting: [\n");
+    output.push_str("harvesting: {\n");
     for chip in &ident_order {
         let id = chips[chip];
         let data = &chip_data[chip];
@@ -234,7 +237,15 @@ fn main() -> Result<(), LuwenError> {
             id, data.noc_translation_en, data.harvest_mask
         ));
     }
-    output.push_str("]");
+    output.push_str("}\n\n");
+
+    output.push_str("boardtype: {\n");
+    for chip in &ident_order {
+        let id = chips[chip];
+        let data = &chip_data[chip];
+        output.push_str(&format!("   {id}: {},\n", data.boardtype));
+    }
+    output.push_str("}");
 
     if let Err(_err) = std::fs::write(&args.file, output) {
         Err(LuwenError::Custom(format!(
