@@ -149,14 +149,14 @@ impl Telemetry {
         format!("{:016x}", self.board_serial_number())
     }
 
-    /// Return the board type.
-    pub fn board_type(&self) -> &'static str {
+    /// Return the board type or None if unknown
+    pub fn try_board_type(&self) -> Option<&'static str> {
         let serial_num = self.board_serial_number();
-        match (serial_num >> 36) & 0xFFFFF {
+        let output = match (serial_num >> 36) & 0xFFFFF {
             0x1 => match (serial_num >> 32) & 0xF {
                 0x2 => "E300_R2",
                 0x3 | 0x4 => "E300_R3",
-                _ => "UNSUPPORTED",
+                _ => return None,
             },
             0x3 => "e150",
             0x7 => "e75",
@@ -165,8 +165,15 @@ impl Telemetry {
             0xB => "GALAXY",
             0x14 => "n300",
             0x18 => "n150",
-            _ => "UNSUPPORTED",
-        }
+            _ => return None,
+        };
+
+        Some(output)
+    }
+
+    /// Return the board type of UNSUPPORTED
+    pub fn board_type(&self) -> &'static str {
+        self.try_board_type().unwrap_or("UNSUPPORTED")
     }
 
     /// Return the AI clock speed in MHz.
