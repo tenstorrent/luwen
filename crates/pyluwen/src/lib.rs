@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use luwen_core::Arch;
 use luwen_if::chip::{
-    wait_for_init, ArcMsg, ArcMsgOk, ArcMsgOptions, ChipImpl, HlComms, HlCommsInterface, InitError,
+    wait_for_init, ArcMsg, ArcMsgOk, ArcMsgOptions, ChipImpl, HlComms, HlCommsInterface, InitError
 };
 use luwen_if::{CallbackStorage, ChipDetectOptions, DeviceInfo, UninitChip};
 use luwen_ref::{DmaConfig, ExtendedPciDeviceWrapper};
@@ -77,6 +77,27 @@ impl DmaBuffer {
         self.0.physical_address
     }
 }
+
+#[pyclass]
+pub struct NeighbouringChip {
+    #[pyo3(get)]
+    local_noc_addr: (u8, u8),
+    #[pyo3(get)]
+    remote_noc_addr: (u8, u8),
+    #[pyo3(get)]
+    eth_addr: EthAddr,
+}
+
+impl From<luwen_if::chip::NeighbouringChip> for NeighbouringChip {
+    fn from(value: luwen_if::chip::NeighbouringChip) -> Self {
+        Self {
+            local_noc_addr: value.local_noc_addr,
+            remote_noc_addr: value.remote_noc_addr,
+            eth_addr: value.eth_addr.into(),
+        }
+    }
+}
+
 
 #[pyclass]
 pub struct Telemetry {
@@ -410,8 +431,16 @@ macro_rules! common_chip_comms_impls {
             pub fn get_telemetry(&self) -> PyResult<Telemetry> {
                 self.0.get_telemetry().map(|v| v.into()).map_err(|v| PyException::new_err(v.to_string()))
             }
-        }
-    };
+                
+            pub fn get_neighbouring_chips(&self) -> PyResult<Vec<NeighbouringChip>> {
+                self.0
+                    .get_neighbouring_chips()
+                    .map(|v| v.into_iter().map(|v| v.into()).collect())
+                    .map_err(|v| PyException::new_err(v.to_string()))
+            }
+        
+    }
+}
 }
 
 #[pyclass]
@@ -817,6 +846,7 @@ impl PciInterface<'_> {
 }
 
 #[pyclass]
+#[derive(Clone)]
 pub struct EthAddr {
     #[pyo3(get)]
     pub shelf_x: u8,
@@ -1156,7 +1186,6 @@ pub fn detect_chips_fallible(
             )))
         })?);
     }
-
     let options = ChipDetectOptions {
         continue_on_failure,
         local_only,
