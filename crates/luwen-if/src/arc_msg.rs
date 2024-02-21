@@ -31,7 +31,7 @@ pub enum FwType {
 }
 
 #[derive(Debug)]
-pub enum ArcMsg {
+pub enum TypedArcMsg {
     Nop,
     Test { arg: u32 },
     ArcGoToSleep,
@@ -55,35 +55,50 @@ pub enum ArcMsg {
     SpiWrite,
 }
 
-impl ArcMsg {
+impl TypedArcMsg {
     pub fn msg_code(&self) -> u16 {
-        let code = match self {
-            ArcMsg::Nop => 0x11,
-            ArcMsg::ArcGoToSleep => 0x55,
-            ArcMsg::Test { .. } => 0x90,
-            ArcMsg::GetSmbusTelemetryAddr => 0x2C,
-            ArcMsg::TriggerSpiCopyLtoR => 0x50,
-            ArcMsg::SetPowerState(state) => match state {
+        match self {
+            TypedArcMsg::Nop => 0x11,
+            TypedArcMsg::ArcGoToSleep => 0x55,
+            TypedArcMsg::Test { .. } => 0x90,
+            TypedArcMsg::GetSmbusTelemetryAddr => 0x2C,
+            TypedArcMsg::TriggerSpiCopyLtoR => 0x50,
+            TypedArcMsg::SetPowerState(state) => match state {
                 PowerState::Busy => 0x52,
                 PowerState::ShortIdle => 0x53,
                 PowerState::LongIdle => 0x54,
             },
-            ArcMsg::TriggerReset => 0x56,
-            ArcMsg::GetHarvesting => 0x57,
-            ArcMsg::DeassertRiscVReset => 0xba,
-            ArcMsg::ResetSafeClks { .. } => 0xbb,
-            ArcMsg::ToggleTensixReset { .. } => 0xaf,
-            ArcMsg::GetAiclk => 0x34,
-            ArcMsg::SetArcState { state } => match state {
+            TypedArcMsg::TriggerReset => 0x56,
+            TypedArcMsg::GetHarvesting => 0x57,
+            TypedArcMsg::DeassertRiscVReset => 0xba,
+            TypedArcMsg::ResetSafeClks { .. } => 0xbb,
+            TypedArcMsg::ToggleTensixReset { .. } => 0xaf,
+            TypedArcMsg::GetAiclk => 0x34,
+            TypedArcMsg::SetArcState { state } => match state {
                 ArcState::A0 => 0xA0,
                 ArcState::A1 => 0xA1,
                 ArcState::A3 => 0xA3,
                 ArcState::A5 => 0xA5,
             },
-            ArcMsg::FwVersion(_) => 0xb9,
-            ArcMsg::GetSpiDumpAddr => 0x29,
-            ArcMsg::SpiRead { .. } => 0x2A,
-            ArcMsg::SpiWrite => 0x2B,
+            TypedArcMsg::FwVersion(_) => 0xb9,
+            TypedArcMsg::GetSpiDumpAddr => 0x29,
+            TypedArcMsg::SpiRead { .. } => 0x2A,
+            TypedArcMsg::SpiWrite => 0x2B,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum ArcMsg {
+    Typed(TypedArcMsg),
+    Raw { msg: u16, arg0: u16, arg1: u16 },
+}
+
+impl ArcMsg {
+    pub fn msg_code(&self) -> u16 {
+        let code = match self {
+            ArcMsg::Raw { msg, .. } => *msg,
+            ArcMsg::Typed(msg) => msg.msg_code(),
         };
 
         0xaa00 | code
@@ -91,28 +106,31 @@ impl ArcMsg {
 
     pub fn args(&self) -> (u16, u16) {
         match self {
-            ArcMsg::Test { arg }
-            | ArcMsg::ResetSafeClks { arg }
-            | ArcMsg::ToggleTensixReset { arg }
-            | ArcMsg::SpiRead { addr: arg } => {
-                ((arg & 0xFFFF) as u16, ((arg >> 16) & 0xFFFF) as u16)
-            }
-            ArcMsg::SpiWrite => (0xFFFF, 0xFFFF),
-            ArcMsg::Nop
-            | ArcMsg::ArcGoToSleep
-            | ArcMsg::GetSmbusTelemetryAddr
-            | ArcMsg::SetPowerState(_)
-            | ArcMsg::DeassertRiscVReset
-            | ArcMsg::GetAiclk
-            | ArcMsg::TriggerReset
-            | ArcMsg::GetHarvesting
-            | ArcMsg::GetSpiDumpAddr
-            | ArcMsg::TriggerSpiCopyLtoR
-            | ArcMsg::SetArcState { .. } => (0, 0),
-            ArcMsg::FwVersion(ty) => match ty {
-                FwType::ArcL2 => (0, 0),
-                FwType::FwBundle => (1, 0),
-                FwType::FwBundleSPI => (2, 0),
+            ArcMsg::Raw { arg0, arg1, .. } => (*arg0, *arg1),
+            ArcMsg::Typed(msg) => match &msg {
+                TypedArcMsg::Test { arg }
+                | TypedArcMsg::ResetSafeClks { arg }
+                | TypedArcMsg::ToggleTensixReset { arg }
+                | TypedArcMsg::SpiRead { addr: arg } => {
+                    ((arg & 0xFFFF) as u16, ((arg >> 16) & 0xFFFF) as u16)
+                }
+                TypedArcMsg::SpiWrite => (0xFFFF, 0xFFFF),
+                TypedArcMsg::Nop
+                | TypedArcMsg::ArcGoToSleep
+                | TypedArcMsg::GetSmbusTelemetryAddr
+                | TypedArcMsg::SetPowerState(_)
+                | TypedArcMsg::DeassertRiscVReset
+                | TypedArcMsg::GetAiclk
+                | TypedArcMsg::TriggerReset
+                | TypedArcMsg::GetHarvesting
+                | TypedArcMsg::GetSpiDumpAddr
+                | TypedArcMsg::TriggerSpiCopyLtoR
+                | TypedArcMsg::SetArcState { .. } => (0, 0),
+                TypedArcMsg::FwVersion(ty) => match ty {
+                    FwType::ArcL2 => (0, 0),
+                    FwType::FwBundle => (1, 0),
+                    FwType::FwBundleSPI => (2, 0),
+                },
             },
         }
     }
@@ -120,32 +138,32 @@ impl ArcMsg {
     pub fn from_values(msg: u32, arg0: u16, arg1: u16) -> Self {
         let arg = ((arg1 as u32) << 16) | arg0 as u32;
         let msg = 0xFF & msg;
-        match msg {
-            0x11 => ArcMsg::Nop,
-            0x34 => ArcMsg::GetAiclk,
-            0x56 => ArcMsg::TriggerReset,
-            0xbb => ArcMsg::ResetSafeClks { arg },
-            0xaf => ArcMsg::ToggleTensixReset { arg },
-            0xba => ArcMsg::DeassertRiscVReset,
-            0x50 => ArcMsg::TriggerSpiCopyLtoR,
-            0x52 => ArcMsg::SetPowerState(PowerState::Busy),
-            0x53 => ArcMsg::SetPowerState(PowerState::ShortIdle),
-            0x54 => ArcMsg::SetPowerState(PowerState::LongIdle),
-            0x57 => ArcMsg::GetHarvesting,
-            0x90 => ArcMsg::Test { arg },
-            0xA0 => ArcMsg::SetArcState {
+        let msg = match msg {
+            0x11 => TypedArcMsg::Nop,
+            0x34 => TypedArcMsg::GetAiclk,
+            0x56 => TypedArcMsg::TriggerReset,
+            0xbb => TypedArcMsg::ResetSafeClks { arg },
+            0xaf => TypedArcMsg::ToggleTensixReset { arg },
+            0xba => TypedArcMsg::DeassertRiscVReset,
+            0x50 => TypedArcMsg::TriggerSpiCopyLtoR,
+            0x52 => TypedArcMsg::SetPowerState(PowerState::Busy),
+            0x53 => TypedArcMsg::SetPowerState(PowerState::ShortIdle),
+            0x54 => TypedArcMsg::SetPowerState(PowerState::LongIdle),
+            0x57 => TypedArcMsg::GetHarvesting,
+            0x90 => TypedArcMsg::Test { arg },
+            0xA0 => TypedArcMsg::SetArcState {
                 state: ArcState::A0,
             },
-            0xA1 => ArcMsg::SetArcState {
+            0xA1 => TypedArcMsg::SetArcState {
                 state: ArcState::A1,
             },
-            0xA3 => ArcMsg::SetArcState {
+            0xA3 => TypedArcMsg::SetArcState {
                 state: ArcState::A3,
             },
-            0xA5 => ArcMsg::SetArcState {
+            0xA5 => TypedArcMsg::SetArcState {
                 state: ArcState::A5,
             },
-            0xB9 => ArcMsg::FwVersion(match arg {
+            0xB9 => TypedArcMsg::FwVersion(match arg {
                 0 => FwType::ArcL2,
                 1 => FwType::FwBundle,
                 2 => FwType::FwBundleSPI,
@@ -154,7 +172,9 @@ impl ArcMsg {
             value => {
                 unimplemented!("Unknown ARC message {:#x}", value)
             }
-        }
+        };
+
+        ArcMsg::Typed(msg)
     }
 }
 
@@ -249,7 +269,7 @@ pub fn arc_msg<T: HlComms>(
     let code = msg.msg_code();
 
     let current_code = comms.axi_read32(addrs.scratch_base + (msg_reg * 4))?;
-    if (current_code & 0xFFFF) as u16 == ArcMsg::ArcGoToSleep.msg_code() {
+    if (current_code & 0xFFFF) as u16 == TypedArcMsg::ArcGoToSleep.msg_code() {
         Err(ArcMsgProtocolError::ArcAsleep.into_error())?;
     }
 

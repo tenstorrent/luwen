@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use crate::{
-    arc_msg::{ArcMsgAddr, ArcMsgOk},
+    arc_msg::{ArcMsgAddr, ArcMsgOk, TypedArcMsg},
     chip::{
         communication::{
             chip_comms::{load_axi_table, ChipComms},
@@ -242,7 +242,7 @@ impl Wormhole {
             ))?;
         }
 
-        if s5 == 0x0000AA00 || s5 == ArcMsg::ArcGoToSleep.msg_code() as u32 {
+        if s5 == 0x0000AA00 || s5 == TypedArcMsg::ArcGoToSleep.msg_code() as u32 {
             return Err(PlatformError::ArcNotReady(
                 crate::error::ArcReadyError::Asleep,
                 BtWrapper::capture(),
@@ -765,7 +765,7 @@ impl ChipImpl for Wormhole {
 
     fn get_telemetry(&self) -> Result<super::Telemetry, PlatformError> {
         let result = self.arc_msg(ArcMsgOptions {
-            msg: ArcMsg::GetSmbusTelemetryAddr,
+            msg: ArcMsg::Typed(TypedArcMsg::GetSmbusTelemetryAddr),
             ..Default::default()
         })?;
 
