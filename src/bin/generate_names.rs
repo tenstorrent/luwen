@@ -391,6 +391,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "ARC_RESET.GPIO2_PAD_DRV_CNTL",
         "ARC_RESET.GPIO2_PAD_RXEN_CNTL",
         "ARC_RESET.SPI_CNTL",
+        "ARC_RESET.REFCLK_COUNTER_LOW",
+        "ARC_RESET.REFCLK_COUNTER_HIGH",
         "ARC_SPI.SPI_CTRLR0",
         "ARC_SPI.SPI_CTRLR1",
         "ARC_SPI.SPI_SSIENR",
