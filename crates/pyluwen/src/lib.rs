@@ -386,11 +386,11 @@ macro_rules! common_chip_comms_impls {
             }
 
             #[pyo3(signature = (msg, wait_for_done = true, use_second_mailbox = false, arg0 = 0xffff, arg1 = 0xffff, timeout = 1.0))]
-            pub fn arc_msg(&self, msg: u32, wait_for_done: bool, use_second_mailbox: bool, arg0: u16, arg1: u16, timeout: f64) -> PyResult<Option<(u32, u32)>> {
+            pub fn arc_msg(&self, msg: u16, wait_for_done: bool, use_second_mailbox: bool, arg0: u16, arg1: u16, timeout: f64) -> PyResult<Option<(u32, u32)>> {
                 match self.0
                     .arc_msg(ArcMsgOptions {
                         addrs: None,
-                        msg: ArcMsg::from_values(msg, arg0, arg1),
+                        msg: ArcMsg::Raw{ msg, arg0, arg1 },
                         wait_for_done,
                         use_second_mailbox,
                         timeout: std::time::Duration::from_secs_f64(timeout),
@@ -406,8 +406,44 @@ macro_rules! common_chip_comms_impls {
                         }
                     }
             }
+
+            pub fn get_telemetry(&self) -> Telemetry {
+                self.0.get_telemetry().unwrap().into()
+            }
         }
     };
+}
+
+
+#[pyclass]
+struct PyChipDetectState(luwen_if::chip::ChipDetectState<'static>);
+
+#[pymethods]
+impl PyChipDetectState {
+    pub fn new_chip(&self) -> bool {
+        match self.0.call {
+            luwen_if::chip::CallReason::NewChip => true,
+            _ => false,
+        }
+    }
+
+    pub fn correct_down(&self) -> bool {
+        match self.0.call {
+            luwen_if::chip::CallReason::NotNew => true,
+            _ => false,
+        }
+    }
+
+    pub fn status_string(&self) -> Option<String> {
+        match self.0.call {
+            luwen_if::chip::CallReason::NewChip | luwen_if::chip::CallReason::NotNew => None,
+            luwen_if::chip::CallReason::ChipInitCompleted(status)
+            | luwen_if::chip::CallReason::InitWait(status) => Some(format!(
+                "{}\n{}\n{}",
+                status.arc_status, status.dram_status, status.eth_status
+            )),
+        }
+    }
 }
 
 impl PciChip {
@@ -472,13 +508,27 @@ impl PciChip {
         ))
     }
 
-    pub fn init(&mut self) -> PyResult<()> {
-        match wait_for_init(
-            &mut self.0,
-            &mut |_| Python::with_gil(|py| py.check_signals()),
-            false,
-            false,
-        ) {
+    #[pyo3(signature = (callback = None))]
+    pub fn init(&mut self, callback: Option<PyObject>) -> PyResult<()> {
+        let mut callback: Box<dyn FnMut(luwen_if::chip::ChipDetectState) -> Result<(), PyErr>> =
+            if let Some(callback) = callback {
+                Box::new(move |status| {
+                    // Safety: This is extremly unsafe, the alternative would be to copy the status for
+                    // every invocation.
+                    let status = unsafe { std::mem::transmute(status) };
+                    if let Err(err) =
+                        Python::with_gil(|py| callback.call1(py, (PyChipDetectState(status),)))
+                    {
+                        Err(err)
+                    } else {
+                        Ok(())
+                    }
+                })
+            } else {
+                Box::new(|_| Python::with_gil(|py| py.check_signals()))
+            };
+
+        match wait_for_init(&mut self.0, &mut callback, false, false) {
             Err(InitError::PlatformError(err)) => Err(PyException::new_err(format!(
                 "Could not initialize chip: {}",
                 err.to_string()
@@ -494,9 +544,6 @@ impl PciChip {
         self.0.inner.get_telemetry().unwrap().board_id
     }
 
-    pub fn get_telemetry(&self) -> Telemetry {
-        self.0.inner.get_telemetry().unwrap().into()
-    }
 
     pub fn device_id(&self) -> PyResult<u32> {
         let info = self.device_info()?;
@@ -1119,36 +1166,6 @@ pub fn detect_chips_fallible(
         noc_safe,
     };
 
-    #[pyclass]
-    struct PyChipDetectState(luwen_if::chip::ChipDetectState<'static>);
-
-    #[pymethods]
-    impl PyChipDetectState {
-        pub fn new_chip(&self) -> bool {
-            match self.0.call {
-                luwen_if::chip::CallReason::NewChip => true,
-                _ => false,
-            }
-        }
-
-        pub fn correct_down(&self) -> bool {
-            match self.0.call {
-                luwen_if::chip::CallReason::NotNew => true,
-                _ => false,
-            }
-        }
-
-        pub fn status_string(&self) -> Option<String> {
-            match self.0.call {
-                luwen_if::chip::CallReason::NewChip | luwen_if::chip::CallReason::NotNew => None,
-                luwen_if::chip::CallReason::ChipInitCompleted(status)
-                | luwen_if::chip::CallReason::InitWait(status) => Some(format!(
-                    "{}\n{}\n{}",
-                    status.arc_status, status.dram_status, status.eth_status
-                )),
-            }
-        }
-    }
 
     let mut callback: Box<dyn FnMut(luwen_if::chip::ChipDetectState) -> Result<(), PyErr>> =
         if let Some(callback) = callback {
@@ -1231,6 +1248,7 @@ fn pyluwen(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PciGrayskull>()?;
     m.add_class::<DmaBuffer>()?;
     m.add_class::<AxiData>()?;
+    m.add_class::<Telemetry>()?;
 
     m.add_wrapped(wrap_pyfunction!(detect_chips))?;
     m.add_wrapped(wrap_pyfunction!(detect_chips_fallible))?;

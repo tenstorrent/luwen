@@ -6,7 +6,7 @@ use std::sync::Arc;
 use luwen_core::Arch;
 
 use crate::{
-    arc_msg::{ArcMsgAddr, ArcMsgOk, ArcMsgProtocolError},
+    arc_msg::{ArcMsgAddr, ArcMsgOk, ArcMsgProtocolError, TypedArcMsg},
     chip::HlCommsInterface,
     error::{BtWrapper, PlatformError},
     ArcMsg, ChipImpl,
@@ -61,7 +61,7 @@ impl Grayskull {
             ))?;
         }
 
-        if s5 == 0x0000AA00 || s5 == ArcMsg::ArcGoToSleep.msg_code() as u32 {
+        if s5 == 0x0000AA00 || s5 == TypedArcMsg::ArcGoToSleep.msg_code() as u32 {
             return Err(PlatformError::ArcNotReady(
                 crate::error::ArcReadyError::Asleep,
                 BtWrapper::capture(),
@@ -452,7 +452,7 @@ impl ChipImpl for Grayskull {
 
     fn get_telemetry(&self) -> Result<super::Telemetry, crate::error::PlatformError> {
         let result = self.arc_msg(ArcMsgOptions {
-            msg: ArcMsg::FwVersion(crate::arc_msg::FwType::ArcL2),
+            msg: ArcMsg::Typed(TypedArcMsg::FwVersion(crate::arc_msg::FwType::ArcL2)),
             ..Default::default()
         })?;
         let version = match result {
@@ -470,7 +470,7 @@ impl ChipImpl for Grayskull {
         }
 
         let result = self.arc_msg(ArcMsgOptions {
-            msg: ArcMsg::GetSmbusTelemetryAddr,
+            msg: ArcMsg::Typed(TypedArcMsg::GetSmbusTelemetryAddr),
             ..Default::default()
         })?;
 

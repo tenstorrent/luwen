@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{AxiError, HlCommsInterface};
-use crate::ChipImpl;
+use crate::{arc_msg::TypedArcMsg, ArcMsg, ChipImpl};
 
 pub struct Spi {
     gpio2_pad_trien_cntl: u64,
@@ -576,7 +576,7 @@ impl ActiveSpi {
         addr: u32,
     ) -> Result<[u8; ARC_SPI_CHUNK_SIZE as usize], Box<dyn std::error::Error>> {
         chip.arc_msg(super::ArcMsgOptions {
-            msg: crate::ArcMsg::SpiRead { addr },
+            msg: ArcMsg::Typed(TypedArcMsg::SpiRead { addr }),
             ..Default::default()
         })?;
 
@@ -596,7 +596,7 @@ impl ActiveSpi {
     ) -> Result<(), Box<dyn std::error::Error>> {
         chip.axi_write(spi_dump_addr, &data)?;
         chip.arc_msg(super::ArcMsgOptions {
-            msg: crate::ArcMsg::SpiWrite,
+            msg: ArcMsg::Typed(TypedArcMsg::SpiWrite),
             ..Default::default()
         })?;
 
@@ -621,7 +621,7 @@ impl ActiveSpi {
         chip: &impl ChipImpl,
     ) -> Result<Option<u64>, Box<dyn std::error::Error>> {
         let dump_addr = if let Ok(result) = chip.arc_msg(super::ArcMsgOptions {
-            msg: crate::ArcMsg::GetSpiDumpAddr,
+            msg: ArcMsg::Typed(TypedArcMsg::GetSpiDumpAddr),
             ..Default::default()
         }) {
             match result {

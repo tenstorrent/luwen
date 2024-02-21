@@ -25,6 +25,7 @@ pub use init::{
 use luwen_core::Arch;
 pub use wormhole::Wormhole;
 
+use crate::arc_msg::TypedArcMsg;
 pub use crate::arc_msg::{ArcMsg, ArcMsgOk};
 use crate::{arc_msg::ArcMsgAddr, error::PlatformError, DeviceInfo};
 
@@ -41,7 +42,7 @@ pub struct ArcMsgOptions {
 impl Default for ArcMsgOptions {
     fn default() -> Self {
         Self {
-            msg: ArcMsg::Nop,
+            msg: ArcMsg::Typed(TypedArcMsg::Nop),
             wait_for_done: true,
             timeout: std::time::Duration::from_secs(1),
             use_second_mailbox: false,
