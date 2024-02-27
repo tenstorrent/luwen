@@ -187,7 +187,9 @@ impl ChipImpl for Grayskull {
         status: &mut InitStatus,
     ) -> Result<ChipInitResult, PlatformError> {
         if status.unknown_state {
+            let init_options = std::mem::take(&mut status.init_options);
             *status = default_status();
+            status.init_options = init_options;
         }
 
         let comms = &mut status.comms_status;
@@ -199,74 +201,82 @@ impl ChipImpl for Grayskull {
                     WaitStatus::Waiting(status_string) => {
                         match self.check_arc_msg_safe(5, 3) {
                             Ok(_) => *arc_status = WaitStatus::JustFinished,
-                            Err(err) => match err {
-                                PlatformError::ArcNotReady(reason, _) => {
-                                    // There are three possibilities when trying to get a response
-                                    // here. 1. 0xffffffff in this case we want to assume this is some
-                                    // sort of AxiError and abort the init. 2. An error we may
-                                    // eventually recover from, i.e. arc booting... 3. we have hit an
-                                    // error that won't resolve but isn't indicative of further
-                                    // problems. For example watchdog triggered.
-                                    match reason {
-                                        // This is triggered when the s5 or pc registers readback
-                                        // 0xffffffff. I am treating it like an AXI error and will
-                                        // assume something has gone terribly wrong and abort.
-                                        crate::error::ArcReadyError::NoAccess => {
-                                            *comms = CommsStatus::CommunicationError(
-                                                "Failed to access ARC".to_string(),
-                                            );
-                                            return Ok(ChipInitResult::ErrorAbort);
-                                        }
-                                        crate::error::ArcReadyError::WatchdogTriggered
-                                        | crate::error::ArcReadyError::Asleep
-                                        | crate::error::ArcReadyError::OldPostCode(_) => {
-                                            *arc_status = WaitStatus::Error(
-                                                ArcInitError::WaitingForInit(reason),
-                                            );
-                                        }
-                                        crate::error::ArcReadyError::BootIncomplete
-                                        | crate::error::ArcReadyError::OutstandingPcieDMA
-                                        | crate::error::ArcReadyError::MessageQueued(_)
-                                        | crate::error::ArcReadyError::HandlingMessage(_) => {
-                                            if status.start_time.elapsed() > status.timeout {
+                            Err(err) => {
+                                match err {
+                                    PlatformError::ArcNotReady(reason, _) => {
+                                        // There are three possibilities when trying to get a response
+                                        // here. 1. 0xffffffff in this case we want to assume this is some
+                                        // sort of AxiError and abort the init. 2. An error we may
+                                        // eventually recover from, i.e. arc booting... 3. we have hit an
+                                        // error that won't resolve but isn't indicative of further
+                                        // problems. For example watchdog triggered.
+                                        match reason {
+                                            // This is triggered when the s5 or pc registers readback
+                                            // 0xffffffff. I am treating it like an AXI error and will
+                                            // assume something has gone terribly wrong and abort.
+                                            crate::error::ArcReadyError::NoAccess => {
                                                 *arc_status = WaitStatus::Error(
                                                     ArcInitError::WaitingForInit(reason),
                                                 );
-                                            } else {
-                                                *status_string = Some(reason.to_string());
+                                            }
+                                            crate::error::ArcReadyError::WatchdogTriggered
+                                            | crate::error::ArcReadyError::Asleep
+                                            | crate::error::ArcReadyError::OldPostCode(_) => {
+                                                *arc_status = WaitStatus::Error(
+                                                    ArcInitError::WaitingForInit(reason),
+                                                );
+                                            }
+                                            crate::error::ArcReadyError::BootIncomplete
+                                            | crate::error::ArcReadyError::OutstandingPcieDMA
+                                            | crate::error::ArcReadyError::MessageQueued(_)
+                                            | crate::error::ArcReadyError::HandlingMessage(_) => {
+                                                if status.start_time.elapsed() > status.timeout {
+                                                    *arc_status = WaitStatus::Error(
+                                                        ArcInitError::WaitingForInit(reason),
+                                                    );
+                                                } else {
+                                                    *status_string = Some(reason.to_string());
+                                                }
                                             }
                                         }
                                     }
-                                }
 
-                                // The fact that this is here means that our result is too generic, for now we just ignore it.
-                                PlatformError::ArcMsgError(_) => {
-                                    return Ok(ChipInitResult::ErrorContinue);
-                                }
+                                    PlatformError::UnsupportedFwVersion { version, required } => {
+                                        *arc_status =
+                                            WaitStatus::Error(ArcInitError::FwVersionTooOld {
+                                                version,
+                                                required,
+                                            });
+                                    }
 
-                                // This is fine to hit at this stage (though it should have been already verified to not be the case).
-                                // For now we just ignore it and hope that it will be resolved by the time the timeout expires...
-                                PlatformError::EthernetTrainingNotComplete(_) => {
-                                    return Ok(ChipInitResult::ErrorContinue);
-                                }
+                                    // The fact that this is here means that our result is too generic, for now we just ignore it.
+                                    PlatformError::ArcMsgError(_) => {
+                                        return Ok(ChipInitResult::ErrorContinue);
+                                    }
 
-                                // This is an "expected error" but we probably can't recover from it, so we should abort the init.
-                                PlatformError::AxiError(_) => {
-                                    return Ok(ChipInitResult::ErrorAbort)
-                                }
+                                    // This is fine to hit at this stage (though it should have been already verified to not be the case).
+                                    // For now we just ignore it and hope that it will be resolved by the time the timeout expires...
+                                    PlatformError::EthernetTrainingNotComplete(_) => {
+                                        return Ok(ChipInitResult::ErrorContinue);
+                                    }
 
-                                // We don't expect to hit these cases so if we do, we should assume that something went terribly
-                                // wrong and abort the init.
-                                PlatformError::UnsupportedFwVersion { .. }
-                                | PlatformError::WrongChipArch { .. }
-                                | PlatformError::WrongChipArchs { .. }
-                                | PlatformError::Generic(_, _)
-                                | PlatformError::GenericError(_, _) => {
-                                    return Ok(ChipInitResult::ErrorAbort)
+                                    // This is an "expected error" but we probably can't recover from it, so we should abort the init.
+                                    PlatformError::AxiError(err) => {
+                                        *comms = CommsStatus::CommunicationError(err.to_string());
+                                        return Ok(ChipInitResult::ErrorAbort);
+                                    }
+
+                                    // We don't expect to hit these cases so if we do, we should assume that something went terribly
+                                    // wrong and abort the init.
+                                    PlatformError::WrongChipArch { .. }
+                                    | PlatformError::WrongChipArchs { .. }
+                                    | PlatformError::Generic(_, _)
+                                    | PlatformError::GenericError(_, _) => {
+                                        return Ok(ChipInitResult::ErrorAbort)
+                                    }
                                 }
-                            },
+                            }
                         }
-                        {}
                     }
                     WaitStatus::JustFinished => {
                         *arc_status = WaitStatus::Done;
@@ -281,6 +291,7 @@ impl ChipImpl for Grayskull {
         if !status.arc_status.is_waiting() {
             // If something went wrong with ARC then we probably don't have DRAM
             if !status.arc_status.has_error() {
+                let arc_status = &mut status.arc_status;
                 let status = &mut status.dram_status;
 
                 // We don't need to get the telemetry if we aren't waiting to see if dram has
@@ -311,6 +322,17 @@ impl ChipImpl for Grayskull {
                                 None
                             }
 
+
+                            PlatformError::UnsupportedFwVersion { version, required } => {
+                                if let Some(status) = arc_status.wait_status.get_mut(0) {
+                                    *status = WaitStatus::Error(ArcInitError::FwVersionTooOld {
+                                        version,
+                                        required,
+                                    });
+                                }
+                                None
+                            }
+
                             // Arc should be ready here...
                             // This means that ARC hung, we should stop initializing this chip in case
                             // we hit something like a noc hang.
@@ -321,10 +343,11 @@ impl ChipImpl for Grayskull {
                             // This is an "expected error" but we probably can't recover from it, so we should abort the init.
                             PlatformError::AxiError(_) => return Ok(ChipInitResult::ErrorAbort),
 
+
+
                             // We don't expect to hit these cases so if we do, we should assume that something went terribly
                             // wrong and abort the init.
-                            PlatformError::UnsupportedFwVersion { .. }
-                            | PlatformError::WrongChipArch { .. }
+                            PlatformError::WrongChipArch { .. }
                             | PlatformError::WrongChipArchs { .. }
                             | PlatformError::Generic(_, _)
                             | PlatformError::GenericError(_, _) => {

@@ -40,16 +40,22 @@ impl fmt::Display for EthernetPartialInitError {
 #[derive(Clone, Debug)]
 pub enum ArcInitError {
     FwCorrupted,
+    NoAccess,
     WaitingForInit(ArcReadyError),
+    FwVersionTooOld { version: u32, required: u32 },
     Hung,
 }
 
 impl fmt::Display for ArcInitError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            ArcInitError::NoAccess => f.write_str("Could not access ARC"),
             ArcInitError::FwCorrupted => f.write_str("ARC firmware is corrupted"),
             ArcInitError::WaitingForInit(err) => {
                 write!(f, "ARC is waiting for initialization; {err}")
+            }
+            ArcInitError::FwVersionTooOld { version, required } => {
+                write!(f, "ARC FW is older than the minimum supported version; {version:x} < {required:x}")
             }
             ArcInitError::Hung => f.write_str("ARC is hung"),
         }
