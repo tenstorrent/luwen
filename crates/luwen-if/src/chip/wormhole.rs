@@ -21,7 +21,7 @@ use super::{
     hl_comms::HlComms,
     init::status::{ComponentStatusInfo, EthernetPartialInitError, InitOptions, WaitStatus},
     remote::{EthAddresses, RemoteArcIf},
-    ArcMsgOptions, ChipInitResult, InitStatus, NeighbouringChip,
+    ArcMsgOptions, ChipInitResult, CommsStatus, InitStatus, NeighbouringChip,
 };
 
 /// Implementation of the interface for a Wormhole
@@ -387,10 +387,9 @@ impl ChipImpl for Wormhole {
                                             // 0xffffffff. I am treating it like an AXI error and will
                                             // assume something has gone terribly wrong and abort.
                                             crate::error::ArcReadyError::NoAccess => {
-                                                *comms = super::CommsStatus::CommunicationError(
-                                                    "Failed to access ARC".to_string(),
+                                                *arc_status = WaitStatus::Error(
+                                                    super::init::status::ArcInitError::WaitingForInit(reason),
                                                 );
-                                                return Ok(ChipInitResult::ErrorAbort);
                                             }
                                             crate::error::ArcReadyError::WatchdogTriggered
                                             | crate::error::ArcReadyError::Asleep
@@ -407,6 +406,15 @@ impl ChipImpl for Wormhole {
                                                 }
                                             }
                                         }
+                                    }
+
+                                    PlatformError::UnsupportedFwVersion { version, required } => {
+                                        *arc_status = WaitStatus::Error(
+                                            super::init::status::ArcInitError::FwVersionTooOld {
+                                                version,
+                                                required,
+                                            },
+                                        );
                                     }
 
                                     // The fact that this is here means that our result is too generic, for now we just ignore it.
@@ -427,14 +435,14 @@ impl ChipImpl for Wormhole {
                                     }
 
                                     // This is an "expected error" but we probably can't recover from it, so we should abort the init.
-                                    PlatformError::AxiError(_) => {
-                                        return Ok(ChipInitResult::ErrorAbort)
+                                    PlatformError::AxiError(err) => {
+                                        *comms = CommsStatus::CommunicationError(err.to_string());
+                                        return Ok(ChipInitResult::ErrorAbort);
                                     }
 
                                     // We don't expect to hit these cases so if we do, we should assume that something went terribly
                                     // wrong and abort the init.
-                                    PlatformError::UnsupportedFwVersion { .. }
-                                    | PlatformError::WrongChipArch { .. }
+                                    PlatformError::WrongChipArch { .. }
                                     | PlatformError::WrongChipArchs { .. }
                                     | PlatformError::Generic(_, _)
                                     | PlatformError::GenericError(_, _) => {
@@ -456,6 +464,7 @@ impl ChipImpl for Wormhole {
         if !status.arc_status.is_waiting() {
             // If something went wrong with ARC then we probably don't have DRAM
             if !status.arc_status.has_error() {
+                let arc_status = &mut status.arc_status;
                 let status = &mut status.dram_status;
 
                 // We don't need to get the telemetry if we aren't waiting to see if dram has
@@ -486,6 +495,17 @@ impl ChipImpl for Wormhole {
                                 None
                             }
 
+
+                            PlatformError::UnsupportedFwVersion { version, required } => {
+                                if let Some(status) = arc_status.wait_status.get_mut(0) {
+                                    *status = WaitStatus::Error(crate::chip::init::status::ArcInitError::FwVersionTooOld {
+                                        version,
+                                        required,
+                                    });
+                                }
+                                None
+                            }
+
                             // Arc should be ready here...
                             // This means that ARC hung, we should stop initializing this chip in case
                             // we hit something like a noc hang.
@@ -498,8 +518,7 @@ impl ChipImpl for Wormhole {
 
                             // We don't expect to hit these cases so if we do, we should assume that something went terribly
                             // wrong and abort the init.
-                            PlatformError::UnsupportedFwVersion { .. }
-                            | PlatformError::WrongChipArch { .. }
+                            PlatformError::WrongChipArch { .. }
                             | PlatformError::WrongChipArchs { .. }
                             | PlatformError::Generic(_, _)
                             | PlatformError::GenericError(_, _) => {
