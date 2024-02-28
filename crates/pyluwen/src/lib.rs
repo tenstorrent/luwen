@@ -407,13 +407,12 @@ macro_rules! common_chip_comms_impls {
                     }
             }
 
-            pub fn get_telemetry(&self) -> Telemetry {
-                self.0.get_telemetry().unwrap().into()
+            pub fn get_telemetry(&self) -> PyResult<Telemetry> {
+                self.0.get_telemetry().map(|v| v.into()).map_err(|v| PyException::new_err(v.to_string()))
             }
         }
     };
 }
-
 
 #[pyclass]
 struct PyChipDetectState(luwen_if::chip::ChipDetectState<'static>);
@@ -543,7 +542,6 @@ impl PciChip {
     pub fn board_id(&self) -> u64 {
         self.0.inner.get_telemetry().unwrap().board_id
     }
-
 
     pub fn device_id(&self) -> PyResult<u32> {
         let info = self.device_info()?;
@@ -1165,7 +1163,6 @@ pub fn detect_chips_fallible(
         chip_filter: converted_chip_filter,
         noc_safe,
     };
-
 
     let mut callback: Box<dyn FnMut(luwen_if::chip::ChipDetectState) -> Result<(), PyErr>> =
         if let Some(callback) = callback {
