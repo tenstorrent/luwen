@@ -405,6 +405,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "axi-data/grayskull-axi-pci.bin",
         &os_keys,
     )?;
+    let os_keys = [
+        [
+            "ARC_RESET.REFCLK_COUNTER_LOW",
+            "ARC_RESET.REFCLK_COUNTER_HIGH",
+        ]
+        .as_slice(),
+        os_keys.as_slice(),
+    ]
+    .concat();
     parse_and_serialize_translation_singlelayer(
         "data/wormhole",
         "axi-noc.yaml",
