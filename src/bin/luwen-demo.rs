@@ -3,7 +3,7 @@
 
 use luwen_if::{
     chip::{ArcMsgOptions, Chip, HlComms, HlCommsInterface},
-    ArcMsg, CallbackStorage, ChipImpl,
+    CallbackStorage, ChipImpl, TypedArcMsg,
 };
 use luwen_ref::{
     comms_callback, error::LuwenError, DmaConfig, ExtendedPciDevice, ExtendedPciDeviceWrapper,
@@ -105,7 +105,7 @@ pub fn main() -> Result<(), LuwenError> {
         let chip = Chip::open(arch, CallbackStorage::new(comms_callback, ud))?;
 
         chip.arc_msg(ArcMsgOptions {
-            msg: ArcMsg::Test { arg: 101 },
+            msg: TypedArcMsg::Test { arg: 101 }.into(),
             ..Default::default()
         })?;
 
@@ -113,7 +113,7 @@ pub fn main() -> Result<(), LuwenError> {
             let remote_wh = wh.open_remote((1, 0)).unwrap();
 
             remote_wh.arc_msg(ArcMsgOptions {
-                msg: ArcMsg::Test { arg: 101 },
+                msg: TypedArcMsg::Test { arg: 101 }.into(),
                 ..Default::default()
             })?;
         }
@@ -125,7 +125,7 @@ pub fn main() -> Result<(), LuwenError> {
     for (chip_id, chip) in all_chips.into_iter().enumerate() {
         println!("Running on device {chip_id}");
         chip.arc_msg(ArcMsgOptions {
-            msg: ArcMsg::Test { arg: 101 },
+            msg: TypedArcMsg::Test { arg: 101 }.into(),
             ..Default::default()
         })?;
     }

@@ -55,6 +55,12 @@ pub enum TypedArcMsg {
     SpiWrite,
 }
 
+impl Into<ArcMsg> for TypedArcMsg {
+    fn into(self) -> ArcMsg {
+        ArcMsg::Typed(self)
+    }
+}
+
 impl TypedArcMsg {
     pub fn msg_code(&self) -> u16 {
         match self {

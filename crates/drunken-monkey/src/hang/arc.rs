@@ -2,7 +2,7 @@ use clap::ValueEnum;
 
 use luwen_if::{
     chip::{ArcMsgOptions, Chip, HlCommsInterface},
-    ArcMsg, ArcState, ChipImpl,
+    ArcState, ChipImpl, TypedArcMsg,
 };
 
 #[derive(Debug, Clone, ValueEnum)]
@@ -19,9 +19,9 @@ pub fn hang_arc(method: ArcHangMethod, chip: Chip) -> Result<(), Box<dyn std::er
         }
         ArcHangMethod::A5 => {
             chip.arc_msg(ArcMsgOptions {
-                msg: ArcMsg::SetArcState {
+                msg: TypedArcMsg::SetArcState {
                     state: ArcState::A5,
-                },
+                }.into(),
                 ..Default::default()
             })?;
         }
@@ -29,9 +29,9 @@ pub fn hang_arc(method: ArcHangMethod, chip: Chip) -> Result<(), Box<dyn std::er
             // Need to go into arc a3 before haulting the core, otherwise we can interrupt
             // communication with the voltage regulator.
             chip.arc_msg(ArcMsgOptions {
-                msg: ArcMsg::SetArcState {
+                msg: TypedArcMsg::SetArcState {
                     state: ArcState::A3,
-                },
+                }.into(),
                 ..Default::default()
             })?;
 
