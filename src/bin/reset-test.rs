@@ -33,9 +33,10 @@ fn lds_reset(interfaces: &[usize]) -> Vec<Chip> {
 
     for chip in &output {
         chip.arc_msg(ArcMsgOptions {
-            msg: luwen_if::ArcMsg::SetArcState {
+            msg: luwen_if::TypedArcMsg::SetArcState {
                 state: luwen_if::ArcState::A3,
-            },
+            }
+            .into(),
             ..Default::default()
         })
         .unwrap();
@@ -43,7 +44,7 @@ fn lds_reset(interfaces: &[usize]) -> Vec<Chip> {
 
     for chip in &output {
         chip.arc_msg(ArcMsgOptions {
-            msg: luwen_if::ArcMsg::TriggerReset,
+            msg: luwen_if::TypedArcMsg::TriggerReset.into(),
             wait_for_done: false,
             ..Default::default()
         })

@@ -52,7 +52,7 @@ fn main() -> Result<(), LuwenError> {
 
             let result = wh
                 .arc_msg(ArcMsgOptions {
-                    msg: luwen_if::ArcMsg::GetHarvesting,
+                    msg: luwen_if::ArcMsg::Typed(luwen_if::TypedArcMsg::GetHarvesting),
                     ..Default::default()
                 })
                 .unwrap();
@@ -121,7 +121,7 @@ fn main() -> Result<(), LuwenError> {
         } else if let Some(gs) = chip.as_gs() {
             let result = gs
                 .arc_msg(ArcMsgOptions {
-                    msg: luwen_if::ArcMsg::GetHarvesting,
+                    msg: luwen_if::ArcMsg::Typed(luwen_if::TypedArcMsg::GetHarvesting),
                     ..Default::default()
                 })
                 .unwrap();

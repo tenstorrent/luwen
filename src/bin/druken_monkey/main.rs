@@ -25,9 +25,9 @@ fn hang_arc(method: ArcHangMethod, chip: Chip) -> Result<(), Box<dyn std::error:
         }
         ArcHangMethod::A5 => {
             chip.arc_msg(luwen_if::chip::ArcMsgOptions {
-                msg: luwen_if::ArcMsg::SetArcState {
+                msg: luwen_if::TypedArcMsg::SetArcState {
                     state: ArcState::A5,
-                },
+                }.into(),
                 ..Default::default()
             })?;
         }
@@ -35,9 +35,9 @@ fn hang_arc(method: ArcHangMethod, chip: Chip) -> Result<(), Box<dyn std::error:
             // Need to go into arc a3 before haulting the core, otherwise we can interrupt
             // communication with the voltage regulator.
             chip.arc_msg(luwen_if::chip::ArcMsgOptions {
-                msg: luwen_if::ArcMsg::SetArcState {
+                msg: luwen_if::TypedArcMsg::SetArcState {
                     state: ArcState::A3,
-                },
+                }.into(),
                 ..Default::default()
             })?;
 
