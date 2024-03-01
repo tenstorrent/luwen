@@ -159,12 +159,19 @@ impl ExtendedPciDevice {
 impl ExtendedPciDevice {
     pub fn open(pci_interface: usize) -> Result<ExtendedPciDeviceWrapper, kmdif::PciOpenError> {
         let device = PciDevice::open(pci_interface)?;
+
+        let (grid_size_x, grid_size_y) = match device.arch {
+            luwen_core::Arch::Grayskull => (13, 12),
+            luwen_core::Arch::Wormhole => (10, 12),
+            _ => unreachable!(),
+        };
+
         Ok(ExtendedPciDeviceWrapper {
             inner: Arc::new(RwLock::new(ExtendedPciDevice {
                 device,
                 harvested_rows: 0,
-                grid_size_x: 10,
-                grid_size_y: 12,
+                grid_size_x,
+                grid_size_y,
                 eth_x: 4,
                 eth_y: 6,
                 command_q_addr: 0,
@@ -384,12 +391,18 @@ pub fn comms_callback_inner(
                 let mut writer = ud.borrow_mut();
                 let writer: &mut ExtendedPciDevice = &mut writer;
 
+                let (x_start, y_start) = match writer.device.arch {
+                    luwen_core::Arch::Grayskull => (0, 0),
+                    luwen_core::Arch::Wormhole => (1, 0),
+                    luwen_core::Arch::Unknown(_) => todo!(),
+                };
+
                 writer.setup_tlb(
                     writer.default_tlb,
                     Tlb {
                         local_offset: addr,
-                        x_start: 0,
-                        y_start: 0,
+                        x_start,
+                        y_start,
                         x_end: writer.grid_size_x - 1,
                         y_end: writer.grid_size_y - 1,
                         noc_sel: noc_id,

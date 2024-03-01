@@ -7,6 +7,7 @@ license = "Apache-2.0"
 [dependencies]
 kmdif = { path = "../kmdif" }
 luwen-if = { path = "../luwen-if" }
+luwen-core = { path = "../luwen-core" }
 
 thiserror = "1.0.40"
 
