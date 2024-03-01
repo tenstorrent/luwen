@@ -24,9 +24,24 @@ pub struct Grayskull {
     pub arc_if: Arc<dyn ChipComms + Send + Sync>,
 
     pub arc_addrs: ArcMsgAddr,
+
+    telemetry_addr: Arc<once_cell::sync::OnceCell<u32>>,
 }
 
 impl Grayskull {
+    pub fn create(
+        chip_if: Arc<dyn ChipInterface + Send + Sync>,
+        arc_if: Arc<dyn ChipComms + Send + Sync>,
+        arc_addrs: ArcMsgAddr,
+    ) -> Self {
+        Grayskull {
+            chip_if,
+            arc_if,
+            arc_addrs,
+            telemetry_addr: Arc::new(once_cell::sync::OnceCell::new()),
+        }
+    }
+
     pub fn get_if<T: ChipInterface>(&self) -> Option<&T> {
         self.chip_if.as_any().downcast_ref::<T>()
     }
@@ -142,6 +157,42 @@ impl Grayskull {
         spi.read(self, addr, value)?;
 
         Ok(())
+    }
+
+    fn get_telemetry_offset(&self) -> Result<u32, PlatformError> {
+        let result = self.arc_msg(ArcMsgOptions {
+            msg: ArcMsg::Typed(TypedArcMsg::FwVersion(crate::arc_msg::FwType::ArcL2)),
+            ..Default::default()
+        })?;
+        let version = match result {
+            ArcMsgOk::Ok { arg, .. } => arg,
+            ArcMsgOk::OkNoWait => {
+                unreachable!("FwVersion should always be waited on for completion")
+            }
+        };
+
+        if version <= 0x01030000 {
+            return Err(crate::error::PlatformError::UnsupportedFwVersion {
+                version,
+                required: 0x01040000,
+            });
+        }
+
+        let result = self.arc_msg(ArcMsgOptions {
+            msg: ArcMsg::Typed(TypedArcMsg::GetSmbusTelemetryAddr),
+            ..Default::default()
+        })?;
+
+        let offset = match result {
+            ArcMsgOk::Ok { arg, .. } => arg,
+            ArcMsgOk::OkNoWait => {
+                return Err(
+                    "GetSmbusTelemetryAddr should always be waited on for completion".to_string(),
+                )?;
+            }
+        };
+
+        Ok(offset)
     }
 }
 
@@ -474,37 +525,9 @@ impl ChipImpl for Grayskull {
     }
 
     fn get_telemetry(&self) -> Result<super::Telemetry, crate::error::PlatformError> {
-        let result = self.arc_msg(ArcMsgOptions {
-            msg: ArcMsg::Typed(TypedArcMsg::FwVersion(crate::arc_msg::FwType::ArcL2)),
-            ..Default::default()
-        })?;
-        let version = match result {
-            ArcMsgOk::Ok { arg, .. } => arg,
-            ArcMsgOk::OkNoWait => {
-                unreachable!("FwVersion should always be waited on for completion")
-            }
-        };
-
-        if version <= 0x01030000 {
-            return Err(crate::error::PlatformError::UnsupportedFwVersion {
-                version,
-                required: 0x01040000,
-            });
-        }
-
-        let result = self.arc_msg(ArcMsgOptions {
-            msg: ArcMsg::Typed(TypedArcMsg::GetSmbusTelemetryAddr),
-            ..Default::default()
-        })?;
-
-        let offset = match result {
-            ArcMsgOk::Ok { arg, .. } => arg,
-            ArcMsgOk::OkNoWait => {
-                return Err(
-                    "GetSmbusTelemetryAddr should always be waited on for completion".to_string(),
-                )?;
-            }
-        };
+        let offset = self
+            .telemetry_addr
+            .get_or_try_init(|| self.get_telemetry_offset())?;
 
         let csm_offset = self.arc_if.axi_translate("ARC_CSM.DATA[0]")?;
 
