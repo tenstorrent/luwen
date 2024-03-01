@@ -29,13 +29,11 @@ impl Chip {
                 axi_data: load_axi_table("grayskull-axi-pci.bin", version),
             });
 
-            Ok(Grayskull {
-                chip_if: Arc::new(backend),
-
-                arc_addrs: ArcMsgAddr::try_from(arc_if.as_ref() as &dyn ChipComms)?,
-
-                arc_if,
-            })
+            Ok(Grayskull::create(
+                Arc::new(backend),
+                arc_if.clone(),
+                ArcMsgAddr::try_from(arc_if.as_ref() as &dyn ChipComms)?,
+            ))
         } else {
             Err(PlatformError::WrongChipArch {
                 actual: arch,

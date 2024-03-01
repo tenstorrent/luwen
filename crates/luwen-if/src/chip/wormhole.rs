@@ -37,6 +37,7 @@ pub struct Wormhole {
     pub arc_addrs: ArcMsgAddr,
     pub eth_locations: [EthCore; 16],
     pub eth_addrs: EthAddresses,
+    telemetry_addr: Arc<once_cell::sync::OnceCell<u32>>,
 }
 
 impl HlComms for Wormhole {
@@ -93,6 +94,8 @@ impl Wormhole {
 
             arc_if: Arc::new(arc_if),
             eth_addrs: EthAddresses::default(),
+
+            telemetry_addr: Arc::new(once_cell::sync::OnceCell::new()),
 
             eth_locations: [
                 EthCore {
@@ -783,15 +786,21 @@ impl ChipImpl for Wormhole {
     }
 
     fn get_telemetry(&self) -> Result<super::Telemetry, PlatformError> {
-        let result = self.arc_msg(ArcMsgOptions {
-            msg: ArcMsg::Typed(TypedArcMsg::GetSmbusTelemetryAddr),
-            ..Default::default()
-        })?;
+        let offset: Result<u32, PlatformError> = self.telemetry_addr.get_or_try_init(|| {
+            let result = self.arc_msg(ArcMsgOptions {
+                msg: ArcMsg::Typed(TypedArcMsg::GetSmbusTelemetryAddr),
+                ..Default::default()
+            })?;
 
-        let offset = match result {
-            ArcMsgOk::Ok { arg, .. } => arg,
-            ArcMsgOk::OkNoWait => todo!(),
-        };
+            let offset = match result {
+                ArcMsgOk::Ok { arg, .. } => arg,
+                ArcMsgOk::OkNoWait => todo!(),
+            };
+
+            Ok(offset)
+        }).copied();
+
+        let offset = offset?;
 
         let csm_offset = self.arc_if.axi_translate("ARC_CSM.DATA[0]")?;
 
