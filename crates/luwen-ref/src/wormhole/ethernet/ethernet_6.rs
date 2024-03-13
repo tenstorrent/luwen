@@ -462,8 +462,8 @@ pub fn fixup_queues<D>(
     let rd_ptr = read32(user_data, rd_ptr_addr)?;
 
     if wr_ptr != rd_ptr {
-        dbg!("RESPONSE_Q out of sync - wr_ptr: {wr_ptr}, rd_ptr: {rd_ptr}");
-        dbg!("Setting rd_ptr = wr_ptr for the RESP CMD Q");
+        println!("RESPONSE_Q out of sync - wr_ptr: {wr_ptr}, rd_ptr: {rd_ptr}");
+        println!("Setting rd_ptr = wr_ptr for the RESP CMD Q");
         write32(user_data, rd_ptr_addr, wr_ptr)?;
     }
 
