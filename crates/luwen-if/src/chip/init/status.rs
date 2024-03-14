@@ -42,7 +42,7 @@ pub enum ArcInitError {
     FwCorrupted,
     NoAccess,
     WaitingForInit(ArcReadyError),
-    FwVersionTooOld { version: u32, required: u32 },
+    FwVersionTooOld { version: Option<u32>, required: u32 },
     Hung,
 }
 
@@ -55,7 +55,12 @@ impl fmt::Display for ArcInitError {
                 write!(f, "ARC is waiting for initialization; {err}")
             }
             ArcInitError::FwVersionTooOld { version, required } => {
-                write!(f, "ARC FW is older than the minimum supported version; {version:x} < {required:x}")
+                let version = if let Some(version) = version {
+                    format!("{version:x}")
+                } else {
+                    "<unknown version>".to_string()
+                };
+                write!(f, "ARC FW is older than the minimum supported version; {version} < {required:x}")
             }
             ArcInitError::Hung => f.write_str("ARC is hung"),
         }

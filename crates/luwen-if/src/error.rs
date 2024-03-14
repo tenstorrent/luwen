@@ -63,8 +63,8 @@ pub enum PlatformError {
         backtrace: BtWrapper,
     },
 
-    #[error("Unsupported fw version, got {version:x} but required {required:x}")]
-    UnsupportedFwVersion { version: u32, required: u32 },
+    #[error("Unsupported fw version, got {} but required {required:x}", version.map(|v| format!("{v:x}")).unwrap_or("<unknown version>".to_string()))]
+    UnsupportedFwVersion { version: Option<u32>, required: u32 },
 
     #[error("It is not currently safe to communicate with ARC because, {0}\n{1}")]
     ArcNotReady(ArcReadyError, BtWrapper),
