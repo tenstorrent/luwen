@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use nix::errno::Errno;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -45,6 +46,9 @@ pub enum PciError {
 
     #[error("DMA for device {id} is not configured")]
     DmaNotConfigured { id: usize },
+
+    #[error("DMA buffer allocation on device {id} failed ({size} bytes) with error {err}")]
+    DmaAllocationFailed { id: usize, size: u32, err: Errno },
 
     #[error("On device {id} tried to use 64-bit DMA, but ARC fw does not support it")]
     No64bitDma { id: usize },

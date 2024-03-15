@@ -103,8 +103,8 @@ pub struct PciDevice {
 
     #[allow(dead_code)]
     dma_buffer_mappings: Vec<Arc<DmaBuffer>>,
-    completion_flag_buffer: DmaBuffer,
-    transfer_buffer: DmaBuffer,
+    completion_flag_buffer: Option<DmaBuffer>,
+    transfer_buffer: Option<DmaBuffer>,
 
     pub dma_config: Option<DmaConfig>,
 }
@@ -122,10 +122,11 @@ fn allocate_dma_buffer(
     allocate_dma_buf.input.buf_index = buffer_index as u8;
 
     if let Err(err) = unsafe { ioctl::allocate_dma_buffer(device_fd, &mut allocate_dma_buf) } {
-        panic!(
-            "DMA buffer allocation on device {} failed ({} bytes) with error {err}",
-            device_id, allocate_dma_buf.input.requested_size
-        );
+        return Err(PciError::DmaAllocationFailed {
+            id: device_id,
+            size: allocate_dma_buf.input.requested_size,
+            err,
+        });
     }
 
     let map = unsafe {
@@ -375,42 +376,39 @@ impl PciDevice {
             system_reg_offset_adjust,
 
             dma_buffer_mappings: vec![],
-            // Note(drosen): These are being allocated immidatly after this struct, they are created using unrelated apis.
-            //               But to avoid issues fi the actual allocations run into errors we are allocating anon buffers here.
-            completion_flag_buffer: DmaBuffer {
-                buffer: memmap2::MmapMut::map_anon(0).map_err(|err| {
-                    PciOpenError::FakeMmapFailed {
-                        buffer: "completion_flag".to_string(),
-                        device_id,
-                        source: err,
-                    }
-                })?,
-                physical_address: 0,
-                size: 0,
-            },
-            transfer_buffer: DmaBuffer {
-                buffer: memmap2::MmapMut::map_anon(0).map_err(|err| {
-                    PciOpenError::FakeMmapFailed {
-                        buffer: "transfer".to_string(),
-                        device_id,
-                        source: err,
-                    }
-                })?,
-                physical_address: 0,
-                size: 0,
-            },
-
             dma_config: None,
+            completion_flag_buffer: None,
+            transfer_buffer: None,
         };
 
-        device.completion_flag_buffer =
-            device.allocate_dma_buffer(std::mem::size_of::<u64>() as u32)?;
-        device.transfer_buffer = device.allocate_dma_buffer_range(
-            kmdif::getpagesize().unwrap() as u32,
-            kmdif::MAX_DMA_BYTES,
-        )?;
+        // To avoid needing a warmup when performing the first dma access, try to allocate the
+        // buffers now.
+        device.allocate_transfer_buffers();
 
         Ok(device)
+    }
+
+    pub fn allocate_transfer_buffers(&mut self) -> bool {
+        // Try to allocate the transfer buffer first, if this fails then there is no point in
+        // allocating the completion flag.
+        if self.transfer_buffer.is_none() {
+            self.transfer_buffer = self
+                .allocate_dma_buffer_range(
+                    kmdif::getpagesize().unwrap() as u32,
+                    kmdif::MAX_DMA_BYTES,
+                )
+                .ok();
+        }
+
+        // If we didn't get the transfer buffer then there is no point in allocating the completion
+        // flag
+        if self.transfer_buffer.is_some() && self.completion_flag_buffer.is_none() {
+            self.completion_flag_buffer = self
+                .allocate_dma_buffer(std::mem::size_of::<u64>() as u32)
+                .ok();
+        }
+
+        self.transfer_buffer.is_some() && self.completion_flag_buffer.is_some()
     }
 
     pub fn allocate_dma_buffer_range(
