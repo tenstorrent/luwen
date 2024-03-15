@@ -122,10 +122,11 @@ fn allocate_dma_buffer(
     allocate_dma_buf.input.buf_index = buffer_index as u8;
 
     if let Err(err) = unsafe { ioctl::allocate_dma_buffer(device_fd, &mut allocate_dma_buf) } {
-        panic!(
-            "DMA buffer allocation on device {} failed ({} bytes) with error {err}",
-            device_id, allocate_dma_buf.input.requested_size
-        );
+        return Err(PciError::DmaAllocationFailed {
+            id: device_id,
+            size: allocate_dma_buf.input.requested_size,
+            err,
+        });
     }
 
     let map = unsafe {
