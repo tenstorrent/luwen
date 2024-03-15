@@ -13,7 +13,7 @@ use crate::{
 };
 
 use super::{
-    init::status::{ArcInitError, ComponentStatusInfo, InitOptions, WaitStatus},
+    init::status::{ArcInitError, ComponentStatusInfo, DramInitError, InitOptions, WaitStatus},
     ArcMsgOptions, ChipComms, ChipInitResult, ChipInterface, CommsStatus, HlComms, InitStatus,
     NeighbouringChip,
 };
@@ -173,7 +173,7 @@ impl Grayskull {
 
         if version <= 0x01030000 {
             return Err(crate::error::PlatformError::UnsupportedFwVersion {
-                version,
+                version: Some(version),
                 required: 0x01040000,
             });
         }
@@ -384,11 +384,33 @@ impl ChipImpl for Grayskull {
                                 None
                             }
 
-                            // Arc should be ready here...
-                            // This means that ARC hung, we should stop initializing this chip in case
-                            // we hit something like a noc hang.
-                            PlatformError::ArcMsgError(_err) => {
-                                return Ok(ChipInitResult::ErrorContinue);
+                            PlatformError::ArcMsgError(err) => match err {
+                                crate::ArcMsgError::ProtocolError { source, backtrace } => match source {
+                                    // We already know that ARC is "ready" to getting a msg not
+                                    // recognized error probably indicates that we are running
+                                    // really, really old fw
+                                    ArcMsgProtocolError::MsgNotRecognized(_) => {
+                                        if let Some(status) = arc_status.wait_status.get_mut(0) {
+                                            *status = WaitStatus::Error(ArcInitError::FwVersionTooOld {
+                                                version: None,
+                                                required: 0x0140000,
+                                            });
+                                        }
+                                        None
+                                    },
+                                    // All other errors indicate that despite passing the arc
+                                    // "ready" check we still have an incomplete init
+                                    source => {
+                                        if let Some(status) = arc_status.wait_status.get_mut(0) {
+                                            *status = WaitStatus::Error(ArcInitError::NoAccess);
+                                        }
+                                        None
+                                    }
+                                }
+                                // This is an "expected error" but we probably can't recover from it, so we should abort the init.
+                                crate::ArcMsgError::AxiError(_) => {
+                                    return Ok(ChipInitResult::ErrorAbort);
+                                }
                             }
 
                             // This is an "expected error" but we probably can't recover from it, so we should abort the init.
