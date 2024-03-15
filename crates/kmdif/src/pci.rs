@@ -174,7 +174,7 @@ impl PciDevice {
         size: u32,
         write: bool,
     ) -> Result<(), PciError> {
-        if self.dma_config.is_none() {
+        if self.dma_config.is_none() || !self.allocate_transfer_buffers() {
             return Err(PciError::DmaNotConfigured { id: self.id });
         }
 
@@ -193,10 +193,14 @@ impl PciDevice {
             });
         }
 
+        // SAFETY: Already checked that the completion_flag_buffer is Some in
+        // self.allocate_transfer_buffers
+        let completion_flag_buffer =
+            unsafe { self.completion_flag_buffer.as_mut().unwrap_unchecked() };
         let req = kmdif::ArcPcieCtrlDmaRequest {
             chip_addr,
             host_phys_addr_lo: (host_buffer_addr & 0xffffffff) as u32,
-            completion_flag_phys_addr: self.completion_flag_buffer.physical_address as u32,
+            completion_flag_phys_addr: completion_flag_buffer.physical_address as u32,
             dma_pack: kmdif::DmaPack::new()
                 .with_size_bytes(size)
                 .with_write(write)
@@ -206,7 +210,7 @@ impl PciDevice {
             repeat: 1 | (((host_phys_addr_hi != 0) as u32) << 31), // 64-bit PCIe DMA transfer request
         };
 
-        let complete_flag = self.completion_flag_buffer.buffer.as_ptr() as *mut u32;
+        let complete_flag = completion_flag_buffer.buffer.as_ptr() as *mut u32;
         unsafe { complete_flag.write_volatile(0) };
 
         // Configure the DMA engine
@@ -252,26 +256,35 @@ impl PciDevice {
     pub fn write_block(&mut self, addr: u32, data: &[u8]) -> Result<(), PciError> {
         if let Some(dma_config) = self.dma_config.clone() {
             if data.len() > dma_config.write_threshold as usize && dma_config.write_threshold > 0 {
-                let mut num_bytes = data.len();
-                let mut offset = 0;
-                while num_bytes > 0 {
-                    let buffer = &mut self.transfer_buffer;
-                    let chunk_size = num_bytes.min(buffer.size as usize);
-                    buffer.buffer[..chunk_size]
-                        .copy_from_slice(&data[offset..(offset + chunk_size)]);
+                if self.allocate_transfer_buffers() {
+                    let mut num_bytes = data.len();
+                    let mut offset = 0;
+                    while num_bytes > 0 {
+                        // SAFETY: Already checked that the transfer_buffer is Some in
+                        // self.allocate_transfer_buffers
+                        let buffer = unsafe { self.transfer_buffer.as_mut().unwrap_unchecked() };
 
-                    let buffer = &self.transfer_buffer;
-                    self.pcie_dma_transfer_turbo(
-                        addr + offset as u32,
-                        buffer.physical_address,
-                        chunk_size as u32,
-                        true,
-                    )?;
-                    num_bytes = num_bytes.saturating_sub(chunk_size);
-                    offset += chunk_size;
+                        let chunk_size = num_bytes.min(buffer.size as usize);
+                        buffer.buffer[..chunk_size]
+                            .copy_from_slice(&data[offset..(offset + chunk_size)]);
+
+                        // SAFETY: Already checked that the transfer_buffer is Some in
+                        // self.allocate_transfer_buffers
+                        let buffer_addr =
+                            unsafe { self.transfer_buffer.as_mut().unwrap_unchecked() }
+                                .physical_address;
+                        self.pcie_dma_transfer_turbo(
+                            addr + offset as u32,
+                            buffer_addr,
+                            chunk_size as u32,
+                            true,
+                        )?;
+                        num_bytes = num_bytes.saturating_sub(chunk_size);
+                        offset += chunk_size;
+                    }
+
+                    return Ok(());
                 }
-
-                return Ok(());
             }
         }
 
@@ -283,28 +296,34 @@ impl PciDevice {
     pub fn read_block(&mut self, addr: u32, data: &mut [u8]) -> Result<(), PciError> {
         if let Some(dma_config) = self.dma_config.clone() {
             if data.len() > dma_config.read_threshold as usize && dma_config.read_threshold > 0 {
-                let mut num_bytes = data.len();
-                let mut offset = 0;
-                while num_bytes > 0 {
-                    let buffer = &self.transfer_buffer;
+                if self.allocate_transfer_buffers() {
+                    let mut num_bytes = data.len();
+                    let mut offset = 0;
+                    while num_bytes > 0 {
+                        // SAFETY: Already checked that the transfer_buffer is Some in
+                        // self.allocate_transfer_buffers
+                        let buffer = unsafe { self.transfer_buffer.as_ref().unwrap_unchecked() };
 
-                    let chunk_size = num_bytes.min(buffer.size as usize);
+                        let chunk_size = num_bytes.min(buffer.size as usize);
 
-                    self.pcie_dma_transfer_turbo(
-                        addr + offset as u32,
-                        buffer.physical_address,
-                        chunk_size as u32,
-                        false,
-                    )?;
+                        self.pcie_dma_transfer_turbo(
+                            addr + offset as u32,
+                            buffer.physical_address,
+                            chunk_size as u32,
+                            false,
+                        )?;
 
-                    let buffer = &self.transfer_buffer;
-                    (&mut data[offset..(offset + chunk_size)])
-                        .copy_from_slice(&buffer.buffer[..chunk_size]);
-                    num_bytes = num_bytes.saturating_sub(chunk_size);
-                    offset += chunk_size;
+                        // SAFETY: Already checked that the transfer_buffer is Some in
+                        // self.allocate_transfer_buffers
+                        let buffer = self.transfer_buffer.as_ref().unwrap();
+                        (&mut data[offset..(offset + chunk_size)])
+                            .copy_from_slice(&buffer.buffer[..chunk_size]);
+                        num_bytes = num_bytes.saturating_sub(chunk_size);
+                        offset += chunk_size;
+                    }
+
+                    return Ok(());
                 }
-
-                return Ok(());
             }
         }
 

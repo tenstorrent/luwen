@@ -87,9 +87,9 @@ pub fn main() -> Result<(), LuwenError> {
         let size = 1 << 19;
         // let size = 1000;
         let (write_time, read_time) = if let Some(wh) = chip.as_wh() {
-            read_write_test(wh, 0, 0, size, false).unwrap()
+            read_write_test(wh, 0, 0, size, true).unwrap()
         } else if let Some(gs) = chip.as_gs() {
-            read_write_test(gs, 1, 0, size, false).unwrap()
+            read_write_test(gs, 1, 0, size, true).unwrap()
         } else {
             unimplemented!("Chip of arch {:?} not supported", chip.get_arch());
         };
