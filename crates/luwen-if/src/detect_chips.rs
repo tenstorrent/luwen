@@ -364,40 +364,6 @@ pub fn detect_chips<E>(
                     }
 
                     for nchip in wh.get_neighbouring_chips()? {
-                        // HACK(drosen): It's not currently possible to route galaxy->nb... this
-                        // should be fixed
-                        let local_id = wh
-                            .eth_locations
-                            .iter()
-                            .position(|v| (v.x, v.y) == nchip.local_noc_addr)
-                            .unwrap();
-
-                        // Get the neighbour's board type
-                        let next_board_type = crate::chip::HlComms::noc_read32(
-                            &wh,
-                            0,
-                            wh.eth_locations[local_id].x,
-                            wh.eth_locations[local_id].y,
-                            0x1ec0 + (72 * 4),
-                        )
-                        .map_err(|v| InitError::PlatformError(v.into()))?;
-
-                        // Get the our board type
-                        let our_board_type = crate::chip::HlComms::noc_read32(
-                            &wh,
-                            0,
-                            wh.eth_locations[local_id].x,
-                            wh.eth_locations[local_id].y,
-                            0x1ec0 + (64 * 4),
-                        )
-                        .map_err(|v| InitError::PlatformError(v.into()))?;
-
-                        // The board type value will be 0 if galaxy and non-zero if nb
-                        // It's currently not possible to go from GALAXY->NB
-                        if our_board_type == 0 && next_board_type != 0 {
-                            continue;
-                        }
-
                         to_check.push(nchip);
                     }
                 }

@@ -743,6 +743,23 @@ impl ChipImpl for Wormhole {
                 continue;
             }
 
+            // HACK(drosen): It's not currently possible to route galaxy->nb...
+            // This is a limitation of the current ethernet firmware routing scheme,
+            // but fixing it would require a large-ish firmware update and lots of testing so
+            // for now we are just ignoreing those routes.
+
+            // Get the neighbour's board type
+            let next_board_type = self.noc_read32(0, eth_x, eth_y, 0x1ec0 + (72 * 4))?;
+
+            // Get the our board type
+            let our_board_type = self.noc_read32(0, eth_x, eth_y, 0x1ec0 + (64 * 4))?;
+
+            // The board type value will be 0 if galaxy and non-zero if nb
+            // It's currently not possible to go from GALAXY->NB
+            if our_board_type == 0 && next_board_type != 0 {
+                continue;
+            }
+
             // Decode the remote eth_addr for our erisc core
             // This can be used to build a map of the full mesh
             let remote_id = self.noc_read32(
@@ -786,19 +803,22 @@ impl ChipImpl for Wormhole {
     }
 
     fn get_telemetry(&self) -> Result<super::Telemetry, PlatformError> {
-        let offset: Result<u32, PlatformError> = self.telemetry_addr.get_or_try_init(|| {
-            let result = self.arc_msg(ArcMsgOptions {
-                msg: ArcMsg::Typed(TypedArcMsg::GetSmbusTelemetryAddr),
-                ..Default::default()
-            })?;
+        let offset: Result<u32, PlatformError> = self
+            .telemetry_addr
+            .get_or_try_init(|| {
+                let result = self.arc_msg(ArcMsgOptions {
+                    msg: ArcMsg::Typed(TypedArcMsg::GetSmbusTelemetryAddr),
+                    ..Default::default()
+                })?;
 
-            let offset = match result {
-                ArcMsgOk::Ok { arg, .. } => arg,
-                ArcMsgOk::OkNoWait => todo!(),
-            };
+                let offset = match result {
+                    ArcMsgOk::Ok { arg, .. } => arg,
+                    ArcMsgOk::OkNoWait => todo!(),
+                };
 
-            Ok(offset)
-        }).copied();
+                Ok(offset)
+            })
+            .copied();
 
         let offset = offset?;
 
