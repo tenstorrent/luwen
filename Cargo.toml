@@ -7,10 +7,10 @@ license = "Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-luwen-core = {path = "crates/luwen-core"}
-luwen-if = {path = "crates/luwen-if"}
-luwen-ref = {path = "crates/luwen-ref"}
-kmdif = {path = "crates/kmdif"}
+luwen-core = {path = "crates/luwen-core", version="0.1.0"}
+luwen-if = {path = "crates/luwen-if", version="0.4.4"}
+luwen-ref = {path = "crates/luwen-ref", version="0.3.1"}
+kmdif = {path = "crates/kmdif", version="0.1.0"}
 
 serde = {"version" = "1.0.164", features = ["derive"]}
 serde_yaml = "0.9.22"
