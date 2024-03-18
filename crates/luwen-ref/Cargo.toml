@@ -6,7 +6,7 @@ edition = "2021"
 license = "Apache-2.0"
 
 [dependencies]
-kmdif = {path = "../kmdif", version = "0.1.0"}
+ttkmd-if = {path = "../ttkmd-if", version = "0.1.0"}
 luwen-if = {path = "../luwen-if", version = "0.4.0"}
 luwen-core = {path = "../luwen-core", version = "0.1.0"}
 

@@ -9,7 +9,7 @@ license = "Apache-2.0"
 crate-type = ["cdylib"]
 
 [dependencies]
-kmdif = {path = "../kmdif", version = "0.1.0"}
+ttkmd-if = {path = "../ttkmd-if", version = "0.1.0"}
 luwen-core = {path = "../luwen-core", version = "0.1.0"}
 luwen-if = {path = "../luwen-if", version = "0.4.4"}
 luwen-ref = {path = "../luwen-ref", version = "0.3.1"}

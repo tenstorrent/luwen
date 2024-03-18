@@ -431,14 +431,14 @@ macro_rules! common_chip_comms_impls {
             pub fn get_telemetry(&self) -> PyResult<Telemetry> {
                 self.0.get_telemetry().map(|v| v.into()).map_err(|v| PyException::new_err(v.to_string()))
             }
-                
+
             pub fn get_neighbouring_chips(&self) -> PyResult<Vec<NeighbouringChip>> {
                 self.0
                     .get_neighbouring_chips()
                     .map(|v| v.into_iter().map(|v| v.into()).collect())
                     .map_err(|v| PyException::new_err(v.to_string()))
             }
-        
+
     }
 }
 }
@@ -616,8 +616,8 @@ impl PciGrayskull {
         let value = PciInterface::from_gs(self);
 
         if let Some(value) = value {
-            match kmdif::tlb::Ordering::from(ordering) {
-                kmdif::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
+            match ttkmd_if::tlb::Ordering::from(ordering) {
+                ttkmd_if::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
                     "Invalid ordering {ordering}."
                 ))),
                 ordering => Ok(value.setup_tlb(
@@ -748,14 +748,14 @@ impl PciInterface<'_> {
         y_end: u8,
         noc_sel: u8,
         mcast: bool,
-        ordering: kmdif::tlb::Ordering,
+        ordering: ttkmd_if::tlb::Ordering,
         linked: bool,
     ) -> (u64, u64) {
         self.pci_interface
             .borrow_mut()
             .setup_tlb(
                 index,
-                kmdif::Tlb {
+                ttkmd_if::Tlb {
                     local_offset: addr,
                     x_end,
                     y_end,
@@ -901,8 +901,8 @@ impl PciWormhole {
         let value = PciInterface::from_wh(self);
 
         if let Some(value) = value {
-            match kmdif::tlb::Ordering::from(ordering) {
-                kmdif::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
+            match ttkmd_if::tlb::Ordering::from(ordering) {
+                ttkmd_if::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
                     "Invalid ordering {ordering}."
                 ))),
                 ordering => Ok(value.setup_tlb(

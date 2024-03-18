@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use kmdif::PciError;
+use ttkmd_if::PciError;
 use luwen_if::EthAddr;
 
 use crate::error::LuwenError;
@@ -198,7 +198,7 @@ pub fn block_read<D>(
     user_data: &mut D,
     mut read32: impl FnMut(&mut D, u32) -> Result<u32, PciError>,
     mut write32: impl FnMut(&mut D, u32, u32) -> Result<(), PciError>,
-    dma_buffer: &mut kmdif::DmaBuffer,
+    dma_buffer: &mut ttkmd_if::DmaBuffer,
     command_q_addr: u32,
     timeout: std::time::Duration,
     fake_it: bool,
@@ -373,7 +373,7 @@ pub fn block_write<D>(
     user_data: &mut D,
     mut read32: impl FnMut(&mut D, u32) -> Result<u32, PciError>,
     mut write32: impl FnMut(&mut D, u32, u32) -> Result<(), PciError>,
-    dma_buffer: &mut kmdif::DmaBuffer,
+    dma_buffer: &mut ttkmd_if::DmaBuffer,
     command_q_addr: u32,
     timeout: std::time::Duration,
     fake_it: bool,

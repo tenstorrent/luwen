@@ -4,7 +4,7 @@
 use std::convert::Infallible;
 
 use indicatif::ProgressBar;
-use kmdif::PciDevice;
+use ttkmd_if::PciDevice;
 use luwen_if::{
     chip::{
         Chip, ChipDetectState, CommsStatus, ComponentStatusInfo, HlCommsInterface, InitError,

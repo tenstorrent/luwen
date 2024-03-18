@@ -1,5 +1,5 @@
 [package]
-name = "kmdif"
+name = "ttkmd-if"
 version = "0.1.0"
 description = "Lowest level pci interface to the tenstorrent driver (ttkmd)"
 edition = "2021"

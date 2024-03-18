@@ -11,15 +11,15 @@ fn lds_reset(interfaces: &[usize]) -> Vec<Chip> {
             .write(true)
             .open(format!("/dev/tenstorrent/{interface}"))
             .unwrap();
-        let mut reset_device = kmdif::ioctl::ResetDevice {
-            input: kmdif::ioctl::ResetDeviceIn {
-                flags: kmdif::ioctl::RESET_DEVICE_RESET_PCIE_LINK,
+        let mut reset_device = ttkmd_if::ioctl::ResetDevice {
+            input: ttkmd_if::ioctl::ResetDeviceIn {
+                flags: ttkmd_if::ioctl::RESET_DEVICE_RESET_PCIE_LINK,
                 ..Default::default()
             },
             ..Default::default()
         };
         unsafe {
-            kmdif::ioctl::reset_device(std::os::fd::AsRawFd::as_raw_fd(&fd), &mut reset_device)
+            ttkmd_if::ioctl::reset_device(std::os::fd::AsRawFd::as_raw_fd(&fd), &mut reset_device)
         }
         .unwrap();
 
@@ -60,15 +60,15 @@ fn lds_reset(interfaces: &[usize]) -> Vec<Chip> {
             .write(true)
             .open(format!("/dev/tenstorrent/{interface}"))
             .unwrap();
-        let mut reset_device = kmdif::ioctl::ResetDevice {
-            input: kmdif::ioctl::ResetDeviceIn {
-                flags: kmdif::ioctl::RESET_DEVICE_RESTORE_STATE,
+        let mut reset_device = ttkmd_if::ioctl::ResetDevice {
+            input: ttkmd_if::ioctl::ResetDeviceIn {
+                flags: ttkmd_if::ioctl::RESET_DEVICE_RESTORE_STATE,
                 ..Default::default()
             },
             ..Default::default()
         };
         unsafe {
-            kmdif::ioctl::reset_device(std::os::fd::AsRawFd::as_raw_fd(&fd), &mut reset_device)
+            ttkmd_if::ioctl::reset_device(std::os::fd::AsRawFd::as_raw_fd(&fd), &mut reset_device)
         }
         .unwrap();
 

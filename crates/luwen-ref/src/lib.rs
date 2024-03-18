@@ -7,7 +7,7 @@ use std::{
 };
 
 use error::LuwenError;
-use kmdif::PciError;
+use ttkmd_if::PciError;
 use luwen_if::{FnDriver, FnOptions};
 
 mod detect;
@@ -17,7 +17,7 @@ mod wormhole;
 use wormhole::ethernet::{self, EthCommCoord};
 
 pub use detect::{detect_chips, detect_chips_fallible};
-pub use kmdif::{DmaBuffer, DmaConfig, PciDevice, Tlb};
+pub use ttkmd_if::{DmaBuffer, DmaConfig, PciDevice, Tlb};
 
 #[derive(Clone)]
 pub struct ExtendedPciDeviceWrapper {
@@ -53,11 +53,11 @@ pub struct ExtendedPciDevice {
 
 impl ExtendedPciDevice {
     pub fn setup_tlb(&mut self, index: u32, tlb: Tlb) -> Result<(u64, u64), PciError> {
-        kmdif::tlb::setup_tlb(&mut self.device, index, tlb)
+        ttkmd_if::tlb::setup_tlb(&mut self.device, index, tlb)
     }
 
     pub fn get_tlb(&self, index: u32) -> Result<Tlb, PciError> {
-        kmdif::tlb::get_tlb(&self.device, index)
+        ttkmd_if::tlb::get_tlb(&self.device, index)
     }
 
     pub fn noc_write(&mut self, tlb_index: u32, addr: u64, data: &[u8]) -> Result<(), PciError> {
@@ -157,7 +157,7 @@ impl ExtendedPciDevice {
 }
 
 impl ExtendedPciDevice {
-    pub fn open(pci_interface: usize) -> Result<ExtendedPciDeviceWrapper, kmdif::PciOpenError> {
+    pub fn open(pci_interface: usize) -> Result<ExtendedPciDeviceWrapper, ttkmd_if::PciOpenError> {
         let device = PciDevice::open(pci_interface)?;
 
         let (grid_size_x, grid_size_y) = match device.arch {
@@ -202,7 +202,7 @@ fn noc_write32(
     addr: u32,
     data: u32,
 ) -> Result<(), PciError> {
-    let (bar_addr, _slice_len) = kmdif::tlb::setup_tlb(
+    let (bar_addr, _slice_len) = ttkmd_if::tlb::setup_tlb(
         device,
         tlb_index,
         Tlb {
@@ -226,7 +226,7 @@ fn noc_read32(
     y: u8,
     addr: u32,
 ) -> Result<u32, PciError> {
-    let (bar_addr, _slice_len) = kmdif::tlb::setup_tlb(
+    let (bar_addr, _slice_len) = ttkmd_if::tlb::setup_tlb(
         device,
         tlb_index,
         Tlb {

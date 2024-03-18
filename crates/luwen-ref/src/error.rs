@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use kmdif::{PciError, PciOpenError};
+use ttkmd_if::{PciError, PciOpenError};
 use luwen_if::{chip::AxiError, error::PlatformError, ArcMsgError};
 use thiserror::Error;
 
