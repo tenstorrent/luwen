@@ -21,4 +21,4 @@ luwen-core = {path = "../luwen-core", version = "0.1.0"}
 luwen-if = {path = "../luwen-if", version = "0.4.4"}
 
 [build-dependencies]
-cbindgen = "0.25.0"
+cbindgen = ">= 0.25.0"
