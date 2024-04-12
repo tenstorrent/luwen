@@ -4,6 +4,7 @@ version = "0.3.7"
 description = "A high-level interface for safe and efficient access Tenstorrent AI accelerators"
 edition = "2021"
 license = "Apache-2.0"
+authors = [ "Daniel Rosen <drosen@tenstorrent.com>", ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
