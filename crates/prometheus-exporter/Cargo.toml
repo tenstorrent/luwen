@@ -12,4 +12,3 @@ luwen-ref = {path = "../luwen-ref", version = "0.3.1"}
 clap = { version = "4.4.6", features = ["derive"] }
 prometheus_exporter = "0.8.5"
 prometheus = { version = "0.13.3", features = ["process"] }
-
