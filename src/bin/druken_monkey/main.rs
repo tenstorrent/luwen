@@ -27,7 +27,8 @@ fn hang_arc(method: ArcHangMethod, chip: Chip) -> Result<(), Box<dyn std::error:
             chip.arc_msg(luwen_if::chip::ArcMsgOptions {
                 msg: luwen_if::TypedArcMsg::SetArcState {
                     state: ArcState::A5,
-                }.into(),
+                }
+                .into(),
                 ..Default::default()
             })?;
         }
@@ -37,7 +38,8 @@ fn hang_arc(method: ArcHangMethod, chip: Chip) -> Result<(), Box<dyn std::error:
             chip.arc_msg(luwen_if::chip::ArcMsgOptions {
                 msg: luwen_if::TypedArcMsg::SetArcState {
                     state: ArcState::A3,
-                }.into(),
+                }
+                .into(),
                 ..Default::default()
             })?;
 
@@ -128,6 +130,7 @@ fn hang_eth(
     Ok(())
 }
 
+#[allow(clippy::type_complexity)]
 fn run_detect_test() -> Result<Option<Vec<(bool, Option<InitStatus>)>>, LuwenError> {
     let mut chip_details = Vec::new();
     let partial_chips = match luwen_ref::detect_chips_fallible() {
@@ -140,7 +143,7 @@ fn run_detect_test() -> Result<Option<Vec<(bool, Option<InitStatus>)>>, LuwenErr
 
     for chip in partial_chips {
         let status = chip.status().cloned();
-        chip.try_upgrade().map(|v| {
+        if let Some(v) = chip.try_upgrade() {
             // let eth_status = chip.eth_safe();
             let remote = if let Some(wh) = v.as_wh() {
                 wh.is_remote
@@ -148,7 +151,7 @@ fn run_detect_test() -> Result<Option<Vec<(bool, Option<InitStatus>)>>, LuwenErr
                 false
             };
             chip_details.push((remote, status));
-        });
+        }
     }
 
     if !chip_details.is_empty() {
@@ -241,7 +244,7 @@ fn main() {
     ];
     // let commands = vec!["noc cg", "noc oob", "eth ver 1", "eth fw 1"];
     for cmd in commands {
-        let args = cmd.split(" ").collect::<Vec<_>>();
+        let args = cmd.split(' ').collect::<Vec<_>>();
         let command = args[0];
         let option = args.get(1);
         println!("Command: {} Option: {}", command, option.unwrap_or(&"None"));
@@ -279,7 +282,7 @@ fn main() {
                 let chips_clone = Arc::clone(&chips_arc);
                 let handle = thread::spawn(move || {
                     let mut chips = chips_clone.lock().unwrap();
-                    let _ = hang_noc(method, chips.pop().unwrap()).unwrap();
+                    hang_noc(method, chips.pop().unwrap()).unwrap();
                 });
 
                 // Wait for the thread to finish and handle any panics
@@ -314,7 +317,7 @@ fn main() {
                 };
 
                 let core = args.get(2).map(|v| v.parse()).unwrap_or(Ok(0)).unwrap();
-                let _ = hang_eth(method, core, chips.pop().unwrap()).unwrap();
+                hang_eth(method, core, chips.pop().unwrap()).unwrap();
                 compare_and_reset(&Some(chips.pop()));
             }
             _ => unimplemented!("Have not yet implemented support for this command"),

@@ -82,14 +82,14 @@ pub fn main() -> Result<(), LuwenError> {
             let mut data = [0; 0x1000];
             wh.noc_read(0, 1, 1, 0x0, &mut data).unwrap();
 
-            for i in 0..0x1000 {
-                if data[i] != (i + 1) as u8 {
+            for (i, d) in data.iter().enumerate() {
+                if *d != (i + 1) as u8 {
                     panic!("Mismatch at index {}", i);
                 }
             }
 
-            for i in 0..0x1000 {
-                if turbo_data[i] != (i + 1) as u8 {
+            for (i, d) in turbo_data.iter().enumerate() {
+                if *d != (i + 1) as u8 {
                     panic!("Mismatch at index {}", i);
                 }
             }

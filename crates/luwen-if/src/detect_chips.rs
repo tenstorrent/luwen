@@ -22,7 +22,7 @@ pub enum UninitChip {
     /// A partially initialized chip, it may be unsafe (0xffffffff errors) to interact with this chip.
     Partially {
         /// Contains the init status
-        status: InitStatus,
+        status: Box<InitStatus>,
         /// Returned when the chip is explicitly upgraded.
         /// Or init is rerun.
         underlying: Chip,
@@ -64,7 +64,7 @@ impl UninitChip {
             UninitChip::Initialized(chip)
         } else {
             UninitChip::Partially {
-                status,
+                status: Box::new(status),
                 underlying: chip,
             }
         }
@@ -264,7 +264,7 @@ pub fn detect_chips<E>(
     let mut output = Vec::new();
     for (root_index, root_chip) in root_chips.iter_mut().enumerate() {
         if !chip_filter.is_empty() && !chip_filter.contains(&root_chip.get_arch()) {
-            return Err(PlatformError::WrongChipArchs {
+            Err(PlatformError::WrongChipArchs {
                 actual: root_chip.get_arch(),
                 expected: chip_filter.clone(),
                 backtrace: BtWrapper::capture(),
@@ -338,7 +338,7 @@ pub fn detect_chips<E>(
                 let local_coord = wh.get_local_chip_coord()?;
 
                 if local_coord != nchip.eth_addr {
-                    return Err(PlatformError::Generic(
+                    Err(PlatformError::Generic(
                         format!("When detecting chips in mesh found a mismatch between the expected chip coordinate {} and the actual {}", nchip.eth_addr, local_coord),
                         crate::error::BtWrapper::capture(),
                     ))?;
