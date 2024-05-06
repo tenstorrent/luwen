@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use ttkmd_if::PciError;
 use luwen_if::EthAddr;
+use ttkmd_if::PciError;
 
 use crate::error::LuwenError;
 
@@ -24,12 +24,12 @@ pub fn get_sys_addr(coord: &EthCommCoord) -> u64 {
     addr = (addr << 6) | (coord.coord.shelf_x as u64);
     addr = (addr << 6) | (coord.noc_y as u64);
     addr = (addr << 6) | (coord.noc_x as u64);
-    addr = (addr << 36) | (coord.offset as u64);
+    addr = (addr << 36) | coord.offset;
 
     addr
 }
 
-const Q_NAME: [&'static str; 4] = [
+const Q_NAME: [&str; 4] = [
     "REQ CMD Q",
     "ETH IN REQ CMD Q",
     "RESP CMD Q",
@@ -58,7 +58,7 @@ const CMD_DEST_UNREACHABLE: u32 = 0x1 << 31;
 const REQ_Q_ADDR: u32 = 0x80;
 const RESP_Q_ADDR: u32 = REQ_Q_ADDR + 2 * Q_SIZE;
 
-const WR_PTR_OFFSET: u32 = 0 + 8;
+const WR_PTR_OFFSET: u32 = 8;
 const RD_PTR_OFFSET: u32 = 4 + 8;
 const CMD_OFFSET: u32 = 8 + 8;
 const ADDR_L_OFFSET: u32 = 0;
@@ -121,7 +121,7 @@ pub fn eth_read32<D>(
     write32(user_data, cmd_addr + 16, rack_addr as u32)?;
 
     let mut flags = CMD_RD_REQ;
-    flags |= (((coord.noc_id as u32) & NOC_ID_MASK) as u32) << NOC_ID_SHIFT;
+    flags |= ((coord.noc_id as u32) & NOC_ID_MASK) << NOC_ID_SHIFT;
     write32(user_data, cmd_addr + 12, flags)?;
 
     let next_wptr = (curr_wptr + 1) % (2 * CMD_BUF_SIZE);
@@ -170,10 +170,8 @@ pub fn eth_read32<D>(
     }
 
     let mut flag_block_read = false;
-    if is_block {
-        if flags & CMD_RD_DATA != 0 {
-            flag_block_read = true;
-        }
+    if is_block && flags & CMD_RD_DATA != 0 {
+        flag_block_read = true;
     }
 
     if flag_block_read {
@@ -194,6 +192,9 @@ pub fn eth_read32<D>(
     Ok(data)
 }
 
+// These functions are used in one place.
+// Should be fixed if more calls are added.
+#[allow(clippy::too_many_arguments)]
 pub fn block_read<D>(
     user_data: &mut D,
     mut read32: impl FnMut(&mut D, u32) -> Result<u32, PciError>,
@@ -304,10 +305,8 @@ pub fn block_read<D>(
         }
 
         let mut flag_block_read = false;
-        if is_block {
-            if flags & CMD_RD_DATA != 0 {
-                flag_block_read = true;
-            }
+        if is_block && flags & CMD_RD_DATA != 0 {
+            flag_block_read = true;
         }
 
         if !flag_block_read {
@@ -333,6 +332,9 @@ pub fn block_read<D>(
     Ok(())
 }
 
+// These functions are used in one place.
+// Should be fixed if more calls are added.
+#[allow(clippy::too_many_arguments)]
 pub fn eth_write32<D>(
     user_data: &mut D,
     mut read32: impl FnMut(&mut D, u32) -> Result<u32, PciError>,
@@ -369,6 +371,9 @@ pub fn eth_write32<D>(
     Ok(())
 }
 
+// These functions are used in one place.
+// Should be fixed if more calls are added.
+#[allow(clippy::too_many_arguments)]
 pub fn block_write<D>(
     user_data: &mut D,
     mut read32: impl FnMut(&mut D, u32) -> Result<u32, PciError>,
@@ -484,8 +489,8 @@ pub fn print_queue_state<D>(
         let mut j = 0;
         while j < Q_SIZE {
             q_data.push(read32(user_data, rd_addr)?);
-            j = j + 4;
-            rd_addr = rd_addr + 4;
+            j += j;
+            rd_addr += rd_addr;
         }
     }
 

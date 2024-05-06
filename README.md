@@ -1,6 +1,6 @@
 # Luwen
 
-Named after Antonie van Leeuwenhoek who invested the microsope.
+Named after Antonie van Leeuwenhoek who invented the microsope.
 
 ## Official Repository
 
@@ -21,4 +21,3 @@ to issue resets.
     implemented communication apis directly. Practically this means direct access to the types defined in luwen-ref.
     This means that you can modify pci tlbs and erisc cores being used or cut out the middle man entirely and
     issue raw calls.
-

@@ -86,6 +86,9 @@ impl<const N: usize> Default for QueryMappings<N> {
     }
 }
 
+/// # Safety
+///
+/// You must make sure that data is a valid pointer and that the file descriptor is valid
 pub unsafe fn query_mappings<const N: usize>(
     fd: nix::libc::c_int,
     data: *mut QueryMappings<N>,

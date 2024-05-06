@@ -4,7 +4,6 @@
 use std::convert::Infallible;
 
 use indicatif::ProgressBar;
-use ttkmd_if::PciDevice;
 use luwen_if::{
     chip::{
         Chip, ChipDetectState, CommsStatus, ComponentStatusInfo, HlCommsInterface, InitError,
@@ -12,10 +11,11 @@ use luwen_if::{
     },
     CallbackStorage, ChipDetectOptions, UninitChip,
 };
+use ttkmd_if::PciDevice;
 
 use crate::{comms_callback, error::LuwenError, ExtendedPciDevice};
 
-pub fn detect_chips_fallible() -> Result<Vec<UninitChip>, LuwenError> {
+pub fn detect_chips_options(options: ChipDetectOptions) -> Result<Vec<UninitChip>, LuwenError> {
     let mut chips = Vec::new();
     let mut failed_chips = Vec::new();
 
@@ -124,7 +124,7 @@ pub fn detect_chips_fallible() -> Result<Vec<UninitChip>, LuwenError> {
                 update_bar_with_status(&bars, &mut cpu_init_bar, &status.cpu_status);
 
                 if let Some(bar) = chip_init_bar.as_ref() {
-                    bar.set_message(format!("Waiting chip to initialize"));
+                    bar.set_message("Waiting chip to initialize".to_string());
                 }
             }
             luwen_if::chip::CallReason::ChipInitCompleted(status) => {
@@ -149,7 +149,6 @@ pub fn detect_chips_fallible() -> Result<Vec<UninitChip>, LuwenError> {
         Ok::<(), Infallible>(())
     };
 
-    let options = ChipDetectOptions::default();
     let mut chips = match luwen_if::detect_chips(chips, &mut init_callback, options) {
         Err(InitError::CallbackError(err)) => {
             chip_detect_bar
@@ -175,15 +174,19 @@ pub fn detect_chips_fallible() -> Result<Vec<UninitChip>, LuwenError> {
         chips.insert(
             id,
             UninitChip::Partially {
-                status,
+                status: Box::new(status),
                 underlying: chip,
             },
         );
     }
 
-    println!("");
+    println!();
 
     Ok(chips)
+}
+
+pub fn detect_chips_fallible() -> Result<Vec<UninitChip>, LuwenError> {
+    detect_chips_options(ChipDetectOptions::default())
 }
 
 pub fn detect_chips() -> Result<Vec<Chip>, LuwenError> {
@@ -191,7 +194,27 @@ pub fn detect_chips() -> Result<Vec<Chip>, LuwenError> {
 
     let mut output = Vec::with_capacity(chips.len());
     for chip in chips {
-        output.push(chip.init(&mut |_| Ok::<(), Infallible>(())).map_err(Into::<luwen_if::error::PlatformError>::into)?);
+        output.push(
+            chip.init(&mut |_| Ok::<(), Infallible>(()))
+                .map_err(Into::<luwen_if::error::PlatformError>::into)?,
+        );
+    }
+
+    Ok(output)
+}
+
+pub fn detect_local_chips() -> Result<Vec<Chip>, LuwenError> {
+    let chips = detect_chips_options(ChipDetectOptions {
+        local_only: true,
+        ..Default::default()
+    })?;
+
+    let mut output = Vec::with_capacity(chips.len());
+    for chip in chips {
+        output.push(
+            chip.init(&mut |_| Ok::<(), Infallible>(()))
+                .map_err(Into::<luwen_if::error::PlatformError>::into)?,
+        );
     }
 
     Ok(output)

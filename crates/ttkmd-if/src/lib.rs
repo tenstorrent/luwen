@@ -423,7 +423,7 @@ impl PciDevice {
 
         loop {
             match allocate_dma_buffer(
-                self.id as usize,
+                self.id,
                 self.device_fd.as_raw_fd(),
                 self.max_dma_buf_size_log2 as u32,
                 self.next_dma_buf,

@@ -124,14 +124,15 @@ fn parse_hexidecimal(i: &str) -> IResult<&str, u64> {
                 many0(char('_')),
             ))),
         ),
-        |value: &str| u64::from_str_radix(&value.replace("_", ""), 16),
+        |value: &str| u64::from_str_radix(&value.replace('_', ""), 16),
     )(i)
 }
 
 fn parse_decimal(i: &str) -> IResult<&str, u64> {
     map_res(
         recognize(many1(terminated(one_of("0123456789"), many0(char('_'))))),
-        |value: &str| u64::from_str_radix(&value.replace("_", ""), 10),
+        #[allow(clippy::from_str_radix_10)]
+        |value: &str| u64::from_str_radix(&value.replace('_', ""), 10),
     )(i)
 }
 
@@ -141,7 +142,7 @@ fn parse_octal(i: &str) -> IResult<&str, u64> {
             alt((tag("0o"), tag("0O"))),
             recognize(many1(terminated(one_of("01234567"), many0(char('_'))))),
         ),
-        |value: &str| u64::from_str_radix(&value.replace("_", ""), 8),
+        |value: &str| u64::from_str_radix(&value.replace('_', ""), 8),
     )(i)
 }
 
@@ -151,7 +152,7 @@ fn parse_binary(i: &str) -> IResult<&str, u64> {
             alt((tag("0b"), tag("0B"))),
             recognize(many1(terminated(one_of("01"), many0(char('_'))))),
         ),
-        |value: &str| u64::from_str_radix(&value.replace("_", ""), 2),
+        |value: &str| u64::from_str_radix(&value.replace('_', ""), 2),
     )(i)
 }
 
@@ -172,7 +173,7 @@ where
         parse_decimal,
         parse_binary,
         parse_octal,
-    )))(&s)
+    )))(s)
     .finish()
     .map_err(|e| serde::de::Error::custom(format!("Could not parse string {s} as integer: {e}")))?;
 
@@ -219,7 +220,7 @@ fn parse_translation_file(
     path: &str,
     file: &str,
 ) -> Result<HashMap<String, MemorySlice>, Box<dyn std::error::Error>> {
-    let top_level: MemoryFile = serde_yaml::from_slice(&std::fs::read(&format!("{path}/{file}"))?)?;
+    let top_level: MemoryFile = serde_yaml::from_slice(&std::fs::read(format!("{path}/{file}"))?)?;
 
     let mut slices = HashMap::with_capacity(top_level.tops.len());
     for (name, top) in top_level.tops {
@@ -237,20 +238,14 @@ fn parse_translation_file(
         });
 
         for (region_name, def) in defs.regions {
-            let all_array = def.fields.values().all(|f| {
-                if let Fields::Array { .. } = f {
-                    true
-                } else {
-                    false
-                }
-            });
-            let all_struct = def.fields.values().all(|f| {
-                if let Fields::Struct { .. } = f {
-                    true
-                } else {
-                    false
-                }
-            });
+            let all_array = def
+                .fields
+                .values()
+                .all(|f| matches!(f, Fields::Array { .. }));
+            let all_struct = def
+                .fields
+                .values()
+                .all(|f| matches!(f, Fields::Struct { .. }));
             assert!(
                 def.fields.is_empty() || (all_array ^ all_struct),
                 "{} ^ {} from {:?}",

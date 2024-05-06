@@ -139,17 +139,16 @@ pub enum FnOptions {
     Eth(FnRemote),
 }
 
+type LuwenInterfaceCallback<T> = fn(&T, FnOptions) -> Result<(), Box<dyn std::error::Error>>;
+
 #[derive(Clone)]
 pub struct CallbackStorage<T: Clone + Send> {
-    pub callback: fn(&T, FnOptions) -> Result<(), Box<dyn std::error::Error>>,
+    pub callback: LuwenInterfaceCallback<T>,
     pub user_data: T,
 }
 
 impl<T: Clone + Send> CallbackStorage<T> {
-    pub fn new(
-        callback: fn(&T, FnOptions) -> Result<(), Box<dyn std::error::Error>>,
-        user_data: T,
-    ) -> Self {
+    pub fn new(callback: LuwenInterfaceCallback<T>, user_data: T) -> Self {
         Self {
             callback,
             user_data,
@@ -204,7 +203,7 @@ impl<T: Clone + Send + 'static> ChipInterface for CallbackStorage<T> {
                 noc_id,
                 x: x as u32,
                 y: y as u32,
-                addr: addr as u64,
+                addr,
                 data: data.as_mut_ptr(),
                 len: data.len() as u64,
             }),
@@ -242,7 +241,7 @@ impl<T: Clone + Send + 'static> ChipInterface for CallbackStorage<T> {
             &self.user_data,
             FnOptions::Noc(FnNoc::Broadcast {
                 noc_id,
-                addr: addr as u64,
+                addr,
                 data: data.as_ptr(),
                 len: data.len() as u64,
             }),
@@ -266,7 +265,7 @@ impl<T: Clone + Send + 'static> ChipInterface for CallbackStorage<T> {
                     noc_id,
                     x: x as u32,
                     y: y as u32,
-                    addr: addr as u64,
+                    addr,
                     data: data.as_mut_ptr(),
                     len: data.len() as u64,
                 },
@@ -291,7 +290,7 @@ impl<T: Clone + Send + 'static> ChipInterface for CallbackStorage<T> {
                     noc_id,
                     x: x as u32,
                     y: y as u32,
-                    addr: addr as u64,
+                    addr,
                     data: data.as_ptr(),
                     len: data.len() as u64,
                 },
@@ -312,7 +311,7 @@ impl<T: Clone + Send + 'static> ChipInterface for CallbackStorage<T> {
                 addr: eth_addr,
                 rw: FnNoc::Broadcast {
                     noc_id,
-                    addr: addr as u64,
+                    addr,
                     data: data.as_ptr(),
                     len: data.len() as u64,
                 },

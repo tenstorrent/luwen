@@ -55,9 +55,9 @@ pub enum TypedArcMsg {
     SpiWrite,
 }
 
-impl Into<ArcMsg> for TypedArcMsg {
-    fn into(self) -> ArcMsg {
-        ArcMsg::Typed(self)
+impl From<TypedArcMsg> for ArcMsg {
+    fn from(val: TypedArcMsg) -> Self {
+        ArcMsg::Typed(val)
     }
 }
 

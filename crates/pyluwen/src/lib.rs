@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use luwen_core::Arch;
 use luwen_if::chip::{
-    wait_for_init, ArcMsg, ArcMsgOk, ArcMsgOptions, ChipImpl, HlComms, HlCommsInterface, InitError
+    wait_for_init, ArcMsg, ArcMsgOk, ArcMsgOptions, ChipImpl, HlComms, HlCommsInterface, InitError,
 };
 use luwen_if::{CallbackStorage, ChipDetectOptions, DeviceInfo, UninitChip};
 use luwen_ref::{DmaConfig, ExtendedPciDeviceWrapper};
@@ -97,7 +97,6 @@ impl From<luwen_if::chip::NeighbouringChip> for NeighbouringChip {
         }
     }
 }
-
 
 #[pyclass]
 pub struct Telemetry {
@@ -449,17 +448,11 @@ struct PyChipDetectState(luwen_if::chip::ChipDetectState<'static>);
 #[pymethods]
 impl PyChipDetectState {
     pub fn new_chip(&self) -> bool {
-        match self.0.call {
-            luwen_if::chip::CallReason::NewChip => true,
-            _ => false,
-        }
+        matches!(self.0.call, luwen_if::chip::CallReason::NewChip)
     }
 
     pub fn correct_down(&self) -> bool {
-        match self.0.call {
-            luwen_if::chip::CallReason::NotNew => true,
-            _ => false,
-        }
+        matches!(self.0.call, luwen_if::chip::CallReason::NotNew)
     }
 
     pub fn status_string(&self) -> Option<String> {
@@ -481,17 +474,14 @@ impl PciChip {
                 if let Some(info) = info {
                     Ok(info)
                 } else {
-                    return Err(PyException::new_err(
+                    Err(PyException::new_err(
                         "Could not get device info: info unavailable",
-                    ));
+                    ))
                 }
             }
-            Err(err) => {
-                return Err(PyException::new_err(format!(
-                    "Could not get device info: {}",
-                    err
-                )));
-            }
+            Err(err) => Err(PyException::new_err(format!(
+                "Could not get device info: {err}"
+            ))),
         }
     }
 }
@@ -530,36 +520,35 @@ impl PciChip {
                     user_data: chip,
                 },
             )
-            .map_err(|v| {
-                PyException::new_err(format!("Could not initialize chip: {}", v.to_string()))
-            })?,
+            .map_err(|v| PyException::new_err(format!("Could not initialize chip: {v}")))?,
         ))
     }
 
     #[pyo3(signature = (callback = None))]
     pub fn init(&mut self, callback: Option<PyObject>) -> PyResult<()> {
-        let mut callback: Box<dyn FnMut(luwen_if::chip::ChipDetectState) -> Result<(), PyErr>> =
-            if let Some(callback) = callback {
-                Box::new(move |status| {
-                    // Safety: This is extremly unsafe, the alternative would be to copy the status for
-                    // every invocation.
-                    let status = unsafe { std::mem::transmute(status) };
-                    if let Err(err) =
-                        Python::with_gil(|py| callback.call1(py, (PyChipDetectState(status),)))
-                    {
-                        Err(err)
-                    } else {
-                        Ok(())
-                    }
-                })
-            } else {
-                Box::new(|_| Python::with_gil(|py| py.check_signals()))
-            };
+        #[allow(clippy::type_complexity)]
+        let mut callback: Box<
+            dyn FnMut(luwen_if::chip::ChipDetectState) -> Result<(), PyErr>,
+        > = if let Some(callback) = callback {
+            Box::new(move |status| {
+                // Safety: This is extremly unsafe, the alternative would be to copy the status for
+                // every invocation.
+                let status = unsafe { std::mem::transmute(status) };
+                if let Err(err) =
+                    Python::with_gil(|py| callback.call1(py, (PyChipDetectState(status),)))
+                {
+                    Err(err)
+                } else {
+                    Ok(())
+                }
+            })
+        } else {
+            Box::new(|_| Python::with_gil(|py| py.check_signals()))
+        };
 
         match wait_for_init(&mut self.0, &mut callback, false, false) {
             Err(InitError::PlatformError(err)) => Err(PyException::new_err(format!(
-                "Could not initialize chip: {}",
-                err.to_string()
+                "Could not initialize chip: {err}"
             ))),
             Err(InitError::CallbackError(err)) => Err(err),
             Ok(status) => Ok(status),
@@ -600,6 +589,7 @@ common_chip_comms_impls!(PciChip);
 
 #[pymethods]
 impl PciGrayskull {
+    #[allow(clippy::too_many_arguments)]
     pub fn setup_tlb(
         &mut self,
         index: u32,
@@ -625,9 +615,9 @@ impl PciGrayskull {
                 )),
             }
         } else {
-            return Err(PyException::new_err(
+            Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
-            ));
+            ))
         }
     }
 
@@ -638,9 +628,9 @@ impl PciGrayskull {
             value.pci_interface.borrow_mut().default_tlb = index;
             Ok(())
         } else {
-            return Err(PyException::new_err(
+            Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
-            ));
+            ))
         }
     }
 
@@ -651,9 +641,9 @@ impl PciGrayskull {
                 .axi_read32(addr)
                 .map_err(|v| PyException::new_err(v.to_string()))
         } else {
-            return Err(PyException::new_err(
+            Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
-            ));
+            ))
         }
     }
 
@@ -664,9 +654,9 @@ impl PciGrayskull {
                 .axi_write32(addr, data)
                 .map_err(|v| PyException::new_err(v.to_string()))
         } else {
-            return Err(PyException::new_err(
+            Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
-            ));
+            ))
         }
     }
 
@@ -675,9 +665,9 @@ impl PciGrayskull {
         if let Some(value) = value {
             Ok(value.pci_interface.borrow().device.physical.subsystem_id)
         } else {
-            return Err(PyException::new_err(
+            Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
-            ));
+            ))
         }
     }
 
@@ -686,9 +676,9 @@ impl PciGrayskull {
         if let Some(value) = value {
             Ok(value.pci_interface.borrow().device.id)
         } else {
-            return Err(PyException::new_err(
+            Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
-            ));
+            ))
         }
     }
 
@@ -724,20 +714,21 @@ pub struct PciInterface<'a> {
 }
 
 impl PciInterface<'_> {
-    pub fn from_wh<'a>(wh: &'a PciWormhole) -> Option<PciInterface<'a>> {
+    pub fn from_wh(wh: &PciWormhole) -> Option<PciInterface> {
         wh.0.get_if::<CallbackStorage<ExtendedPciDeviceWrapper>>()
             .map(|v| PciInterface {
                 pci_interface: &v.user_data,
             })
     }
 
-    pub fn from_gs<'a>(gs: &'a PciGrayskull) -> Option<PciInterface<'a>> {
+    pub fn from_gs(gs: &PciGrayskull) -> Option<PciInterface> {
         gs.0.get_if::<CallbackStorage<ExtendedPciDeviceWrapper>>()
             .map(|v| PciInterface {
                 pci_interface: &v.user_data,
             })
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn setup_tlb(
         &self,
         index: u32,
@@ -885,6 +876,7 @@ impl PciWormhole {
         ))
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn setup_tlb(
         &mut self,
         index: u32,
@@ -910,9 +902,9 @@ impl PciWormhole {
                 )),
             }
         } else {
-            return Err(PyException::new_err(
+            Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
-            ));
+            ))
         }
     }
 
@@ -923,9 +915,9 @@ impl PciWormhole {
             value.pci_interface.borrow_mut().default_tlb = index;
             Ok(())
         } else {
-            return Err(PyException::new_err(
+            Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
-            ));
+            ))
         }
     }
 
@@ -937,9 +929,9 @@ impl PciWormhole {
                 PyException::new_err(format!("Could not allocate DMA buffer: {}", v))
             })?)
         } else {
-            return Err(PyException::new_err(
+            Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
-            ));
+            ))
         }
     }
 
@@ -967,9 +959,9 @@ impl PciWormhole {
                 )
                 .map_err(|v| PyException::new_err(format!("Could perform dma config: {}", v)))?)
         } else {
-            return Err(PyException::new_err(
+            Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
-            ));
+            ))
         }
     }
 
@@ -987,9 +979,9 @@ impl PciWormhole {
                 .dma_transfer_turbo(addr, physical_dma_buffer, size, write)
                 .map_err(|v| PyException::new_err(format!("Could perform dma transfer: {}", v)))?)
         } else {
-            return Err(PyException::new_err(
+            Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
-            ));
+            ))
         }
     }
 
@@ -998,9 +990,9 @@ impl PciWormhole {
         if let Some(value) = value {
             Ok(value.pci_interface.borrow().device.physical.subsystem_id)
         } else {
-            return Err(PyException::new_err(
+            Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
-            ));
+            ))
         }
     }
 
@@ -1009,9 +1001,9 @@ impl PciWormhole {
         if let Some(value) = value {
             Ok(value.pci_interface.borrow().device.id)
         } else {
-            return Err(PyException::new_err(
+            Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
-            ));
+            ))
         }
     }
 
@@ -1101,12 +1093,8 @@ impl UninitPciChip {
             .init(&mut |_| Python::with_gil(|py| py.check_signals()));
         match chip {
             Ok(chip) => Ok(PciChip(chip)),
-            Err(InitError::PlatformError(err)) => {
-                return Err(PyException::new_err(err.to_string()));
-            }
-            Err(InitError::CallbackError(err)) => {
-                return Err(err);
-            }
+            Err(InitError::PlatformError(err)) => Err(PyException::new_err(err.to_string())),
+            Err(InitError::CallbackError(err)) => Err(err),
         }
     }
 
@@ -1136,11 +1124,11 @@ pub fn detect_chips_fallible(
     noc_safe: bool,
     callback: Option<PyObject>,
 ) -> PyResult<Vec<UninitPciChip>> {
-    let interfaces = interfaces.unwrap_or(Vec::new());
+    let interfaces = interfaces.unwrap_or_default();
 
     let all_devices = luwen_ref::PciDevice::scan();
 
-    let interfaces = if interfaces.len() == 0 {
+    let interfaces = if interfaces.is_empty() {
         all_devices
     } else {
         let mut error_interfaces = Vec::with_capacity(interfaces.len());
@@ -1150,7 +1138,7 @@ pub fn detect_chips_fallible(
             }
         }
 
-        if error_interfaces.len() > 0 {
+        if !error_interfaces.is_empty() {
             return Err(PyException::new_err(format!(
                 "Could not open TT-PCI device: {:?}; expected one of {:?}",
                 error_interfaces, all_devices
@@ -1179,11 +1167,8 @@ pub fn detect_chips_fallible(
     let chip_filter = chip_filter.unwrap_or_default();
     let mut converted_chip_filter = Vec::with_capacity(chip_filter.len());
     for filter in chip_filter {
-        converted_chip_filter.push(Arch::from_str(&filter).or_else(|value| {
-            Err(PyException::new_err(format!(
-                "Could not parse chip arch: {}",
-                value
-            )))
+        converted_chip_filter.push(Arch::from_str(&filter).map_err(|value| {
+            PyException::new_err(format!("Could not parse chip arch: {}", value))
         })?);
     }
     let options = ChipDetectOptions {
@@ -1193,6 +1178,7 @@ pub fn detect_chips_fallible(
         noc_safe,
     };
 
+    #[allow(clippy::type_complexity)]
     let mut callback: Box<dyn FnMut(luwen_if::chip::ChipDetectState) -> Result<(), PyErr>> =
         if let Some(callback) = callback {
             Box::new(move |status| {
@@ -1228,7 +1214,7 @@ pub fn detect_chips_fallible(
         chips.insert(
             id,
             UninitChip::Partially {
-                status,
+                status: Box::new(status),
                 underlying: chip,
             },
         );

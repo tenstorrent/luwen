@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{
-    collections::HashMap,
+    collections::{hash_map::Entry, HashMap},
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
 use error::LuwenError;
-use ttkmd_if::PciError;
 use luwen_if::{FnDriver, FnOptions};
+use ttkmd_if::PciError;
 
 mod detect;
 pub mod error;
@@ -16,7 +16,7 @@ mod wormhole;
 
 use wormhole::ethernet::{self, EthCommCoord};
 
-pub use detect::{detect_chips, detect_chips_fallible};
+pub use detect::{detect_chips, detect_chips_fallible, detect_local_chips};
 pub use ttkmd_if::{DmaBuffer, DmaConfig, PciDevice, Tlb};
 
 #[derive(Clone)]
@@ -68,7 +68,7 @@ impl ExtendedPciDevice {
         let len = data.len() as u64;
 
         while written < len {
-            starting_tlb.local_offset = addr + written as u64;
+            starting_tlb.local_offset = addr + written;
             let (bar_addr, slice_len) = self.setup_tlb(tlb_index, starting_tlb.clone())?;
 
             let to_write = std::cmp::min(slice_len, len.saturating_sub(written));
@@ -91,7 +91,7 @@ impl ExtendedPciDevice {
         let len = data.len() as u64;
 
         while read < len {
-            starting_tlb.local_offset = addr + read as u64;
+            starting_tlb.local_offset = addr + read;
             let (bar_addr, slice_len) = self.setup_tlb(tlb_index, starting_tlb.clone())?;
 
             let to_read = std::cmp::min(slice_len, len.saturating_sub(read));
@@ -207,8 +207,8 @@ fn noc_write32(
         tlb_index,
         Tlb {
             local_offset: addr as u64,
-            x_end: x as u8,
-            y_end: y as u8,
+            x_end: x,
+            y_end: y,
             noc_sel: noc_id,
             mcast: false,
             ..Default::default()
@@ -231,8 +231,8 @@ fn noc_read32(
         tlb_index,
         Tlb {
             local_offset: addr as u64,
-            x_end: x as u8,
-            y_end: y as u8,
+            x_end: x,
+            y_end: y,
             noc_sel: noc_id,
             mcast: false,
             ..Default::default()
@@ -451,11 +451,9 @@ pub fn comms_callback_inner(
 
                 let dma_buffer = {
                     let key = (eth_x, eth_y);
-                    if !borrow.ethernet_dma_buffer.contains_key(&key) {
+                    if let Entry::Vacant(e) = borrow.ethernet_dma_buffer.entry(key) {
                         // 1 MB buffer
-                        borrow
-                            .ethernet_dma_buffer
-                            .insert(key, borrow.device.allocate_dma_buffer(1 << 20)?);
+                        e.insert(borrow.device.allocate_dma_buffer(1 << 20)?);
                     }
 
                     // SAFETY: Can never get here without first inserting something into the hashmap
@@ -534,11 +532,9 @@ pub fn comms_callback_inner(
 
                 let dma_buffer = {
                     let key = (eth_x, eth_y);
-                    if !borrow.ethernet_dma_buffer.contains_key(&key) {
+                    if let Entry::Vacant(e) = borrow.ethernet_dma_buffer.entry(key) {
                         // 1 MB buffer
-                        borrow
-                            .ethernet_dma_buffer
-                            .insert(key, borrow.device.allocate_dma_buffer(1 << 20)?);
+                        e.insert(borrow.device.allocate_dma_buffer(1 << 20)?);
                     }
 
                     // SAFETY: Can never get here without first inserting something into the hashmap

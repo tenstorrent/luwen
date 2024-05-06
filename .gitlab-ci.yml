@@ -116,8 +116,8 @@ deploy:
     - make deb
   environment: production
 
-# The default cross riscv image doesn't work with 
-# simd instructions, so I've made a manual job here 
+# The default cross riscv image doesn't work with
+# simd instructions, so I've made a manual job here
 # to deploy the image to the container registry
 deploy-cross:
   tags:

@@ -30,9 +30,9 @@ pub enum InitError<E> {
     CallbackError(E),
 }
 
-impl Into<PlatformError> for InitError<Infallible> {
-    fn into(self) -> PlatformError {
-        match self {
+impl From<InitError<Infallible>> for PlatformError {
+    fn from(val: InitError<Infallible>) -> Self {
+        match val {
             InitError::PlatformError(err) => err,
             InitError::CallbackError(_) => unreachable!(),
         }
@@ -73,7 +73,7 @@ pub fn wait_for_init<E>(
                 // Hit an error, cannot continue to initialize the current chip,
                 // but we can continue to initialize other chips (assuming we are allowing failures).
                 if !allow_failure {
-                    return Err(PlatformError::Generic(
+                    Err(PlatformError::Generic(
                         "Chip initialization failed".to_string(),
                         crate::error::BtWrapper::capture(),
                     ))?;
@@ -87,7 +87,7 @@ pub fn wait_for_init<E>(
                 }
             }
             super::ChipInitResult::ErrorAbort => {
-                return Err(PlatformError::Generic(
+                Err(PlatformError::Generic(
                     "Chip initialization failed (aborted)".to_string(),
                     crate::error::BtWrapper::capture(),
                 ))?;

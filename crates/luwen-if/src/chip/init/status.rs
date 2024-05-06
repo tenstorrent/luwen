@@ -60,7 +60,10 @@ impl fmt::Display for ArcInitError {
                 } else {
                     "<unknown version>".to_string()
                 };
-                write!(f, "ARC FW is older than the minimum supported version; {version} < {required:x}")
+                write!(
+                    f,
+                    "ARC FW is older than the minimum supported version; {version} < {required:x}"
+                )
             }
             ArcInitError::Hung => f.write_str("ARC is hung"),
         }
@@ -156,10 +159,7 @@ pub enum WaitStatus<P, E> {
 
 impl<P, E> WaitStatus<P, E> {
     pub fn is_done(&self) -> bool {
-        match self {
-            WaitStatus::Done => true,
-            _ => false,
-        }
+        matches!(self, WaitStatus::Done)
     }
 }
 
@@ -213,25 +213,21 @@ impl<P: fmt::Display, E: fmt::Display> fmt::Display for ComponentStatusInfo<P, E
         let mut force_oneline = true;
         for (index, status) in self.wait_status.iter().enumerate() {
             if let WaitStatus::Waiting(Some(status)) = status {
-                if let Some(value) = message_options
-                    .iter_mut()
-                    .filter(|(_, v)| v == status)
-                    .next()
-                {
+                if let Some(value) = message_options.iter_mut().find(|(_, v)| v == status) {
                     value.0.push(index);
                 } else {
                     message_options.push((vec![index], status.clone()));
                 }
             } else if let WaitStatus::Error(e) = status {
                 let e = e.to_string();
-                if let Some(value) = message_options.iter_mut().filter(|v| v.1 == e).next() {
+                if let Some(value) = message_options.iter_mut().find(|v| v.1 == e) {
                     value.0.push(index);
                 } else {
                     message_options.push((vec![index], e));
                 }
             } else if let WaitStatus::NotInitialized(e) = status {
                 let e = e.to_string();
-                if let Some(value) = message_options.iter_mut().filter(|v| v.1 == e).next() {
+                if let Some(value) = message_options.iter_mut().find(|v| v.1 == e) {
                     value.0.push(index);
                 } else {
                     message_options.push((vec![index], e));
@@ -247,7 +243,7 @@ impl<P: fmt::Display, E: fmt::Display> fmt::Display for ComponentStatusInfo<P, E
             let mut message = format!("{message}\n");
             for (indexes, option) in message_options {
                 message = format!("\t{message}[");
-                for index in indexes[..indexes.len().saturating_sub(1)].iter().copied() {
+                for index in indexes[..indexes.len().saturating_sub(1)].iter() {
                     message = format!("{message}{index};");
                 }
                 if let Some(index) = indexes.last() {
@@ -321,7 +317,7 @@ impl<P, E> ComponentStatusInfo<P, E> {
             }
         }
 
-        return false;
+        false
     }
 
     pub fn has_error(&self) -> bool {
@@ -339,7 +335,7 @@ impl<P, E> ComponentStatusInfo<P, E> {
             }
         }
 
-        return false;
+        false
     }
 }
 
