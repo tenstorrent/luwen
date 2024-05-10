@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
+use std::{backtrace, sync::Arc};
 
 use crate::{
     arc_msg::{ArcMsgAddr, ArcMsgOk, TypedArcMsg},
@@ -421,8 +421,8 @@ impl ChipImpl for Wormhole {
                                     }
 
                                     // The fact that this is here means that our result is too generic, for now we just ignore it.
-                                    PlatformError::ArcMsgError(_) => {
-                                        return Ok(ChipInitResult::ErrorContinue);
+                                    PlatformError::ArcMsgError(error) => {
+                                        return Ok(ChipInitResult::ErrorContinue(error.to_string(), backtrace::Backtrace::capture()));
                                     }
 
                                     // This is fine to hit at this stage (though it should have been already verified to not be the case).
@@ -440,16 +440,23 @@ impl ChipImpl for Wormhole {
                                     // This is an "expected error" but we probably can't recover from it, so we should abort the init.
                                     PlatformError::AxiError(err) => {
                                         *comms = CommsStatus::CommunicationError(err.to_string());
-                                        return Ok(ChipInitResult::ErrorAbort);
+                                        return Ok(ChipInitResult::ErrorAbort(format!("ARC AXI error: {}", err.to_string()), backtrace::Backtrace::capture()));
                                     }
 
                                     // We don't expect to hit these cases so if we do, we should assume that something went terribly
                                     // wrong and abort the init.
                                     PlatformError::WrongChipArch { .. }
-                                    | PlatformError::WrongChipArchs { .. }
-                                    | PlatformError::Generic(_, _)
-                                    | PlatformError::GenericError(_, _) => {
-                                        return Ok(ChipInitResult::ErrorAbort)
+                                    | PlatformError::WrongChipArchs { .. } => {
+                                        return Ok(ChipInitResult::ErrorAbort("Wrong Chip Arch(s)".to_string(), backtrace::Backtrace::capture()));
+                                    }
+
+                                    PlatformError::Generic(error, bt) => {
+                                        return Ok(ChipInitResult::ErrorAbort(error, bt.0));
+                                    }
+
+                                    | PlatformError::GenericError(error, bt) => {
+                                        let err_msg = error.to_string();
+                                        return Ok(ChipInitResult::ErrorAbort(err_msg, bt.0));
                                     }
                                 }
                             }
@@ -512,20 +519,27 @@ impl ChipImpl for Wormhole {
                             // Arc should be ready here...
                             // This means that ARC hung, we should stop initializing this chip in case
                             // we hit something like a noc hang.
-                            PlatformError::ArcMsgError(_err) => {
-                                return Ok(ChipInitResult::ErrorContinue);
+                            PlatformError::ArcMsgError(err) => {
+                                return Ok(ChipInitResult::ErrorContinue(format!("Telemetry ARC message error: {}; we expected to have communication, but lost it.", err.to_string()), backtrace::Backtrace::capture()));
                             }
 
                             // This is an "expected error" but we probably can't recover from it, so we should abort the init.
-                            PlatformError::AxiError(_) => return Ok(ChipInitResult::ErrorAbort),
+                            PlatformError::AxiError(_) => return Ok(ChipInitResult::ErrorAbort(format!("Telemetry AXI error: {}; we expected to have communication, but lost it.", err.to_string()), backtrace::Backtrace::capture())),
 
                             // We don't expect to hit these cases so if we do, we should assume that something went terribly
                             // wrong and abort the init.
                             PlatformError::WrongChipArch { .. }
-                            | PlatformError::WrongChipArchs { .. }
-                            | PlatformError::Generic(_, _)
-                            | PlatformError::GenericError(_, _) => {
-                                return Ok(ChipInitResult::ErrorAbort)
+                            | PlatformError::WrongChipArchs { .. } => {
+                                return Ok(ChipInitResult::ErrorAbort("Wrong Chip Arch(s)".to_string(), backtrace::Backtrace::capture()));
+                            }
+
+                            PlatformError::Generic(error, bt) => {
+                                return Ok(ChipInitResult::ErrorAbort(error, bt.0));
+                            }
+
+                            | PlatformError::GenericError(error, bt) => {
+                                let err_msg = error.to_string();
+                                return Ok(ChipInitResult::ErrorAbort(err_msg, bt.0));
                             }
                         },
                     };
@@ -610,18 +624,18 @@ impl ChipImpl for Wormhole {
                                 // that we can no longer progress in the init.
                                 PlatformError::ArcMsgError(_)
                                 | PlatformError::ArcNotReady(_, _) => {
-                                    return Ok(ChipInitResult::ErrorContinue);
+                                    return Ok(ChipInitResult::ErrorContinue("Ethernet ARC message error".to_string(), backtrace::Backtrace::capture()));
                                 }
 
                                 // We are checking for ethernet training to complete... if we hit this than
                                 // something has gone terribly wrong
                                 PlatformError::EthernetTrainingNotComplete(_) => {
-                                    return Ok(ChipInitResult::ErrorContinue);
+                                    return Ok(ChipInitResult::ErrorContinue("Ethernet training not complete".to_string(), backtrace::Backtrace::capture()));
                                 }
 
                                 // This is an "expected error" but we probably can't recover from it, so we should abort the init.
                                 PlatformError::AxiError(_) => {
-                                    return Ok(ChipInitResult::ErrorAbort)
+                                    return Ok(ChipInitResult::ErrorAbort("Ethernet AXI error".to_string(), backtrace::Backtrace::capture()));
                                 }
 
                                 // We don't expect to hit these cases so if we do, we should assume that something went terribly
@@ -631,7 +645,7 @@ impl ChipImpl for Wormhole {
                                 | PlatformError::WrongChipArchs { .. }
                                 | PlatformError::Generic(_, _)
                                 | PlatformError::GenericError(_, _) => {
-                                    return Ok(ChipInitResult::ErrorAbort)
+                                    return Ok(ChipInitResult::ErrorAbort("Ethernet Generic error".to_string(), backtrace::Backtrace::capture()));
                                 }
                             },
                         };

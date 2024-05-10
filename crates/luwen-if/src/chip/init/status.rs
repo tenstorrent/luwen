@@ -364,6 +364,15 @@ impl CommsStatus {
     }
 }
 
+impl fmt::Display for CommsStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CommsStatus::CanCommunicate => f.write_str("OK"),
+            CommsStatus::CommunicationError(_err) => f.write_str("communication error"),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct InitStatus {
     pub comms_status: CommsStatus,
@@ -377,6 +386,19 @@ pub struct InitStatus {
     /// We cannot communicate with the chip prior to the initialization process. Therefore we start
     /// with the chip in an unknown state (all status is marked as not present).
     pub unknown_state: bool,
+}
+
+impl fmt::Display for InitStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "InitStatus:")?;
+        writeln!(f, "Communication Status: {}", self.comms_status)?;
+        writeln!(f, "DRAM Status: {}", self.dram_status)?;
+        writeln!(f, "CPU Status: {}", self.cpu_status)?;
+        writeln!(f, "ARC Status: {}", self.arc_status)?;
+        writeln!(f, "Ethernet Status: {}", self.eth_status)?;
+        writeln!(f, "Init Options: {:?}", self.init_options)?;
+        writeln!(f, "Unknown State: {}", self.unknown_state)
+    }
 }
 
 impl InitStatus {

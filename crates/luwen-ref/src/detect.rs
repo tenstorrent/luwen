@@ -4,7 +4,7 @@
 use std::convert::Infallible;
 
 use indicatif::ProgressBar;
-use ttkmd_if::PciDevice;
+use ttkmd_if::{PciDevice, PciError};
 use luwen_if::{
     chip::{
         Chip, ChipDetectState, CommsStatus, ComponentStatusInfo, HlCommsInterface, InitError,
@@ -99,7 +99,7 @@ pub fn detect_chips_fallible() -> Result<Vec<UninitChip>, LuwenError> {
     let chip_detect_bar = bars.add(chip_detect_bar);
     chip_detect_bar.enable_steady_tick(std::time::Duration::from_secs_f32(1.0 / 30.0));
 
-    // First we will output errors for the chips we alraedy know have failed
+    // First we will output errors for the chips we already know have failed
     for (id, _, err) in &failed_chips {
         chip_detect_bar.inc(1);
         let bar = add_bar(&bars);
@@ -191,7 +191,10 @@ pub fn detect_chips() -> Result<Vec<Chip>, LuwenError> {
 
     let mut output = Vec::with_capacity(chips.len());
     for chip in chips {
-        output.push(chip.init(&mut |_| Ok::<(), Infallible>(())).map_err(Into::<luwen_if::error::PlatformError>::into)?);
+        match chip.status().unwrap().comms_status {
+            CommsStatus::CanCommunicate => output.push(chip.init(&mut |_| Ok::<(), Infallible>(())).map_err(Into::<luwen_if::error::PlatformError>::into)?),
+            CommsStatus::CommunicationError(_) => return Err(PciError::BrokenConnection.into()),
+        }      
     }
 
     Ok(output)

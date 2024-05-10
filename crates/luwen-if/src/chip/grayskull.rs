@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
+use std::{backtrace, sync::Arc};
 
 use luwen_core::Arch;
 
@@ -301,29 +301,36 @@ impl ChipImpl for Grayskull {
                                     }
 
                                     // The fact that this is here means that our result is too generic, for now we just ignore it.
-                                    PlatformError::ArcMsgError(_) => {
-                                        return Ok(ChipInitResult::ErrorContinue);
+                                    PlatformError::ArcMsgError(error) => {
+                                        return Ok(ChipInitResult::ErrorContinue(error.to_string(), backtrace::Backtrace::capture()));
                                     }
 
                                     // This is fine to hit at this stage (though it should have been already verified to not be the case).
                                     // For now we just ignore it and hope that it will be resolved by the time the timeout expires...
                                     PlatformError::EthernetTrainingNotComplete(_) => {
-                                        return Ok(ChipInitResult::ErrorContinue);
+                                        return Ok(ChipInitResult::ErrorContinue("Ethernet Training Not Complete".to_string(), backtrace::Backtrace::capture()));
                                     }
 
                                     // This is an "expected error" but we probably can't recover from it, so we should abort the init.
                                     PlatformError::AxiError(err) => {
                                         *comms = CommsStatus::CommunicationError(err.to_string());
-                                        return Ok(ChipInitResult::ErrorAbort);
+                                        return Ok(ChipInitResult::ErrorAbort(format!("AXI Error: {}", err.to_string()), backtrace::Backtrace::capture()));
                                     }
 
                                     // We don't expect to hit these cases so if we do, we should assume that something went terribly
                                     // wrong and abort the init.
                                     PlatformError::WrongChipArch { .. }
-                                    | PlatformError::WrongChipArchs { .. }
-                                    | PlatformError::Generic(_, _)
-                                    | PlatformError::GenericError(_, _) => {
-                                        return Ok(ChipInitResult::ErrorAbort)
+                                    | PlatformError::WrongChipArchs { .. } => {
+                                        return Ok(ChipInitResult::ErrorAbort("Wrong Chip Arch(s)".to_string(), backtrace::Backtrace::capture()));
+                                    }
+
+                                    PlatformError::Generic(error, bt) => {
+                                        return Ok(ChipInitResult::ErrorAbort(error, bt.0));
+                                    }
+
+                                    | PlatformError::GenericError(error, bt) => {
+                                        let err_msg = error.to_string();
+                                        return Ok(ChipInitResult::ErrorAbort(err_msg, bt.0));
                                     }
                                 }
                             }
@@ -400,7 +407,7 @@ impl ChipImpl for Grayskull {
                                     },
                                     // All other errors indicate that despite passing the arc
                                     // "ready" check we still have an incomplete init
-                                    source => {
+                                    _source => {
                                         if let Some(status) = arc_status.wait_status.get_mut(0) {
                                             *status = WaitStatus::Error(ArcInitError::NoAccess);
                                         }
@@ -408,23 +415,30 @@ impl ChipImpl for Grayskull {
                                     }
                                 }
                                 // This is an "expected error" but we probably can't recover from it, so we should abort the init.
-                                crate::ArcMsgError::AxiError(_) => {
-                                    return Ok(ChipInitResult::ErrorAbort);
+                                crate::ArcMsgError::AxiError(err) => {
+                                    return Ok(ChipInitResult::ErrorAbort(format!("Telemetry AXI error: {}; we expected to have communication, but lost it.", err.to_string()), backtrace::Backtrace::capture()));
                                 }
                             }
 
                             // This is an "expected error" but we probably can't recover from it, so we should abort the init.
-                            PlatformError::AxiError(_) => return Ok(ChipInitResult::ErrorAbort),
+                            PlatformError::AxiError(err) => return Ok(ChipInitResult::ErrorAbort(format!("Telemetry AXI error: {}; we expected to have communication, but lost it.", err.to_string()), backtrace::Backtrace::capture())),
 
 
 
                             // We don't expect to hit these cases so if we do, we should assume that something went terribly
                             // wrong and abort the init.
                             PlatformError::WrongChipArch { .. }
-                            | PlatformError::WrongChipArchs { .. }
-                            | PlatformError::Generic(_, _)
-                            | PlatformError::GenericError(_, _) => {
-                                return Ok(ChipInitResult::ErrorAbort)
+                            | PlatformError::WrongChipArchs { .. } => {
+                                return Ok(ChipInitResult::ErrorAbort("Wrong Chip Arch(s)".to_string(), backtrace::Backtrace::capture()));
+                            }
+
+                            PlatformError::Generic(error, bt) => {
+                                return Ok(ChipInitResult::ErrorAbort(error, bt.0));
+                            }
+
+                            | PlatformError::GenericError(error, bt) => {
+                                let err_msg = error.to_string();
+                                return Ok(ChipInitResult::ErrorAbort(err_msg, bt.0));
                             }
                         },
                     };
