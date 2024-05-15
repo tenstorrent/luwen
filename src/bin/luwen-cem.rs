@@ -160,14 +160,14 @@ fn main() -> Result<(), LuwenError> {
 
     let mut ident_order = Vec::new();
     for chip in &chips {
-        ident_order.push(chip.clone());
+        ident_order.push(chip);
     }
     ident_order.sort_by_key(|v| v.1);
     let ident_order: Vec<_> = ident_order.into_iter().map(|v| v.0.clone()).collect();
 
     let mut known_connections = HashSet::new();
     for chip in &ident_order {
-        if let Some(connection_info) = connection_map.get(&chip) {
+        if let Some(connection_info) = connection_map.get(chip) {
             for (remote_chip, connection) in connection_info {
                 for (current_eth_id, next_eth_id) in connection {
                     let local = (chips[chip], current_eth_id);
@@ -246,13 +246,10 @@ fn main() -> Result<(), LuwenError> {
         let data = &chip_data[chip];
         output.push_str(&format!(
             "   {id}: {},\n",
-            data.boardtype
-                .as_ref()
-                .map(|v| v.as_str())
-                .unwrap_or("null")
+            data.boardtype.as_deref().unwrap_or("null")
         ));
     }
-    output.push_str("}");
+    output.push('}');
 
     if let Err(_err) = std::fs::write(&args.file, output) {
         Err(LuwenError::Custom(format!(

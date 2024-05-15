@@ -233,7 +233,7 @@ pub fn axi_translate_tree(
             }
 
             size = slice.size;
-            bits = slice.bit_mask.clone();
+            bits = slice.bit_mask;
             offset += slice.offset + slice.size * index.unwrap_or(0);
         } else {
             return Err(AxiError::InvalidPath {

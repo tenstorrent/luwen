@@ -296,7 +296,7 @@ impl Wormhole {
 
             // Some of these also represent short-term busy, but it's safe to write SCRATCH[5].
             let pc_idle = pc == POST_CODE_INIT_DONE
-                || (POST_CODE_ARC_MSG_HANDLE_DONE <= pc && pc <= POST_CODE_ARC_TIME_LAST);
+                || (POST_CODE_ARC_MSG_HANDLE_DONE..=POST_CODE_ARC_TIME_LAST).contains(&pc);
             if pc_idle {
                 return Ok(());
             } else {
@@ -308,7 +308,7 @@ impl Wormhole {
         }
 
         // We should never get here, every case should be handled above.
-        return Ok(());
+        Ok(())
     }
 
     pub fn spi_write(&self, addr: u32, value: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
@@ -548,11 +548,11 @@ impl ChipImpl for Wormhole {
                         let dram_status = telem.smbus_tx_ddr_status;
 
                         let mut channels = [None; 6];
-                        for i in 0..6 {
+                        for (i, channel) in channels.iter_mut().enumerate() {
                             let status = (dram_status >> (i * 4)) & 0xF;
                             let status = status as u8;
 
-                            channels[i] =
+                            *channel =
                                 super::init::status::DramChannelStatus::try_from(status).ok();
                         }
 
@@ -841,10 +841,10 @@ impl ChipImpl for Wormhole {
         let telemetry_struct_offset = csm_offset.addr + (offset - 0x10000000) as u64;
         let smbus_tx_enum_version = self
             .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (0 * 4))?;
+            .axi_read32(&self.chip_if, telemetry_struct_offset)?;
         let smbus_tx_device_id = self
             .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (1 * 4))?;
+            .axi_read32(&self.chip_if, telemetry_struct_offset + 4)?;
         let smbus_tx_asic_ro = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (2 * 4))?;

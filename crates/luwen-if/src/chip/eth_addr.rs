@@ -41,7 +41,7 @@ impl IntoChip<EthAddr> for EthAddr {
         _chip: &dyn ChipComms,
         _cif: &dyn ChipInterface,
     ) -> Result<EthAddr, PlatformError> {
-        Ok(self.clone())
+        Ok(*self)
     }
 }
 
@@ -53,10 +53,10 @@ impl IntoChip<EthAddr> for (Option<u8>, Option<u8>, Option<u8>, Option<u8>) {
     ) -> Result<EthAddr, PlatformError> {
         let local_coord = get_local_chip_coord(chip, cif)?;
 
-        let rack_x = self.0.unwrap_or_else(|| local_coord.rack_x);
-        let rack_y = self.1.unwrap_or_else(|| local_coord.rack_y);
-        let shelf_x = self.2.unwrap_or_else(|| local_coord.shelf_x);
-        let shelf_y = self.3.unwrap_or_else(|| local_coord.shelf_y);
+        let rack_x = self.0.unwrap_or(local_coord.rack_x);
+        let rack_y = self.1.unwrap_or(local_coord.rack_y);
+        let shelf_x = self.2.unwrap_or(local_coord.shelf_x);
+        let shelf_y = self.3.unwrap_or(local_coord.shelf_y);
 
         Ok(EthAddr {
             rack_x,

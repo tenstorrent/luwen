@@ -5,7 +5,7 @@ use luwen_if::{
 use luwen_ref::detect_chips;
 
 fn lds_reset(interfaces: &[usize]) -> Vec<Chip> {
-    for interface in interfaces.iter().copied() {
+    for interface in interfaces {
         let fd = std::fs::OpenOptions::new()
             .read(true)
             .write(true)
@@ -28,7 +28,7 @@ fn lds_reset(interfaces: &[usize]) -> Vec<Chip> {
 
     let mut output = Vec::new();
     for interface in interfaces.iter().copied() {
-        output.push(luwen_ref::open(interface as usize).unwrap());
+        output.push(luwen_ref::open(interface).unwrap());
     }
 
     for chip in &output {

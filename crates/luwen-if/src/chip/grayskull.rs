@@ -13,7 +13,7 @@ use crate::{
 };
 
 use super::{
-    init::status::{ArcInitError, ComponentStatusInfo, DramInitError, InitOptions, WaitStatus},
+    init::status::{ArcInitError, ComponentStatusInfo, InitOptions, WaitStatus},
     ArcMsgOptions, ChipComms, ChipInitResult, ChipInterface, CommsStatus, HlComms, InitStatus,
     NeighbouringChip,
 };
@@ -136,7 +136,7 @@ impl Grayskull {
         }
 
         // We should never get here, every case should be handled above.
-        return Ok(());
+        Ok(())
     }
 
     pub fn spi_write(&self, addr: u32, value: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
@@ -392,7 +392,7 @@ impl ChipImpl for Grayskull {
                             }
 
                             PlatformError::ArcMsgError(err) => match err {
-                                crate::ArcMsgError::ProtocolError { source, backtrace } => match source {
+                                crate::ArcMsgError::ProtocolError { source, backtrace: _ } => match source {
                                     // We already know that ARC is "ready" to getting a msg not
                                     // recognized error probably indicates that we are running
                                     // really, really old fw
@@ -447,21 +447,19 @@ impl ChipImpl for Grayskull {
                         let dram_status = telem.smbus_tx_ddr_status;
 
                         let mut channels = [None; 6];
-                        for i in 0..6 {
+                        for (i, channel) in channels.iter_mut().enumerate() {
                             let status = (dram_status >> (i * 4)) & 0xF;
                             let status = status as u8;
 
                             // In the firmware these are just magic values, we'll translate them to
                             // something meaningful here (but it should be noted that these are
                             // based on wormhole definitions).
-                            if status == 1 {
-                                channels[i] =
-                                    Some(super::init::status::DramChannelStatus::TrainingPass);
+                            *channel = if status == 1 {
+                                Some(super::init::status::DramChannelStatus::TrainingPass)
                             } else if status == 0 {
-                                channels[i] =
-                                    Some(super::init::status::DramChannelStatus::TrainingFail);
+                                Some(super::init::status::DramChannelStatus::TrainingFail)
                             } else {
-                                channels[i] = None;
+                                None
                             }
                         }
 
@@ -570,10 +568,10 @@ impl ChipImpl for Grayskull {
         let telemetry_struct_offset = csm_offset.addr + (offset - 0x10000000) as u64;
         let smbus_tx_enum_version = self
             .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (0 * 4))?;
+            .axi_read32(&self.chip_if, telemetry_struct_offset)?;
         let smbus_tx_device_id = self
             .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (1 * 4))?;
+            .axi_read32(&self.chip_if, telemetry_struct_offset + 4)?;
         let smbus_tx_asic_ro = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (2 * 4))?;

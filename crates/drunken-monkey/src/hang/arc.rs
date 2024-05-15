@@ -21,7 +21,8 @@ pub fn hang_arc(method: ArcHangMethod, chip: Chip) -> Result<(), Box<dyn std::er
             chip.arc_msg(ArcMsgOptions {
                 msg: TypedArcMsg::SetArcState {
                     state: ArcState::A5,
-                }.into(),
+                }
+                .into(),
                 ..Default::default()
             })?;
         }
@@ -31,7 +32,8 @@ pub fn hang_arc(method: ArcHangMethod, chip: Chip) -> Result<(), Box<dyn std::er
             chip.arc_msg(ArcMsgOptions {
                 msg: TypedArcMsg::SetArcState {
                     state: ArcState::A3,
-                }.into(),
+                }
+                .into(),
                 ..Default::default()
             })?;
 

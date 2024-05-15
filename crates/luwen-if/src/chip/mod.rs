@@ -128,7 +128,7 @@ impl Telemetry {
     pub fn arc_fw_version(&self) -> String {
         let major = (self.smbus_tx_arc0_fw_version >> 16) & 0xFF;
         let minor = (self.smbus_tx_arc0_fw_version >> 8) & 0xFF;
-        let patch = (self.smbus_tx_arc0_fw_version >> 0) & 0xFF;
+        let patch = self.smbus_tx_arc0_fw_version & 0xFF;
         format!("{}.{}.{}", major, minor, patch)
     }
 
@@ -136,7 +136,7 @@ impl Telemetry {
     pub fn eth_fw_version(&self) -> String {
         let major = (self.smbus_tx_eth_fw_version >> 16) & 0x0FF;
         let minor = (self.smbus_tx_eth_fw_version >> 12) & 0x00F;
-        let patch = (self.smbus_tx_eth_fw_version >> 0) & 0xFFF;
+        let patch = self.smbus_tx_eth_fw_version & 0xFFF;
         format!("{}.{}.{}", major, minor, patch)
     }
 
@@ -219,7 +219,7 @@ impl Telemetry {
 
     /// Return the second outlet temperature in degrees celsius.
     pub fn outlet_temperature2(&self) -> f64 {
-        ((self.smbus_tx_board_temperature >> 0x00) & 0xff) as f64
+        (self.smbus_tx_board_temperature & 0xff) as f64
     }
 
     /// Return the power consumption in watts.

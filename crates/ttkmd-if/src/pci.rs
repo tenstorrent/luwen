@@ -25,7 +25,7 @@ pub(crate) fn read_bar0_base(config_space: &std::fs::File) -> u64 {
         }
     }
 
-    return u64::from_ne_bytes(bar01) & BAR_ADDRESS_MASK;
+    u64::from_ne_bytes(bar01) & BAR_ADDRESS_MASK
 }
 
 impl PciDevice {
@@ -214,7 +214,6 @@ impl PciDevice {
         unsafe { complete_flag.write_volatile(0) };
 
         // Configure the DMA engine
-        let msi_interrupt_received = false;
         if dma_config.support_64_bit_dma {
             self.write32(dma_config.dma_host_phys_addr_high, host_phys_addr_hi)?;
         }
@@ -247,7 +246,7 @@ impl PciDevice {
                 }
             }
         } else {
-            while msi_interrupt_received == false {}
+            unimplemented!("Do not currently support MSI based dma");
         }
 
         Ok(())
@@ -255,6 +254,8 @@ impl PciDevice {
 
     pub fn write_block(&mut self, addr: u32, data: &[u8]) -> Result<(), PciError> {
         if let Some(dma_config) = self.dma_config.clone() {
+            #[allow(clippy::collapsible_if)] // I want to make it clear that these are seperate
+            // types of checks
             if data.len() > dma_config.write_threshold as usize && dma_config.write_threshold > 0 {
                 if self.allocate_transfer_buffers() {
                     let mut num_bytes = data.len();
@@ -288,13 +289,17 @@ impl PciDevice {
             }
         }
 
-        Self::memcpy_to_device(unsafe { self.register_address_mut(addr) }, data);
+        unsafe {
+            Self::memcpy_to_device(self.register_address_mut(addr), data);
+        }
 
         Ok(())
     }
 
     pub fn read_block(&mut self, addr: u32, data: &mut [u8]) -> Result<(), PciError> {
         if let Some(dma_config) = self.dma_config.clone() {
+            #[allow(clippy::collapsible_if)] // I want to make it clear that these are seperate
+            // types of checks
             if data.len() > dma_config.read_threshold as usize && dma_config.read_threshold > 0 {
                 if self.allocate_transfer_buffers() {
                     let mut num_bytes = data.len();
@@ -316,7 +321,7 @@ impl PciDevice {
                         // SAFETY: Already checked that the transfer_buffer is Some in
                         // self.allocate_transfer_buffers
                         let buffer = self.transfer_buffer.as_ref().unwrap();
-                        (&mut data[offset..(offset + chunk_size)])
+                        data[offset..(offset + chunk_size)]
                             .copy_from_slice(&buffer.buffer[..chunk_size]);
                         num_bytes = num_bytes.saturating_sub(chunk_size);
                         offset += chunk_size;
@@ -338,17 +343,20 @@ impl PciDevice {
 }
 
 impl PciDevice {
-    pub fn memcpy_to_device(dest: *mut u8, src: &[u8]) {
+    /// # Safety
+    /// This function requires that dest is a value gotten from the self.register_address
+    /// function.
+    pub unsafe fn memcpy_to_device(dest: *mut u8, src: &[u8]) {
         // Start by aligning the destination (device) pointer. If needed, do RMW to fix up the
         // first partial word.
         let dest_misalignment = dest as usize % std::mem::size_of::<u32>();
 
         let (dest, src) = if dest_misalignment != 0 {
             // Read-modify-write for the first dest element.
-            let dest = unsafe { (dest as *mut u8).offset(-(dest_misalignment as isize)) };
+            let dest = unsafe { dest.offset(-(dest_misalignment as isize)) };
             let dest = dest as *mut u32;
 
-            let tmp = unsafe { (dest as *mut u32).read() };
+            let tmp = unsafe { dest.read() };
 
             let leading_len = (std::mem::size_of::<u32>() - dest_misalignment).min(src.len());
 

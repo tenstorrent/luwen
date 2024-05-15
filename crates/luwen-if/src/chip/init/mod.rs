@@ -30,9 +30,9 @@ pub enum InitError<E> {
     CallbackError(E),
 }
 
-impl Into<PlatformError> for InitError<Infallible> {
-    fn into(self) -> PlatformError {
-        match self {
+impl From<InitError<Infallible>> for PlatformError {
+    fn from(val: InitError<Infallible>) -> Self {
+        match val {
             InitError::PlatformError(err) => err,
             InitError::CallbackError(_) => unreachable!(),
         }

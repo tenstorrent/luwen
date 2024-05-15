@@ -139,10 +139,10 @@ impl From<Tlb16M> for Tlb {
     fn from(value: Tlb16M) -> Self {
         Tlb {
             local_offset: value.local_offset() as u64,
-            x_end: value.x_end() as u8,
-            y_end: value.y_end() as u8,
-            x_start: value.x_start() as u8,
-            y_start: value.y_start() as u8,
+            x_end: value.x_end(),
+            y_end: value.y_end(),
+            x_start: value.x_start(),
+            y_start: value.y_start(),
             noc_sel: value.noc_sel(),
             mcast: value.mcast(),
             ordering: Ordering::from(value.ordering()),
@@ -192,7 +192,7 @@ pub fn setup_tlb(
     let (tlb_value, mmio_addr, size, addr_offset) = match tlb_index {
         0..=155 => {
             let size = 1 << 20;
-            let tlb_address = tlb.local_offset as u64 / size;
+            let tlb_address = tlb.local_offset / size;
             let local_offset = tlb.local_offset % size;
 
             tlb.local_offset = tlb_address;
@@ -205,7 +205,7 @@ pub fn setup_tlb(
         }
         156..=165 => {
             let size = 1 << 21;
-            let tlb_address = tlb.local_offset as u64 / size;
+            let tlb_address = tlb.local_offset / size;
             let local_offset = tlb.local_offset % size;
 
             tlb.local_offset = tlb_address;
@@ -218,7 +218,7 @@ pub fn setup_tlb(
         }
         166..=185 => {
             let size = 1 << 24;
-            let tlb_address = tlb.local_offset as u64 / size;
+            let tlb_address = tlb.local_offset / size;
             let local_offset = tlb.local_offset % size;
 
             tlb.local_offset = tlb_address;
@@ -248,7 +248,7 @@ pub fn get_tlb(device: &PciDevice, tlb_index: u32) -> Result<Tlb, PciError> {
     let tlb_config_addr = TLB_CONFIG_BASE + (tlb_index * 8);
 
     let tlb = ((device.read32(tlb_config_addr + 4)? as u64) << 32)
-        | device.read32(tlb_config_addr as u32)? as u64;
+        | device.read32(tlb_config_addr)? as u64;
 
     let output = match tlb_index {
         0..=155 => Tlb1M::from(tlb).into(),

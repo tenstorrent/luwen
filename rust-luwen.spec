@@ -244,4 +244,3 @@ tomcli \
 %autochangelog
 * Wed Apr 03 2024 John 'Warthog9' Hawley <jhawley@tenstorrent.com> 0.3.7-1
 - new package built with tito
-

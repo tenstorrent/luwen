@@ -26,8 +26,8 @@ const PAGE_SIZE: u32 = 256;
 const SECTOR_SIZE: u32 = 4 * 1024;
 
 const SPI_CNTL_CLK_DISABLE: u32 = 0x1 << 8;
-const SPI_CNTL_SPI_DISABLE: u32 = 0x0 << 0;
-const SPI_CNTL_SPI_ENABLE: u32 = 0x1 << 0;
+const SPI_CNTL_SPI_DISABLE: u32 = 0x0;
+const SPI_CNTL_SPI_ENABLE: u32 = 0x1;
 
 const SPI_SSIENR_ENABLE: u32 = 0x1;
 const SPI_SSIENR_DISABLE: u32 = 0x0;
@@ -50,7 +50,7 @@ const SPI_CTRL0_SPI_FRF_STANDARD: u32 = 0x0 << 21;
 const SPI_CTRL0_DFS32_FRAME_08BITS: u32 = 0x7 << 16;
 
 fn spi_ctrl1_ndf(frame_count: u32) -> u32 {
-    (frame_count << 0) & 0xffff
+    frame_count & 0xffff
 }
 
 const SPI_SR_RFNE: u32 = 0x1 << 3;
@@ -70,7 +70,7 @@ fn spi_ser_slave_enable(slave_id: u32) -> u32 {
 }
 
 fn spi_baudr_sckdv(ssi_clk_div: u32) -> u32 {
-    (ssi_clk_div << 0) & 0xffff
+    ssi_clk_div & 0xffff
 }
 
 impl Spi {
@@ -273,7 +273,7 @@ impl Spi {
             chip.axi_write32(self.spi_dr, SPI_RD_CMD as u32)?;
             chip.axi_write32(self.spi_dr, (addr >> 16) & 0xff)?;
             chip.axi_write32(self.spi_dr, (addr >> 8) & 0xff)?;
-            chip.axi_write32(self.spi_dr, (addr >> 0) & 0xff)?;
+            chip.axi_write32(self.spi_dr, addr & 0xff)?;
 
             chip.axi_write32(self.spi_ser, spi_ser_slave_enable(0))?;
 
@@ -345,7 +345,7 @@ impl Spi {
             chip.axi_write32(self.spi_dr, SPI_WR_CMD as u32)?;
             chip.axi_write32(self.spi_dr, (addr >> 16) & 0xff)?;
             chip.axi_write32(self.spi_dr, (addr >> 8) & 0xff)?;
-            chip.axi_write32(self.spi_dr, (addr >> 0) & 0xff)?;
+            chip.axi_write32(self.spi_dr, addr & 0xff)?;
             for _ in 0..frames {
                 chip.axi_write32(self.spi_dr, write[frame_index] as u32)?;
                 frame_index += 1;
@@ -415,9 +415,9 @@ impl Spi {
 
         // Write sector to erase
         chip.axi_write32(self.spi_dr, SPI_WR_ER_CMD as u32)?;
-        chip.axi_write32(self.spi_dr, ((addr >> 16) & 0xff) as u32)?;
-        chip.axi_write32(self.spi_dr, ((addr >> 8) & 0xff) as u32)?;
-        chip.axi_write32(self.spi_dr, ((addr >> 0) & 0xff) as u32)?;
+        chip.axi_write32(self.spi_dr, (addr >> 16) & 0xff)?;
+        chip.axi_write32(self.spi_dr, (addr >> 8) & 0xff)?;
+        chip.axi_write32(self.spi_dr, addr & 0xff)?;
         chip.axi_write32(self.spi_ser, spi_ser_slave_enable(0))?;
 
         // Add some delay to make sure enable propagates
@@ -632,7 +632,7 @@ impl ActiveSpi {
             None
         };
 
-        let csm_offset = chip.axi_translate("ARC_CSM.DATA[0]")?.addr - 0x10000000 as u64;
+        let csm_offset = chip.axi_translate("ARC_CSM.DATA[0]")?.addr - 0x10000000_u64;
 
         if let Some(dump_addr) = dump_addr {
             Ok(Some(csm_offset + (dump_addr as u64)))
@@ -660,7 +660,7 @@ impl ActiveSpi {
             if offset < start_offset {
                 for (a, b) in data[offset as usize..]
                     .iter_mut()
-                    .zip(read_data[(start_offset - offset) as usize..].into_iter())
+                    .zip(read_data[(start_offset - offset) as usize..].iter())
                 {
                     *a = *b;
                 }
@@ -692,7 +692,7 @@ impl ActiveSpi {
             let addr = start_addr + offset;
 
             let mut read_data = Self::spi_arc_read_chunk(chip, spi_dump_addr, addr)?;
-            let orig_data = read_data.clone();
+            let orig_data = read_data;
             if offset < start_offset {
                 for (a, b) in data[offset as usize..]
                     .iter()
@@ -777,6 +777,7 @@ impl ActiveSpi {
         })();
 
         // I liked this better than putting `write_result?;`
+        #[allow(clippy::question_mark)]
         if let Err(err) = write_result {
             return Err(err);
         }

@@ -12,17 +12,11 @@ pub enum Arch {
 
 impl Arch {
     pub fn is_wormhole(&self) -> bool {
-        match self {
-            Arch::Wormhole => true,
-            _ => false,
-        }
+        matches!(self, Arch::Wormhole)
     }
 
     pub fn is_grayskull(&self) -> bool {
-        match self {
-            Arch::Grayskull => true,
-            _ => false,
-        }
+        matches!(self, Arch::Grayskull)
     }
 }
 
