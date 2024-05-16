@@ -1111,6 +1111,26 @@ impl UninitPciChip {
     pub fn force_upgrade(&self) -> PciChip {
         PciChip(self.chip.clone().upgrade())
     }
+
+    pub fn dram_safe(&self) -> bool {
+        self.chip
+            .dram_safe()
+    }
+
+    pub fn eth_safe(&self) -> bool {
+        self.chip
+            .eth_safe()
+    }
+
+    pub fn arc_alive(&self) -> bool {
+        self.chip
+            .arc_alive()
+    }
+
+    pub fn cpu_safe(&self) -> bool {
+        self.chip
+            .cpu_safe()
+    }
 }
 
 //silent callback (import), stdout (print)
@@ -1130,7 +1150,6 @@ pub fn detect_chips_fallible(
     let interfaces = interfaces.unwrap_or_default();
 
     let all_devices = luwen_ref::PciDevice::scan();
-
     let interfaces = if interfaces.is_empty() {
         all_devices
     } else {
@@ -1199,7 +1218,6 @@ pub fn detect_chips_fallible(
         } else {
             Box::new(|_| Python::with_gil(|py| py.check_signals()))
         };
-
     let mut chips = match luwen_if::detect_chips(root_chips, &mut callback, options) {
         Ok(chips) => chips,
         Err(InitError::PlatformError(err)) => {
@@ -1209,7 +1227,6 @@ pub fn detect_chips_fallible(
             return Err(err)?;
         }
     };
-
     for (id, chip, err) in failed_chips.into_iter() {
         let mut status = luwen_if::chip::InitStatus::new_unknown();
         status.comms_status = luwen_if::chip::CommsStatus::CommunicationError(err.to_string());
