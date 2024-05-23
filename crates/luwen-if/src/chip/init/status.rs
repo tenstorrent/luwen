@@ -363,8 +363,8 @@ impl CommsStatus {
 impl fmt::Display for CommsStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CommsStatus::CanCommunicate => f.write_str("OK"),
-            CommsStatus::CommunicationError(_err) => f.write_str("communication error"),
+            CommsStatus::CanCommunicate => f.write_str("Success"),
+            CommsStatus::CommunicationError(_err) => f.write_str("Error"),
         }
     }
 }
@@ -386,14 +386,38 @@ pub struct InitStatus {
 
 impl fmt::Display for InitStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "InitStatus:")?;
-        writeln!(f, "Communication Status: {}", self.comms_status)?;
-        writeln!(f, "DRAM Status: {}", self.dram_status)?;
-        writeln!(f, "CPU Status: {}", self.cpu_status)?;
-        writeln!(f, "ARC Status: {}", self.arc_status)?;
-        writeln!(f, "Ethernet Status: {}", self.eth_status)?;
-        writeln!(f, "Init Options: {:?}", self.init_options)?;
-        writeln!(f, "Unknown State: {}", self.unknown_state)
+        fn write_component_status<P, E>(
+            status: &ComponentStatusInfo<P, E>,
+        ) -> String {
+            let mut init_status = String::new();
+            if status.start_time.elapsed() > status.timeout {
+                init_status.push_str("Timeout");
+            } else {
+                init_status.push_str("In Progress");
+            }
+            let mut completed_count = 0;
+            for status in status.wait_status.iter() {
+                if let WaitStatus::NoCheck
+                | WaitStatus::JustFinished
+                | WaitStatus::Done
+                | WaitStatus::NotPresent = status
+                {
+                    completed_count += 1;
+                }
+            }
+            if status.wait_status.len() > 0 {
+                init_status.push_str(format!(", {} out of {} initialized", completed_count, status.wait_status.len()).as_str());
+            }
+            init_status
+            
+        }
+        writeln!(f, "   Communication Status: {}", self.comms_status)?;
+        writeln!(f, "   DRAM Status: {}", write_component_status(&self.dram_status))?;
+        writeln!(f, "   CPU Status: {}", write_component_status(&self.cpu_status))?;
+        writeln!(f, "   ARC Status: {}", write_component_status(&self.arc_status))?;
+        writeln!(f, "   Ethernet Status: {}", write_component_status(&self.eth_status))?;
+        writeln!(f, "   Noc Safe: {:?}", self.init_options.noc_safe)?;
+        writeln!(f, "   Unknown State: {}", self.unknown_state)
     }
 }
 

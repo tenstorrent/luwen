@@ -73,9 +73,8 @@ pub fn wait_for_init<E>(
                 // Hit an error, cannot continue to initialize the current chip,
                 // but we can continue to initialize other chips (assuming we are allowing failures).
                 if !allow_failure {
-                    let status = status.to_string();
                     return Err(PlatformError::Generic(
-                        format!("Chip initialization failed: {}, {}", error.to_string(), status),
+                        format!("Chip initialization failed: {} \n{}", error, status),
                         crate::error::BtWrapper(bt_tracker),
                     ))?;
                 } else {
@@ -88,9 +87,8 @@ pub fn wait_for_init<E>(
                 }
             }
             super::ChipInitResult::ErrorAbort(error, bt_tracker) => {
-                let status = status.to_string();
                 return Err(PlatformError::Generic(
-                    format!("Chip initialization failed (aborted): {}, {}", error.to_string(), status),
+                    format!("Chip initialization failed (aborted): {} \n{}", error, status),
                     crate::error::BtWrapper(bt_tracker),
                 ))?;
             }
