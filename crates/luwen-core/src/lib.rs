@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::str::FromStr;
+use std::fmt;
 
 #[derive(Clone, Hash, Copy, Debug, PartialEq, Eq)]
 pub enum Arch {
@@ -28,6 +29,16 @@ impl FromStr for Arch {
             "grayskull" => Ok(Arch::Grayskull),
             "wormhole" => Ok(Arch::Wormhole),
             err => Err(err.to_string()),
+        }
+    }
+}
+
+impl fmt::Display for Arch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Arch::Grayskull => write!(f, "Grayskull"),
+            Arch::Wormhole => write!(f, "Wormhole"),
+            Arch::Unknown(u) => write!(f, "Unknown({})", u),
         }
     }
 }

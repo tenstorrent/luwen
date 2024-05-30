@@ -99,7 +99,7 @@ pub fn detect_chips_options(options: ChipDetectOptions) -> Result<Vec<UninitChip
     let chip_detect_bar = bars.add(chip_detect_bar);
     chip_detect_bar.enable_steady_tick(std::time::Duration::from_secs_f32(1.0 / 30.0));
 
-    // First we will output errors for the chips we alraedy know have failed
+    // First we will output errors for the chips we already know have failed
     for (id, _, err) in &failed_chips {
         chip_detect_bar.inc(1);
         let bar = add_bar(&bars);

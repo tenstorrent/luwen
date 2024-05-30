@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
+use std::{backtrace, sync::Arc};
 
 use luwen_core::Arch;
 
@@ -301,29 +301,40 @@ impl ChipImpl for Grayskull {
                                     }
 
                                     // The fact that this is here means that our result is too generic, for now we just ignore it.
-                                    PlatformError::ArcMsgError(_) => {
-                                        return Ok(ChipInitResult::ErrorContinue);
+                                    PlatformError::ArcMsgError(error) => {
+                                        return Ok(ChipInitResult::ErrorContinue(error.to_string(), backtrace::Backtrace::capture()));
                                     }
 
                                     // This is fine to hit at this stage (though it should have been already verified to not be the case).
                                     // For now we just ignore it and hope that it will be resolved by the time the timeout expires...
-                                    PlatformError::EthernetTrainingNotComplete(_) => {
-                                        return Ok(ChipInitResult::ErrorContinue);
+                                    PlatformError::EthernetTrainingNotComplete(eth_cores) => {
+                                        let false_count = eth_cores.iter().filter(|&&x| !x).count();
+                                        return Ok(ChipInitResult::ErrorContinue(format!("Ethernet training not complete on [{}/16] ports", false_count), backtrace::Backtrace::capture()));
                                     }
 
                                     // This is an "expected error" but we probably can't recover from it, so we should abort the init.
-                                    PlatformError::AxiError(err) => {
-                                        *comms = CommsStatus::CommunicationError(err.to_string());
-                                        return Ok(ChipInitResult::ErrorAbort);
+                                    PlatformError::AxiError(error) => {
+                                        *comms = CommsStatus::CommunicationError(error.to_string());
+                                        return Ok(ChipInitResult::ErrorAbort(format!("AXI Error: {}", error.to_string()), backtrace::Backtrace::capture()));
                                     }
 
                                     // We don't expect to hit these cases so if we do, we should assume that something went terribly
                                     // wrong and abort the init.
-                                    PlatformError::WrongChipArch { .. }
-                                    | PlatformError::WrongChipArchs { .. }
-                                    | PlatformError::Generic(_, _)
-                                    | PlatformError::GenericError(_, _) => {
-                                        return Ok(ChipInitResult::ErrorAbort)
+                                    PlatformError::WrongChipArch {actual, expected, backtrace} => {
+                                        return Ok(ChipInitResult::ErrorAbort(format!("expected chip: {}, actual detected chip: {}", expected, actual), backtrace.0))
+                                    }
+
+                                    PlatformError::WrongChipArchs {actual, expected, backtrace} => {
+                                        let expected_chips = expected.iter().map(|arch| arch.to_string()).collect::<Vec<_>>().join(", ");
+                                        return Ok(ChipInitResult::ErrorAbort(format!("expected chip: {}, actual detected chips: {}", expected_chips, actual), backtrace.0));
+                                    }
+
+                                    PlatformError::Generic(error, backtrace) => {
+                                        return Ok(ChipInitResult::ErrorAbort(error, backtrace.0));
+                                    }
+
+                                    PlatformError::GenericError(error, backtrace) => {
+                                        return Ok(ChipInitResult::ErrorAbort(error.to_string(), backtrace.0));
                                     }
                                 }
                             }
@@ -408,23 +419,33 @@ impl ChipImpl for Grayskull {
                                     }
                                 }
                                 // This is an "expected error" but we probably can't recover from it, so we should abort the init.
-                                crate::ArcMsgError::AxiError(_) => {
-                                    return Ok(ChipInitResult::ErrorAbort);
+                                crate::ArcMsgError::AxiError(error) => {
+                                    return Ok(ChipInitResult::ErrorAbort(format!("Telemetry AXI error: {}; we expected to have communication, but lost it.", error.to_string()), backtrace::Backtrace::capture()));
                                 }
                             }
 
                             // This is an "expected error" but we probably can't recover from it, so we should abort the init.
-                            PlatformError::AxiError(_) => return Ok(ChipInitResult::ErrorAbort),
+                            PlatformError::AxiError(error) => return Ok(ChipInitResult::ErrorAbort(format!("Telemetry AXI error: {}; we expected to have communication, but lost it.", error.to_string()), backtrace::Backtrace::capture())),
 
 
 
                             // We don't expect to hit these cases so if we do, we should assume that something went terribly
                             // wrong and abort the init.
-                            PlatformError::WrongChipArch { .. }
-                            | PlatformError::WrongChipArchs { .. }
-                            | PlatformError::Generic(_, _)
-                            | PlatformError::GenericError(_, _) => {
-                                return Ok(ChipInitResult::ErrorAbort)
+                            PlatformError::WrongChipArch {actual, expected, backtrace} => {
+                                return Ok(ChipInitResult::ErrorAbort(format!("Expected chip: {}, actual detected chip: {}", expected, actual), backtrace.0))
+                            }
+
+                            PlatformError::WrongChipArchs {actual, expected, backtrace} => {
+                                let expected_chips = expected.iter().map(|arch| arch.to_string()).collect::<Vec<_>>().join(", ");
+                                return Ok(ChipInitResult::ErrorAbort(format!("Expected chip: {}, actual detected chips: {}", expected_chips, actual), backtrace.0));
+                            }
+
+                            PlatformError::Generic(error, backtrace) => {
+                                return Ok(ChipInitResult::ErrorAbort(error, backtrace.0));
+                            }
+
+                            PlatformError::GenericError(error, backtrace) => {
+                                return Ok(ChipInitResult::ErrorAbort(error.to_string(), backtrace.0));
                             }
                         },
                     };

@@ -240,9 +240,9 @@ pub enum ChipInitResult {
     /// this is for things like arc or ethernet training timeout.
     /// If this is returned then there shouldn't be a chip returned to the user,
     /// but we are okay to findout more information.
-    ErrorContinue,
+    ErrorContinue(String, std::backtrace::Backtrace),
     /// We hit an error that indicates that it would be unsafe to continue with init.
-    ErrorAbort,
+    ErrorAbort(String, std::backtrace::Backtrace),
 }
 
 /// Defines common functionality for all chips.
