@@ -90,6 +90,8 @@ pub fn main() -> Result<(), LuwenError> {
             read_write_test(wh, 0, 0, size, true).unwrap()
         } else if let Some(gs) = chip.as_gs() {
             read_write_test(gs, 1, 0, size, true).unwrap()
+        } else if let Some(bh) = chip.as_bh() {
+            read_write_test(bh, 1, 11, size, false).unwrap()
         } else {
             unimplemented!("Chip of arch {:?} not supported", chip.get_arch());
         };
