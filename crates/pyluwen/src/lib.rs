@@ -65,6 +65,23 @@ impl DerefMut for PciGrayskull {
 }
 
 #[pyclass]
+pub struct PciBlackhole(luwen_if::chip::Blackhole);
+
+impl Deref for PciBlackhole {
+    type Target = luwen_if::chip::Blackhole;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for PciBlackhole {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+#[pyclass]
 pub struct DmaBuffer(luwen_ref::DmaBuffer);
 
 #[pymethods]
@@ -499,6 +516,10 @@ impl PciChip {
         self.0.as_gs().map(|v| PciGrayskull(v.clone()))
     }
 
+    pub fn as_bh(&self) -> Option<PciBlackhole> {
+        self.0.as_bh().map(|v| PciBlackhole(v.clone()))
+    }
+
     pub fn is_remote(&self) -> bool {
         if let Some(wh) = self.0.as_wh() {
             wh.is_remote
@@ -731,6 +752,14 @@ impl PciInterface<'_> {
             })
     }
 
+    pub fn from_bh(bh: &PciBlackhole) -> Option<PciInterface> {
+        bh.0.get_if::<CallbackStorage<ExtendedPciDeviceWrapper>>()
+            .map(|v| PciInterface {
+                pci_interface: &v.user_data,
+            })
+    }
+
+
     #[allow(clippy::too_many_arguments)]
     pub fn setup_tlb(
         &self,
@@ -759,6 +788,7 @@ impl PciInterface<'_> {
                     mcast,
                     ordering,
                     linked,
+                    ..Default::default()
                 },
             )
             .unwrap()
@@ -1082,6 +1112,173 @@ impl RemoteWormhole {
     }
 }
 
+#[pymethods]
+impl PciBlackhole {
+    #[allow(clippy::too_many_arguments)]
+    pub fn setup_tlb(
+        &mut self,
+        index: u32,
+        addr: u64,
+        x_start: u8,
+        y_start: u8,
+        x_end: u8,
+        y_end: u8,
+        noc_sel: u8,
+        mcast: bool,
+        ordering: u8,
+        linked: bool,
+    ) -> PyResult<(u64, u64)> {
+        let value = PciInterface::from_bh(self);
+
+        if let Some(value) = value {
+            match ttkmd_if::tlb::Ordering::from(ordering) {
+                ttkmd_if::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
+                    "Invalid ordering {ordering}."
+                ))),
+                ordering => Ok(value.setup_tlb(
+                    index, addr, x_start, y_start, x_end, y_end, noc_sel, mcast, ordering, linked,
+                )),
+            }
+        } else {
+            Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ))
+        }
+    }
+
+    pub fn set_default_tlb(&self, index: u32) -> PyResult<()> {
+        let value = PciInterface::from_bh(self);
+
+        if let Some(value) = value {
+            value.pci_interface.borrow_mut().default_tlb = index;
+            Ok(())
+        } else {
+            Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ))
+        }
+    }
+
+    pub fn allocate_dma_buffer(&self, size: u32) -> PyResult<DmaBuffer> {
+        let value = PciInterface::from_bh(self);
+
+        if let Some(value) = value {
+            Ok(value.allocate_dma_buffer(size).map_err(|v| {
+                PyException::new_err(format!("Could not allocate DMA buffer: {}", v))
+            })?)
+        } else {
+            Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ))
+        }
+    }
+
+    #[pyo3(signature = (dma_64_bit_addr, csm_pcie_ctrl_dma_request_offset, arc_misc_cntl_addr, msi, read_threshold, write_threshold))]
+    pub fn config_dma(
+        &self,
+        dma_64_bit_addr: Option<u32>,
+        csm_pcie_ctrl_dma_request_offset: u32,
+        arc_misc_cntl_addr: u32,
+        msi: bool,
+        read_threshold: u32,
+        write_threshold: u32,
+    ) -> PyResult<()> {
+        let value = PciInterface::from_bh(self);
+
+        if let Some(value) = value {
+            Ok(value
+                .config_dma(
+                    dma_64_bit_addr,
+                    csm_pcie_ctrl_dma_request_offset,
+                    arc_misc_cntl_addr,
+                    msi,
+                    read_threshold,
+                    write_threshold,
+                )
+                .map_err(|v| PyException::new_err(format!("Could perform dma config: {}", v)))?)
+        } else {
+            Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ))
+        }
+    }
+
+    pub fn dma_transfer_turbo(
+        &self,
+        addr: u32,
+        physical_dma_buffer: u64,
+        size: u32,
+        write: bool,
+    ) -> PyResult<()> {
+        let value = PciInterface::from_bh(self);
+
+        if let Some(value) = value {
+            Ok(value
+                .dma_transfer_turbo(addr, physical_dma_buffer, size, write)
+                .map_err(|v| PyException::new_err(format!("Could perform dma transfer: {}", v)))?)
+        } else {
+            Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ))
+        }
+    }
+
+    pub fn pci_board_type(&self) -> PyResult<u16> {
+        let value = PciInterface::from_bh(self);
+        if let Some(value) = value {
+            Ok(value.pci_interface.borrow().device.physical.subsystem_id)
+        } else {
+            Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ))
+        }
+    }
+
+    pub fn pci_interface_id(&self) -> PyResult<usize> {
+        let value = PciInterface::from_bh(self);
+        if let Some(value) = value {
+            Ok(value.pci_interface.borrow().device.id)
+        } else {
+            Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ))
+        }
+    }
+
+    pub fn spi_read(&self, addr: u32, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
+        Python::with_gil(|_py| {
+            let ptr: *mut u8 = data.buf_ptr().cast();
+            let len = data.len_bytes();
+
+            let data = unsafe { std::slice::from_raw_parts_mut(ptr, len) };
+            self.0
+                .spi_read(addr, data)
+                .map_err(|v| PyException::new_err(v.to_string()))
+        })
+    }
+
+    pub fn spi_write(&self, addr: u32, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
+        Python::with_gil(|_py| {
+            let ptr: *mut u8 = data.buf_ptr().cast();
+            let len = data.len_bytes();
+
+            let data = unsafe { std::slice::from_raw_parts(ptr, len) };
+            self.0
+                .spi_write(addr, data)
+                .map_err(|v| PyException::new_err(v.to_string()))
+        })
+    }
+
+    pub fn get_local_coord(&self) -> PyResult<EthAddr> {
+        self.0
+            .get_local_chip_coord()
+            .map(|v| v.into())
+            .map_err(|v| PyException::new_err(v.to_string()))
+    }
+}
+
+common_chip_comms_impls!(PciBlackhole);
+
 #[pyclass]
 pub struct UninitPciChip {
     pub chip: UninitChip,
@@ -1288,6 +1485,8 @@ fn pyluwen(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<DmaBuffer>()?;
     m.add_class::<AxiData>()?;
     m.add_class::<Telemetry>()?;
+
+    m.add_class::<PciBlackhole>()?;
 
     m.add_wrapped(wrap_pyfunction!(detect_chips))?;
     m.add_wrapped(wrap_pyfunction!(detect_chips_fallible))?;

@@ -89,7 +89,9 @@ impl Blackhole {
 
             arc_addrs: ArcMsgAddr {
                 scratch_base: arc_if.axi_translate("arc_ss.reset_unit.SCRATCH_0")?.addr,
-                arc_misc_cntl: arc_if.axi_translate("arc_ss.reset_unit.ARC_MISC_CNTL")?.addr,
+                arc_misc_cntl: arc_if
+                    .axi_translate("arc_ss.reset_unit.ARC_MISC_CNTL")?
+                    .addr,
             },
 
             arc_if: Arc::new(arc_if),
@@ -198,6 +200,15 @@ impl Blackhole {
         unimplemented!("Need CMFW support for spi_read impl");
 
         Ok(())
+    }
+
+    pub fn get_local_chip_coord(&self) -> Result<EthAddr, PlatformError> {
+        Ok(EthAddr {
+            rack_x: 0,
+            rack_y: 0,
+            shelf_x: 0,
+            shelf_y: 0,
+        })
     }
 }
 
