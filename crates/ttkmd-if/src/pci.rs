@@ -86,9 +86,8 @@ impl PciDevice {
         let data_read = data_read.unwrap_or(ERROR_VALUE);
 
         if self.read_checking_enabled && data_read == ERROR_VALUE {
-            const ARC_SCRATCH6_ADDR: u32 = 0x1ff30078;
             let scratch_data = unsafe {
-                self.register_address::<u32>(ARC_SCRATCH6_ADDR)
+                self.register_address::<u32>(self.read_checking_addr)
                     .read_volatile()
             };
 
@@ -108,7 +107,7 @@ impl PciDevice {
 
             register_addr -= self.system_reg_offset_adjust;
             reg_mapping = mapping.as_ptr();
-        } else if self.bar0_wc.is_some() && (register_addr as usize) < self.bar0_wc_size {
+        } else if self.bar0_wc.is_some() && (register_addr as u64) < self.bar0_wc_size {
             let mapping = self.bar0_wc.as_ref().unwrap_unchecked();
 
             reg_mapping = mapping.as_ptr();
@@ -128,7 +127,7 @@ impl PciDevice {
 
             register_addr -= self.system_reg_offset_adjust;
             reg_mapping = mapping.as_ptr() as *mut u8;
-        } else if self.bar0_wc.is_some() && (register_addr as usize) < self.bar0_wc_size {
+        } else if self.bar0_wc.is_some() && (register_addr as u64) < self.bar0_wc_size {
             let mapping = self.bar0_wc.as_ref().unwrap_unchecked();
 
             reg_mapping = mapping.as_ptr() as *mut u8;

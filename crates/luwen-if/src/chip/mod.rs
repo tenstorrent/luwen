@@ -10,6 +10,7 @@ mod init;
 mod remote;
 mod spi;
 mod wormhole;
+mod blackhole;
 
 pub use communication::chip_comms::{
     axi_translate, ArcIf, AxiData, AxiError, ChipComms, MemorySlice, MemorySlices,
@@ -24,6 +25,7 @@ pub use init::{
 };
 use luwen_core::Arch;
 pub use wormhole::Wormhole;
+pub use blackhole::Blackhole;
 
 use crate::arc_msg::TypedArcMsg;
 pub use crate::arc_msg::{ArcMsg, ArcMsgOk};
@@ -312,6 +314,11 @@ impl Chip {
     /// Downcast to a grayskull chip
     pub fn as_gs(&self) -> Option<&Grayskull> {
         self.inner.as_any().downcast_ref::<Grayskull>()
+    }
+
+    /// Downcast to a blackhole chip
+    pub fn as_bh(&self) -> Option<&Blackhole> {
+        self.inner.as_any().downcast_ref::<Blackhole>()
     }
 }
 

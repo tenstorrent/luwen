@@ -163,7 +163,8 @@ impl ExtendedPciDevice {
         let (grid_size_x, grid_size_y) = match device.arch {
             luwen_core::Arch::Grayskull => (13, 12),
             luwen_core::Arch::Wormhole => (10, 12),
-            _ => unreachable!(),
+            luwen_core::Arch::Blackhole => (14, 10),
+            luwen_core::Arch::Unknown(id) => unreachable!("Found unrecognizable id {id:x}"),
         };
 
         Ok(ExtendedPciDeviceWrapper {
@@ -395,6 +396,7 @@ pub fn comms_callback_inner(
                 let (x_start, y_start) = match writer.device.arch {
                     luwen_core::Arch::Grayskull => (0, 0),
                     luwen_core::Arch::Wormhole => (1, 0),
+                    luwen_core::Arch::Blackhole => (0, 0),
                     luwen_core::Arch::Unknown(_) => todo!(),
                 };
 

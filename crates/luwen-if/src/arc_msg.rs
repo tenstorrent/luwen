@@ -248,17 +248,6 @@ pub struct ArcMsgAddr {
     pub arc_misc_cntl: u64,
 }
 
-impl TryFrom<&dyn ChipComms> for ArcMsgAddr {
-    type Error = AxiError;
-
-    fn try_from(value: &dyn ChipComms) -> Result<Self, Self::Error> {
-        Ok(ArcMsgAddr {
-            scratch_base: value.axi_translate("ARC_RESET.SCRATCH[0]")?.addr,
-            arc_misc_cntl: value.axi_translate("ARC_RESET.ARC_MISC_CNTL")?.addr,
-        })
-    }
-}
-
 pub fn arc_msg<T: HlComms>(
     comms: &T,
     msg: &ArcMsg,

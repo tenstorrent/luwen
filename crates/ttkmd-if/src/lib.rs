@@ -27,6 +27,7 @@ impl From<&GetDeviceInfoOut> for Arch {
         match value.device_id {
             0xfaca => Arch::Grayskull,
             0x401e => Arch::Wormhole,
+            0xb140 => Arch::Blackhole,
             id => Arch::Unknown(id),
         }
     }
@@ -79,17 +80,18 @@ pub struct PciDevice {
     pub arch: Arch,
 
     pub read_checking_enabled: bool,
+    pub read_checking_addr: u32,
 
     next_dma_buf: usize,
 
     device_fd: std::fs::File,
     bar0_uc: memmap2::MmapMut,
     #[allow(dead_code)]
-    bar0_uc_size: usize,
+    bar0_uc_size: u64,
     bar0_uc_offset: u64,
 
     bar0_wc: Option<memmap2::MmapMut>,
-    bar0_wc_size: usize,
+    bar0_wc_size: u64,
 
     config_space: std::fs::File,
 
@@ -193,6 +195,8 @@ impl PciDevice {
             });
         }
 
+        let arch = Arch::from(&device_info.output);
+
         let mut bar0_uc_mapping = Mapping::default();
         let mut bar0_wc_mapping = Mapping::default();
         let mut bar2_uc_mapping = Mapping::default();
@@ -230,6 +234,12 @@ impl PciDevice {
             });
         }
 
+        let wc_mapping_size = if arch.is_blackhole() {
+            kmdif::BH_BAR0_WC_MAPPING_SIZE
+        } else {
+            kmdif::GS_BAR0_WC_MAPPING_SIZE
+        };
+
         // if disable_wc
         // bar0_wc_mapping = 0;
         // bar0_wc_size = 0;
@@ -237,12 +247,10 @@ impl PciDevice {
         let mut bar0_wc_size = 0;
         let mut bar0_wc = None;
         if bar0_wc_mapping.mapping_id == kmdif::MappingId::Resource0Wc.as_u32() {
-            bar0_wc_size = bar0_wc_mapping
-                .mapping_size
-                .min(kmdif::GS_BAR0_WC_MAPPING_SIZE) as usize;
+            bar0_wc_size = bar0_wc_mapping.mapping_size.min(wc_mapping_size);
             let bar0_wc_map = unsafe {
                 memmap2::MmapOptions::default()
-                    .len(bar0_wc_size)
+                    .len(bar0_wc_size as usize)
                     .offset(bar0_wc_mapping.mapping_base)
                     .map_mut(fd.as_raw_fd())
             };
@@ -261,19 +269,17 @@ impl PciDevice {
         let bar0_uc_size;
         let bar0_uc_offset;
         if bar0_wc.is_some() {
-            bar0_uc_size = bar0_uc_mapping
-                .mapping_size
-                .saturating_sub(kmdif::GS_BAR0_WC_MAPPING_SIZE) as usize;
-            bar0_uc_offset = kmdif::GS_BAR0_WC_MAPPING_SIZE;
+            bar0_uc_size = bar0_uc_mapping.mapping_size.saturating_sub(wc_mapping_size);
+            bar0_uc_offset = wc_mapping_size;
         } else {
             // No WC mapping, map the entire BAR UC.
-            bar0_uc_size = bar0_uc_mapping.mapping_size as usize;
+            bar0_uc_size = bar0_uc_mapping.mapping_size;
             bar0_uc_offset = 0;
         }
 
         let bar0_uc = unsafe {
             memmap2::MmapOptions::default()
-                .len(bar0_uc_size)
+                .len(bar0_uc_size as usize)
                 .offset(bar0_uc_mapping.mapping_base + bar0_uc_offset)
                 .map_mut(fd.as_raw_fd())
         };
@@ -294,7 +300,7 @@ impl PciDevice {
         let mut system_reg_start_offset = 0;
         let mut system_reg_offset_adjust = 0;
         let mut system_reg_mapping = None;
-        if Arch::from(&device_info.output) == Arch::Wormhole {
+        if arch.is_wormhole() {
             if bar2_uc_mapping.mapping_id != kmdif::MappingId::Resource2Uc.as_u32() {
                 panic!("Device {device_id} has no BAR4 mapping");
             }
@@ -338,7 +344,7 @@ impl PciDevice {
 
         let mut device = PciDevice {
             id: device_id,
-            arch: Arch::from(&device_info.output),
+            arch,
 
             physical: PhysicalDevice {
                 vendor_id: device_info.output.vendor_id,
@@ -354,6 +360,11 @@ impl PciDevice {
             },
 
             read_checking_enabled: true,
+            read_checking_addr: if arch.is_blackhole() {
+                kmdif::BH_NOC_NODE_ID_OFFSET
+            } else {
+                kmdif::GS_WH_ARC_SCRATCH6_ADDR
+            },
 
             next_dma_buf: 0,
 

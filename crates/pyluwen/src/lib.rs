@@ -1177,7 +1177,14 @@ pub fn detect_chips_fallible(
 
         // First let's test basic pcie communication we may be in a hang state so it's
         // important that we let the detect function know
-        let result = chip.axi_sread32("ARC_RESET.SCRATCH[0]");
+
+        // Hack(drosen): Basic init procedure should resolve this
+        let scratch_0 = if chip.get_arch().is_blackhole() {
+            "arc_ss.reset_unit.SCRATCH_0"
+        } else {
+            "ARC_RESET.SCRATCH[0]"
+        };
+        let result = chip.axi_sread32(scratch_0);
         if let Err(err) = result {
             // Basic comms have failed... we should output a nice error message on the console
             failed_chips.push((interface, chip, err));

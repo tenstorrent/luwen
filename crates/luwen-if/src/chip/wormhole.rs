@@ -90,7 +90,10 @@ impl Wormhole {
             is_remote,
             use_arc_for_spi,
 
-            arc_addrs: ArcMsgAddr::try_from(&arc_if as &dyn ChipComms)?,
+            arc_addrs: ArcMsgAddr {
+                scratch_base: arc_if.axi_translate("ARC_RESET.SCRATCH[0]")?.addr,
+                arc_misc_cntl: arc_if.axi_translate("ARC_RESET.ARC_MISC_CNTL")?.addr,
+            },
 
             arc_if: Arc::new(arc_if),
             eth_addrs: EthAddresses::default(),
@@ -422,7 +425,10 @@ impl ChipImpl for Wormhole {
 
                                     // The fact that this is here means that our result is too generic, for now we just ignore it.
                                     PlatformError::ArcMsgError(error) => {
-                                        return Ok(ChipInitResult::ErrorContinue(error.to_string(), backtrace::Backtrace::capture()));
+                                        return Ok(ChipInitResult::ErrorContinue(
+                                            error.to_string(),
+                                            backtrace::Backtrace::capture(),
+                                        ));
                                     }
 
                                     // This is fine to hit at this stage (though it should have been already verified to not be the case).
@@ -440,27 +446,57 @@ impl ChipImpl for Wormhole {
                                     // This is an "expected error" but we probably can't recover from it, so we should abort the init.
                                     PlatformError::AxiError(error) => {
                                         *comms = CommsStatus::CommunicationError(error.to_string());
-                                        return Ok(ChipInitResult::ErrorAbort(format!("ARC AXI error: {}", error.to_string()), backtrace::Backtrace::capture()));
+                                        return Ok(ChipInitResult::ErrorAbort(
+                                            format!("ARC AXI error: {}", error.to_string()),
+                                            backtrace::Backtrace::capture(),
+                                        ));
                                     }
 
                                     // We don't expect to hit these cases so if we do, we should assume that something went terribly
                                     // wrong and abort the init.
-                                    PlatformError::WrongChipArch {actual, expected, backtrace} => {
-                                        return Ok(ChipInitResult::ErrorAbort(format!("expected chip: {}, actual detected chip: {}", expected, actual), backtrace.0))
+                                    PlatformError::WrongChipArch {
+                                        actual,
+                                        expected,
+                                        backtrace,
+                                    } => {
+                                        return Ok(ChipInitResult::ErrorAbort(
+                                            format!(
+                                                "expected chip: {}, actual detected chip: {}",
+                                                expected, actual
+                                            ),
+                                            backtrace.0,
+                                        ))
                                     }
 
-                                    PlatformError::WrongChipArchs {actual, expected, backtrace} => {
-                                        let expected_chips = expected.iter().map(|arch| arch.to_string()).collect::<Vec<_>>().join(", ");
-                                        return Ok(ChipInitResult::ErrorAbort(format!("expected chip: {}, actual detected chips: {}", expected_chips, actual), backtrace.0));
+                                    PlatformError::WrongChipArchs {
+                                        actual,
+                                        expected,
+                                        backtrace,
+                                    } => {
+                                        let expected_chips = expected
+                                            .iter()
+                                            .map(|arch| arch.to_string())
+                                            .collect::<Vec<_>>()
+                                            .join(", ");
+                                        return Ok(ChipInitResult::ErrorAbort(
+                                            format!(
+                                                "expected chip: {}, actual detected chips: {}",
+                                                expected_chips, actual
+                                            ),
+                                            backtrace.0,
+                                        ));
                                     }
 
                                     PlatformError::Generic(error, backtrace) => {
                                         return Ok(ChipInitResult::ErrorAbort(error, backtrace.0));
                                     }
 
-                                    | PlatformError::GenericError(error, backtrace) => {
+                                    PlatformError::GenericError(error, backtrace) => {
                                         let err_msg = error.to_string();
-                                        return Ok(ChipInitResult::ErrorAbort(err_msg, backtrace.0));
+                                        return Ok(ChipInitResult::ErrorAbort(
+                                            err_msg,
+                                            backtrace.0,
+                                        ));
                                     }
                                 }
                             }
@@ -631,23 +667,38 @@ impl ChipImpl for Wormhole {
                                 // ARC should be initialized at this point, hitting an error here means
                                 // that we can no longer progress in the init.
                                 PlatformError::ArcMsgError(error) => {
-                                    return Ok(ChipInitResult::ErrorContinue(error.to_string(), backtrace::Backtrace::capture()));
+                                    return Ok(ChipInitResult::ErrorContinue(
+                                        error.to_string(),
+                                        backtrace::Backtrace::capture(),
+                                    ));
                                 }
 
                                 PlatformError::ArcNotReady(error, backtrace) => {
-                                    return Ok(ChipInitResult::ErrorContinue(error.to_string(), backtrace.0));
+                                    return Ok(ChipInitResult::ErrorContinue(
+                                        error.to_string(),
+                                        backtrace.0,
+                                    ));
                                 }
 
                                 // We are checking for ethernet training to complete... if we hit this than
                                 // something has gone terribly wrong
                                 PlatformError::EthernetTrainingNotComplete(eth_cores) => {
                                     let false_count = eth_cores.iter().filter(|&&x| !x).count();
-                                    return Ok(ChipInitResult::ErrorContinue(format!("Ethernet training not complete on [{}/16] ports", false_count), backtrace::Backtrace::capture()));
-                                    }
+                                    return Ok(ChipInitResult::ErrorContinue(
+                                        format!(
+                                            "Ethernet training not complete on [{}/16] ports",
+                                            false_count
+                                        ),
+                                        backtrace::Backtrace::capture(),
+                                    ));
+                                }
 
                                 // This is an "expected error" but we probably can't recover from it, so we should abort the init.
                                 PlatformError::AxiError(error) => {
-                                    return Ok(ChipInitResult::ErrorAbort(error.to_string(), backtrace::Backtrace::capture()));
+                                    return Ok(ChipInitResult::ErrorAbort(
+                                        error.to_string(),
+                                        backtrace::Backtrace::capture(),
+                                    ));
                                 }
 
                                 // We don't expect to hit these cases so if we do, we should assume that something went terribly
@@ -655,20 +706,44 @@ impl ChipImpl for Wormhole {
                                 PlatformError::UnsupportedFwVersion { version, required } => {
                                     return Ok(ChipInitResult::ErrorAbort(format!("Required Ethernet Firmware Version: {}, current version: {:?}", required, version), backtrace::Backtrace::capture()));
                                 }
-                                PlatformError::WrongChipArch {actual, expected, backtrace} => {
-                                    return Ok(ChipInitResult::ErrorAbort(format!("expected chip: {}, actual detected chip: {}", expected, actual), backtrace.0))
+                                PlatformError::WrongChipArch {
+                                    actual,
+                                    expected,
+                                    backtrace,
+                                } => {
+                                    return Ok(ChipInitResult::ErrorAbort(
+                                        format!(
+                                            "expected chip: {}, actual detected chip: {}",
+                                            expected, actual
+                                        ),
+                                        backtrace.0,
+                                    ))
                                 }
-    
-                                PlatformError::WrongChipArchs {actual, expected, backtrace} => {
-                                    let expected_chips = expected.iter().map(|arch| arch.to_string()).collect::<Vec<_>>().join(", ");
-                                    return Ok(ChipInitResult::ErrorAbort(format!("expected chip: {}, actual detected chips: {}", expected_chips, actual), backtrace.0));
+
+                                PlatformError::WrongChipArchs {
+                                    actual,
+                                    expected,
+                                    backtrace,
+                                } => {
+                                    let expected_chips = expected
+                                        .iter()
+                                        .map(|arch| arch.to_string())
+                                        .collect::<Vec<_>>()
+                                        .join(", ");
+                                    return Ok(ChipInitResult::ErrorAbort(
+                                        format!(
+                                            "expected chip: {}, actual detected chips: {}",
+                                            expected_chips, actual
+                                        ),
+                                        backtrace.0,
+                                    ));
                                 }
-    
+
                                 PlatformError::Generic(error, backtrace) => {
                                     return Ok(ChipInitResult::ErrorAbort(error, backtrace.0));
                                 }
-    
-                                | PlatformError::GenericError(error, backtrace) => {
+
+                                PlatformError::GenericError(error, backtrace) => {
                                     let err_msg = error.to_string();
                                     return Ok(ChipInitResult::ErrorAbort(err_msg, backtrace.0));
                                 }

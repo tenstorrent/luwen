@@ -216,7 +216,7 @@ pub struct MemoryFile {
     pub tops: HashMap<String, MemoryTopLevel>,
 }
 
-fn parse_translation_file(
+fn parse_yaml_translation_file(
     path: &str,
     file: &str,
 ) -> Result<HashMap<String, MemorySlice>, Box<dyn std::error::Error>> {
@@ -335,24 +335,268 @@ fn parse_translation_file(
     Ok(slices)
 }
 
-fn parse_and_serialize_translation(
+fn parse_yaml_and_serialize_translation(
     path: &str,
     file: &str,
     output: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let data = parse_translation_file(path, file)?;
+    let data = parse_yaml_translation_file(path, file)?;
     std::fs::write(output, bincode::serialize(&MemorySlices::Tree(data))?)?;
 
     Ok(())
 }
 
-fn parse_and_serialize_translation_singlelayer(
+fn parse_yaml_and_serialize_translation_singlelayer(
     path: &str,
     file: &str,
     output: &str,
     whitelist: &[&str],
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let data = MemorySlices::Tree(parse_translation_file(path, file)?);
+    let data = MemorySlices::Tree(parse_yaml_translation_file(path, file)?);
+
+    let mut output_data = HashMap::new();
+    for w in whitelist {
+        output_data.insert(w.to_string(), axi_translate(Some(&data), w)?);
+    }
+
+    let data = bincode::serialize(&MemorySlices::Flat(output_data))?;
+    std::fs::write(output, data)?;
+
+    Ok(())
+}
+
+fn maybe_deserialize_rdl_number<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: serde_json::Value = Deserialize::deserialize(deserializer)?;
+
+    Ok(if s.is_object() {
+        let number = s.get("int").unwrap().as_str().unwrap();
+
+        // Then use nom to parse the string as an integer, this parser accepts (and ignores) '_' in the
+        // value.
+        let (_, s) = all_consuming(alt((
+            parse_hexidecimal,
+            parse_decimal,
+            parse_binary,
+            parse_octal,
+        )))(number)
+        .finish()
+        .map_err(|e| {
+            serde::de::Error::custom(format!("Could not parse string {s} as integer: {e}"))
+        })?;
+
+        Some(s)
+    } else {
+        Some(s.as_u64().unwrap())
+    })
+}
+
+fn deserialize_rdl_number<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: serde_json::Value = Deserialize::deserialize(deserializer)?;
+
+    Ok(if s.is_object() {
+        let number = s.get("int").unwrap().as_str().unwrap();
+
+        // Then use nom to parse the string as an integer, this parser accepts (and ignores) '_' in the
+        // value.
+        let (_, s) = all_consuming(alt((
+            parse_hexidecimal,
+            parse_decimal,
+            parse_binary,
+            parse_octal,
+        )))(number)
+        .finish()
+        .map_err(|e| {
+            serde::de::Error::custom(format!("Could not parse string {s} as integer: {e}"))
+        })?;
+
+        s
+    } else {
+        s.as_u64().unwrap()
+    })
+}
+
+fn deserialize_rdl_string<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: serde_json::Value = Deserialize::deserialize(deserializer)?;
+
+    Ok(if s.is_object() {
+        let mut output = s
+            .get("text")
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| {
+                let mut output = s.as_str().unwrap().to_string();
+                output.push('\n');
+                output
+            })
+            .collect::<String>();
+        output.pop();
+        output
+    } else {
+        s.as_str().unwrap().to_string()
+    })
+}
+
+pub enum RdlField {
+    MemoryRef {
+        mask: u32,
+        upper_bits: u32,
+        lower_bits: u32,
+        description: String,
+    },
+    Field(RdlDef),
+}
+
+impl<'de> Deserialize<'de> for RdlField {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct DeserializeField;
+
+        impl<'de> Visitor<'de> for DeserializeField {
+            type Value = RdlField;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a list either either 4 or 5 elements long")
+            }
+
+            fn visit_seq<A>(self, seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let value: (u32, u32, u32, String) =
+                    Deserialize::deserialize(SeqAccessDeserializer::new(seq))?;
+
+                Ok(RdlField::MemoryRef {
+                    mask: value.0,
+                    upper_bits: value.1,
+                    lower_bits: value.2,
+                    description: value.3,
+                })
+            }
+
+            fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                let output =
+                    RdlDef::deserialize(serde::de::value::MapAccessDeserializer::new(map))?;
+                Ok(RdlField::Field(output))
+            }
+        }
+
+        deserializer.deserialize_any(DeserializeField)
+    }
+}
+
+#[derive(Deserialize)]
+pub struct RdlDef {
+    #[serde(rename = "Address", deserialize_with = "deserialize_rdl_number")]
+    address: u64,
+    #[serde(
+        rename = "Description",
+        deserialize_with = "deserialize_rdl_string",
+        default
+    )]
+    description: String,
+    #[serde(
+        rename = "ArraySize",
+        deserialize_with = "maybe_deserialize_rdl_number",
+        default
+    )]
+    array_size: Option<u64>,
+    #[serde(
+        rename = "AddressIncrement",
+        deserialize_with = "maybe_deserialize_rdl_number",
+        default
+    )]
+    address_increment: Option<u64>,
+    #[serde(rename = "Fields", default)]
+    fields: HashMap<String, RdlField>,
+}
+
+fn parse_json_translation_file(
+    path: &str,
+    file: &str,
+) -> Result<HashMap<String, MemorySlice>, Box<dyn std::error::Error>> {
+    fn parse_field(addr: u64, name: &str, field: &RdlField) -> MemorySlice {
+        match field {
+            RdlField::MemoryRef {
+                mask,
+                upper_bits,
+                lower_bits,
+                description,
+            } => {
+                let size = ((upper_bits + 1 + 7) / 8) as u64;
+                MemorySlice {
+                    name: name.to_string(),
+                    offset: 0,
+                    array_count: None,
+                    size,
+                    bit_mask: Some((*lower_bits, *upper_bits)),
+                    children: HashMap::new(),
+                }
+            }
+            RdlField::Field(field) => convert_to_memory_slice(addr, name, field),
+        }
+    }
+
+    fn convert_to_memory_slice(base_addr: u64, name: &str, def: &RdlDef) -> MemorySlice {
+        let mut output = MemorySlice {
+            name: name.to_string(),
+            offset: base_addr,
+            size: 0,
+            array_count: def.array_size,
+            bit_mask: None,
+            children: HashMap::with_capacity(def.fields.len()),
+        };
+        for (region_name, def) in &def.fields {
+            output.children.insert(
+                region_name.clone(),
+                parse_field(base_addr, region_name.as_str(), def),
+            );
+        }
+
+        output.size = if let Some(incr) = &def.address_increment {
+            *incr
+        } else {
+            output.children.values().map(|v| v.size).sum()
+        };
+
+        output
+    }
+
+    let top_level: HashMap<String, RdlDef> =
+        serde_json::from_slice(&std::fs::read(format!("{path}/{file}"))?)?;
+
+    let mut slices = HashMap::with_capacity(top_level.len());
+    for (name, top) in top_level {
+        println!("Parsing {name}");
+
+        slices.insert(name.clone(), convert_to_memory_slice(0, &name, &top));
+    }
+
+    Ok(slices)
+}
+
+fn parse_json_and_serialize_translation_singlelayer(
+    path: &str,
+    file: &str,
+    output: &str,
+    whitelist: &[&str],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let data = MemorySlices::Tree(parse_json_translation_file(path, file)?);
 
     let mut output_data = HashMap::new();
     for w in whitelist {
@@ -366,9 +610,13 @@ fn parse_and_serialize_translation_singlelayer(
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    parse_and_serialize_translation("data/grayskull", "axi-pci.yaml", "grayskull-axi-pci.bin")?;
-    parse_and_serialize_translation("data/wormhole", "axi-pci.yaml", "wormhole-axi-pci.bin")?;
-    parse_and_serialize_translation("data/wormhole", "axi-noc.yaml", "wormhole-axi-noc.bin")?;
+    parse_yaml_and_serialize_translation(
+        "data/grayskull",
+        "axi-pci.yaml",
+        "grayskull-axi-pci.bin",
+    )?;
+    parse_yaml_and_serialize_translation("data/wormhole", "axi-pci.yaml", "wormhole-axi-pci.bin")?;
+    parse_yaml_and_serialize_translation("data/wormhole", "axi-noc.yaml", "wormhole-axi-noc.bin")?;
 
     let os_keys = [
         "ARC_CSM.ARC_PCIE_DMA_REQUEST",
@@ -394,7 +642,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "ARC_SPI.SPI_DR",
         "ARC_SPI.SPI_BAUDR",
     ];
-    parse_and_serialize_translation_singlelayer(
+    parse_yaml_and_serialize_translation_singlelayer(
         "data/grayskull",
         "axi-pci.yaml",
         "axi-data/grayskull-axi-pci.bin",
@@ -409,16 +657,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         os_keys.as_slice(),
     ]
     .concat();
-    parse_and_serialize_translation_singlelayer(
+    parse_yaml_and_serialize_translation_singlelayer(
         "data/wormhole",
         "axi-noc.yaml",
         "axi-data/wormhole-axi-noc.bin",
         &os_keys,
     )?;
-    parse_and_serialize_translation_singlelayer(
+    parse_yaml_and_serialize_translation_singlelayer(
         "data/wormhole",
         "axi-pci.yaml",
         "axi-data/wormhole-axi-pci.bin",
+        &os_keys,
+    )?;
+
+    let os_keys = ["arc_ss.reset_unit.SCRATCH_0", "arc_ss.reset_unit.ARC_MISC_CNTL"];
+    parse_json_and_serialize_translation_singlelayer(
+        "data/blackhole/a0",
+        "arc.json",
+        "axi-data/blackhole-axi-pci.bin",
         &os_keys,
     )?;
 
