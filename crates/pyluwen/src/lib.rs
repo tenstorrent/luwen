@@ -198,6 +198,8 @@ pub struct Telemetry {
     smbus_tx_eth_debug_status1: u32,
     #[pyo3(get)]
     smbus_tx_tt_flash_version: u32,
+    #[pyo3(get)]
+    smbus_tx_fw_bundle_version: u32,
 }
 impl From<luwen_if::chip::Telemetry> for Telemetry {
     fn from(value: luwen_if::chip::Telemetry) -> Self {
@@ -251,6 +253,7 @@ impl From<luwen_if::chip::Telemetry> for Telemetry {
             smbus_tx_eth_debug_status0: value.smbus_tx_eth_debug_status0,
             smbus_tx_eth_debug_status1: value.smbus_tx_eth_debug_status1,
             smbus_tx_tt_flash_version: value.smbus_tx_tt_flash_version,
+            smbus_tx_fw_bundle_version: value.smbus_tx_fw_bundle_version,
         }
     }
 }
