@@ -1007,7 +1007,7 @@ impl ChipImpl for Wormhole {
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (46 * 4))?;
         
-        let threshold: u32 = 35192832;  // arc fw 2.25.0.0
+        let threshold: u32 = 0x02190000;  // arc fw 2.25.0.0
         let smbus_tx_fw_bundle_version: u32;
         if smbus_tx_arc0_fw_version >= threshold {
             smbus_tx_fw_bundle_version = self
