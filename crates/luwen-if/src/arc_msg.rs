@@ -222,6 +222,7 @@ pub enum ArcMsgError {
     AxiError(#[from] AxiError),
 }
 
+#[derive(Debug)]
 pub enum ArcMsgOk {
     Ok { rc: u32, arg: u32 },
     OkNoWait,

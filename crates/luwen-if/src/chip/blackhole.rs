@@ -319,7 +319,7 @@ impl ChipImpl for Blackhole {
 
         let response = self.message_queue.send_message(
             &self,
-            0,
+            3,
             [
                 code as u32,
                 args.0 as u32 | ((args.1 as u32) << 16),
@@ -330,7 +330,7 @@ impl ChipImpl for Blackhole {
                 0,
                 0,
             ],
-            std::time::Duration::from_millis(500),
+            msg.timeout,
         )?;
         let status = (response[0] & 0xFF) as u8;
 

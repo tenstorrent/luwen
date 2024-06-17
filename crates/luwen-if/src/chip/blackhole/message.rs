@@ -29,7 +29,7 @@ pub struct MessageQueue<const N: usize> {
 impl<const N: usize> MessageQueue<N> {
     fn get_base(&self, index: u8) -> u64 {
         let msg_queue_size = 2 * self.queue_size * (self.entry_size * 4) + (self.header_size * 4);
-        self.queue_base + index as u64 * msg_queue_size as u64
+        self.queue_base + (index as u64 * msg_queue_size as u64)
     }
 
     fn qread32(
@@ -57,17 +57,19 @@ impl<const N: usize> MessageQueue<N> {
     }
 
     fn trigger_int(&self, chip: &Blackhole) -> Result<bool, PlatformError> {
-        let mut value = vec![0u8; self.fw_int.size as usize];
-        let value = crate::chip::HlCommsInterface::axi_read_field(&chip, &self.fw_int, &mut value)?;
+        let mut mvalue = vec![0u8; self.fw_int.size as usize];
+        let value = crate::chip::HlCommsInterface::axi_read_field(&chip, &self.fw_int, &mut mvalue)?;
 
         if value[0] & 1 != 0 {
             return Ok(false);
         }
 
+        mvalue[0] |= 1;
+
         crate::chip::HlCommsInterface::axi_write_field(
             &chip,
             &self.fw_int,
-            [value[0] | 1].as_slice(),
+            mvalue.as_slice(),
         )?;
 
         Ok(true)
@@ -110,6 +112,8 @@ impl<const N: usize> MessageQueue<N> {
 
         let request_queue_wptr = (request_queue_wptr + 1) % (2 * self.queue_size);
         self.qwrite32(&chip, index, 0, request_queue_wptr)?;
+
+        self.trigger_int(chip)?;
 
         Ok(())
     }

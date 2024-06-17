@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::os::fd::AsRawFd;
+use std::{mem, os::fd::AsRawFd};
 
 use crate::{error::PciError, kmdif, PciDevice};
 
@@ -141,7 +141,23 @@ impl PciDevice {
 
     #[inline]
     pub fn read32(&self, addr: u32) -> Result<u32, PciError> {
-        let data = unsafe { self.register_address::<u32>(addr).read_volatile() };
+        let read_pointer = unsafe { self.register_address::<u32>(addr) } as usize;
+        let data = if read_pointer % core::mem::align_of::<u32>() != 0 {
+            unsafe {
+                let aligned_read_pointer = read_pointer & !(core::mem::align_of::<u32>() - 1);
+                let a = (aligned_read_pointer as *const u32).read_volatile();
+                let b = (aligned_read_pointer as *const u32).add(1).read_volatile();
+
+                let byte_offset = read_pointer & (core::mem::align_of::<u32>() - 1);
+                let bit_offset = byte_offset * 8;
+                let shift_mask = (1 << bit_offset) - 1;
+
+                ((a >> bit_offset) & shift_mask)
+                    | ((b << ((core::mem::size_of::<u32>() * 8) - bit_offset)) & !shift_mask)
+            }
+        } else {
+            unsafe { (read_pointer as *const u32).read_volatile() }
+        };
         self.detect_ffffffff_read(Some(data))?;
 
         Ok(data)
@@ -149,7 +165,27 @@ impl PciDevice {
 
     #[inline]
     pub fn write32(&mut self, addr: u32, data: u32) -> Result<(), PciError> {
-        unsafe { self.register_address_mut::<u32>(addr).write_volatile(data) };
+        let write_pointer = unsafe { self.register_address_mut::<u32>(addr) } as usize;
+        if write_pointer % core::mem::align_of::<u32>() != 0 {
+            unsafe {
+                let aligned_write_pointer = write_pointer & !(core::mem::align_of::<u32>() - 1);
+                let a = (aligned_write_pointer as *const u32).read_volatile();
+                let b = (aligned_write_pointer as *const u32).add(1).read_volatile();
+
+                let byte_offset = write_pointer & (core::mem::align_of::<u32>() - 1);
+                let bit_offset = byte_offset * 8;
+                let shift_mask = (1 << bit_offset) - 1;
+
+                let a = (a & shift_mask) | ((data << bit_offset) & !shift_mask);
+                let b = (b & !shift_mask)
+                    | ((data >> ((core::mem::size_of::<u32>() * 8) - bit_offset)) & shift_mask);
+
+                (aligned_write_pointer as *mut u32).write_volatile(a);
+                (aligned_write_pointer as *mut u32).add(1).write_volatile(b);
+            }
+        } else {
+            unsafe { (write_pointer as *mut u32).write_volatile(data) }
+        };
         self.detect_ffffffff_read(None)?;
 
         Ok(())

@@ -670,7 +670,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &os_keys,
     )?;
 
-    let os_keys = ["arc_ss.reset_unit.SCRATCH_0", "arc_ss.reset_unit.ARC_MISC_CNTL"];
+    let os_keys = [
+        "arc_ss.reset_unit.SCRATCH_0",
+        "arc_ss.reset_unit.ARC_MISC_CNTL",
+        "arc_ss.reset_unit.ARC_MISC_CNTL.irq0_trig",
+        "arc_ss.reset_unit.SCRATCH_RAM[11]",
+    ];
     parse_json_and_serialize_translation_singlelayer(
         "data/blackhole/a0",
         "arc.json",
