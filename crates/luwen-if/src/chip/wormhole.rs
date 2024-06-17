@@ -431,6 +431,13 @@ impl ChipImpl for Wormhole {
                                         ));
                                     }
 
+                                    PlatformError::MessageError(error) => {
+                                        return Ok(ChipInitResult::ErrorContinue(
+                                            error.to_string(),
+                                            backtrace::Backtrace::capture(),
+                                        ));
+                                    }
+
                                     // This is fine to hit at this stage (though it should have been already verified to not be the case).
                                     // For now we just ignore it and hope that it will be resolved by the time the timeout expires...
                                     PlatformError::EthernetTrainingNotComplete(_) => {
@@ -563,6 +570,10 @@ impl ChipImpl for Wormhole {
                                 return Ok(ChipInitResult::ErrorContinue(format!("Telemetry ARC message error: {}; we expected to have communication, but lost it.", error.to_string()), backtrace::Backtrace::capture()));
                             }
 
+                            PlatformError::MessageError(error) => {
+                                return Ok(ChipInitResult::ErrorContinue(format!("Telemetry ARC message error: {:?}; we expected to have communication, but lost it.", error), backtrace::Backtrace::capture()));
+                            }
+
                             // This is an "expected error" but we probably can't recover from it, so we should abort the init.
                             PlatformError::AxiError(error) => return Ok(ChipInitResult::ErrorAbort(error.to_string(), backtrace::Backtrace::capture())),
 
@@ -667,6 +678,13 @@ impl ChipImpl for Wormhole {
                                 // ARC should be initialized at this point, hitting an error here means
                                 // that we can no longer progress in the init.
                                 PlatformError::ArcMsgError(error) => {
+                                    return Ok(ChipInitResult::ErrorContinue(
+                                        error.to_string(),
+                                        backtrace::Backtrace::capture(),
+                                    ));
+                                }
+
+                                PlatformError::MessageError(error) => {
                                     return Ok(ChipInitResult::ErrorContinue(
                                         error.to_string(),
                                         backtrace::Backtrace::capture(),

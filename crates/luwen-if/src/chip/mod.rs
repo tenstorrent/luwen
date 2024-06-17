@@ -25,7 +25,7 @@ pub use init::{
 };
 use luwen_core::Arch;
 pub use wormhole::Wormhole;
-pub use blackhole::Blackhole;
+pub use blackhole::{Blackhole, message::MessageError};
 
 use crate::arc_msg::TypedArcMsg;
 pub use crate::arc_msg::{ArcMsg, ArcMsgOk};

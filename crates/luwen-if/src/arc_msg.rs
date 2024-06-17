@@ -196,6 +196,8 @@ pub enum ArcMsgProtocolError {
     FwIntFailed,
     #[error("Mailbox {0} is invalid")]
     InvalidMailbox(usize),
+    #[error("Unknown error code {0}")]
+    UnknownErrorCode(u8)
 }
 
 impl ArcMsgProtocolError {

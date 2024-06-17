@@ -21,15 +21,18 @@ use super::{
     hl_comms::HlComms,
     init::status::{ComponentStatusInfo, EthernetPartialInitError, InitOptions, WaitStatus},
     remote::{EthAddresses, RemoteArcIf},
-    ArcMsgOptions, ChipInitResult, CommsStatus, InitStatus, NeighbouringChip,
+    ArcMsgOptions, AxiData, ChipInitResult, CommsStatus, InitStatus, NeighbouringChip,
 };
+
+pub mod message;
 
 #[derive(Clone)]
 pub struct Blackhole {
     pub chip_if: Arc<dyn ChipInterface + Send + Sync>,
     pub arc_if: Arc<dyn ChipComms + Send + Sync>,
 
-    pub arc_addrs: ArcMsgAddr,
+    pub message_queue: message::MessageQueue<8>,
+
     pub eth_locations: [EthCore; 14],
     pub eth_addrs: EthAddresses,
 
@@ -84,14 +87,24 @@ impl Blackhole {
         // let version = u32::from_le_bytes(version);
         let _version = 0x0;
 
+        let message_queue_info_address = arc_if
+            .axi_translate("arc_ss.reset_unit.SCRATCH_RAM[11]")?
+            .addr;
+        let queue_base = arc_if.axi_read32(&chip_if, message_queue_info_address)?;
+        let queue_sizing = arc_if.axi_read32(&chip_if, message_queue_info_address + 4)?;
+        let queue_size = queue_sizing & 0xFF;
+        let queue_count = (queue_sizing >> 8) & 0xFF;
+
         let output = Blackhole {
             chip_if: Arc::new(chip_if),
 
-            arc_addrs: ArcMsgAddr {
-                scratch_base: arc_if.axi_translate("arc_ss.reset_unit.SCRATCH_0")?.addr,
-                arc_misc_cntl: arc_if
-                    .axi_translate("arc_ss.reset_unit.ARC_MISC_CNTL")?
-                    .addr,
+            message_queue: message::MessageQueue {
+                header_size: 8,
+                entry_size: 8,
+                queue_base: queue_base as u64,
+                queue_size,
+                queue_count,
+                fw_int: arc_if.axi_translate("arc_ss.reset_unit.ARC_MISC_CNTL.irq0_trig")?,
             },
 
             arc_if: Arc::new(arc_if),
@@ -301,7 +314,46 @@ impl ChipImpl for Blackhole {
     }
 
     fn arc_msg(&self, msg: ArcMsgOptions) -> Result<ArcMsgOk, PlatformError> {
-        unimplemented!("No arc_msg support")
+        let code = msg.msg.msg_code();
+        let args = msg.msg.args();
+
+        let response = self.message_queue.send_message(
+            &self,
+            0,
+            [
+                code as u32,
+                args.0 as u32 | ((args.1 as u32) << 16),
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+            ],
+            std::time::Duration::from_millis(500),
+        )?;
+        let status = (response[0] & 0xFF) as u8;
+
+        if status < 240 {
+            Ok(ArcMsgOk::Ok {
+                rc: response[0] >> 16,
+                arg: 0,
+            })
+        } else if status == 0xFF {
+            Err(PlatformError::ArcMsgError(
+                crate::ArcMsgError::ProtocolError {
+                    source: crate::ArcMsgProtocolError::MsgNotRecognized(code),
+                    backtrace: BtWrapper::capture(),
+                },
+            ))
+        } else {
+            Err(PlatformError::ArcMsgError(
+                crate::ArcMsgError::ProtocolError {
+                    source: crate::ArcMsgProtocolError::UnknownErrorCode(status),
+                    backtrace: BtWrapper::capture(),
+                },
+            ))
+        }
     }
 
     fn get_neighbouring_chips(&self) -> Result<Vec<NeighbouringChip>, crate::error::PlatformError> {
