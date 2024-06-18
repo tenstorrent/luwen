@@ -111,6 +111,7 @@ pub struct Telemetry {
     pub smbus_tx_eth_debug_status0: u32,
     pub smbus_tx_eth_debug_status1: u32,
     pub smbus_tx_tt_flash_version: u32,
+    pub smbus_tx_fw_bundle_version: u32,
 }
 
 impl Telemetry {

@@ -1006,6 +1006,16 @@ impl ChipImpl for Wormhole {
         let smbus_tx_tt_flash_version = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (46 * 4))?;
+        
+        let threshold: u32 = 0x02190000;  // arc fw 2.25.0.0
+        let smbus_tx_fw_bundle_version: u32;
+        if smbus_tx_arc0_fw_version >= threshold {
+            smbus_tx_fw_bundle_version = self
+                .arc_if
+                .axi_read32(&self.chip_if, telemetry_struct_offset + (49 * 4))?;            
+        } else {
+            smbus_tx_fw_bundle_version = 0;
+        }
 
         Ok(super::Telemetry {
             board_id: ((smbus_tx_board_id_high as u64) << 32) | (smbus_tx_board_id_low as u64),
@@ -1056,6 +1066,7 @@ impl ChipImpl for Wormhole {
             smbus_tx_eth_debug_status0,
             smbus_tx_eth_debug_status1,
             smbus_tx_tt_flash_version,
+            smbus_tx_fw_bundle_version,
             ..Default::default()
         })
     }
