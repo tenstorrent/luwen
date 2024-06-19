@@ -159,3 +159,98 @@ impl ChipInterface for Arc<dyn ChipInterface + Send + Sync> {
         self.as_ref().as_any()
     }
 }
+
+pub struct NocInterface {
+    pub noc_id: u8,
+    pub x: u8,
+    pub y: u8,
+
+    pub backing: Box<dyn ChipInterface + Send + Sync>,
+}
+
+impl ChipInterface for NocInterface {
+    fn get_device_info(&self) -> Result<Option<DeviceInfo>, Box<dyn std::error::Error>> {
+        self.backing.get_device_info()
+    }
+
+    fn axi_read(&self, addr: u32, data: &mut [u8]) -> Result<(), Box<dyn std::error::Error>> {
+        self.backing
+            .noc_read(self.noc_id, self.x, self.y, addr as u64, data)
+    }
+
+    fn axi_write(&self, addr: u32, data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+        self.backing
+            .noc_write(self.noc_id, self.x, self.y, addr as u64, data)
+    }
+
+    fn noc_read(
+        &self,
+        noc_id: u8,
+        x: u8,
+        y: u8,
+        addr: u64,
+        data: &mut [u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.backing.noc_read(noc_id, x, y, addr, data)
+    }
+
+    fn noc_write(
+        &self,
+        noc_id: u8,
+        x: u8,
+        y: u8,
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.backing.noc_write(noc_id, x, y, addr, data)
+    }
+
+    fn noc_broadcast(
+        &self,
+        noc_id: u8,
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.backing.noc_broadcast(noc_id, addr, data)
+    }
+
+    fn eth_noc_read(
+        &self,
+        eth_addr: EthAddr,
+        noc_id: u8,
+        x: u8,
+        y: u8,
+        addr: u64,
+        data: &mut [u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.backing
+            .eth_noc_read(eth_addr, noc_id, x, y, addr, data)
+    }
+
+    fn eth_noc_write(
+        &self,
+        eth_addr: EthAddr,
+        noc_id: u8,
+        x: u8,
+        y: u8,
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.backing
+            .eth_noc_write(eth_addr, noc_id, x, y, addr, data)
+    }
+
+    fn eth_noc_broadcast(
+        &self,
+        eth_addr: EthAddr,
+        noc_id: u8,
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.backing.eth_noc_broadcast(eth_addr, noc_id, addr, data)
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}

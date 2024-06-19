@@ -93,6 +93,9 @@ pub struct PciDevice {
     bar0_wc: Option<memmap2::MmapMut>,
     bar0_wc_size: u64,
 
+    bar1_uc: Option<memmap2::MmapMut>,
+    bar1_uc_size: u64,
+
     config_space: std::fs::File,
 
     max_dma_buf_size_log2: u16,
@@ -199,6 +202,8 @@ impl PciDevice {
 
         let mut bar0_uc_mapping = Mapping::default();
         let mut bar0_wc_mapping = Mapping::default();
+        let mut bar1_uc_mapping = Mapping::default();
+        let mut bar1_wc_mapping = Mapping::default();
         let mut bar2_uc_mapping = Mapping::default();
         let mut _bar2_wc_mapping = Mapping::default();
 
@@ -210,8 +215,12 @@ impl PciDevice {
                 kmdif::MappingId::Resource0Wc => {
                     bar0_wc_mapping = mappings.output.mappings[i];
                 }
-                kmdif::MappingId::Resource1Uc => {}
-                kmdif::MappingId::Resource1Wc => {}
+                kmdif::MappingId::Resource1Uc => {
+                    bar1_uc_mapping = mappings.output.mappings[i];
+                }
+                kmdif::MappingId::Resource1Wc => {
+                    bar1_wc_mapping = mappings.output.mappings[i];
+                }
                 kmdif::MappingId::Resource2Uc => {
                     bar2_uc_mapping = mappings.output.mappings[i];
                 }
@@ -323,6 +332,23 @@ impl PciDevice {
             system_reg_offset_adjust = (512 - 32) * 1024 * 1024;
         }
 
+        let mut bar1_uc = None;
+        let mut bar1_uc_size = 0;
+        if arch.is_blackhole() {
+            if bar1_uc_mapping.mapping_id != kmdif::MappingId::Resource1Uc.as_u32() {
+                panic!("Device {device_id} has not Bar1 UC mapping");
+            }
+
+            bar1_uc_size = bar1_uc_mapping.mapping_size;
+            bar1_uc = Some(unsafe {
+                memmap2::MmapOptions::default()
+                    .len(bar1_uc_mapping.mapping_size as usize)
+                    .offset(bar1_uc_mapping.mapping_base)
+                    .map_mut(fd.as_raw_fd())
+                    .expect("Bar1 mapping failed for device {device_id}")
+            });
+        }
+
         let pci_bus = device_info.output.bus_dev_fn >> 8;
         let slot = ((device_info.output.bus_dev_fn) >> 3) & 0x1f; // The definition of PCI_SLOT from include/uapi/linux/pci.h
         let pci_function = (device_info.output.bus_dev_fn) & 0x7; // The definition of PCI_FUNC from include/uapi/linux/pci.h
@@ -376,6 +402,9 @@ impl PciDevice {
 
             bar0_wc,
             bar0_wc_size,
+
+            bar1_uc,
+            bar1_uc_size,
 
             config_space,
 

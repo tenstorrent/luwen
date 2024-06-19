@@ -81,13 +81,21 @@ impl Chip {
             let version = [0u8; 4];
             let version = u32::from_le_bytes(version);
 
-            let arc_if = ArcIf {
+            let arc_if = super::communication::chip_comms::NocIf {
                 axi_data: load_axi_table("blackhole-axi-pci.bin", version),
+                noc_id: 0,
+                x: 8,
+                y: 0,
             };
 
             Ok(Blackhole::init(
-                arc_if,
-                Arc::new(backend) as Arc<dyn ChipInterface + Sync + Send>,
+                Arc::new(arc_if) as Arc<dyn ChipComms + Sync + Send>,
+                Arc::new(super::communication::chip_interface::NocInterface {
+                    noc_id: 0,
+                    x: 8,
+                    y: 0,
+                    backing: Box::new(backend),
+                }) as Arc<dyn ChipInterface + Sync + Send>,
             )?)
         } else {
             Err(PlatformError::WrongChipArch {

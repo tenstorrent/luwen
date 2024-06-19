@@ -99,26 +99,6 @@ impl PciDevice {
         Ok(())
     }
 
-    unsafe fn register_address<T>(&self, mut register_addr: u32) -> *const T {
-        let reg_mapping: *const u8;
-
-        if self.system_reg_mapping.is_some() && register_addr >= self.system_reg_start_offset {
-            let mapping = self.system_reg_mapping.as_ref().unwrap_unchecked();
-
-            register_addr -= self.system_reg_offset_adjust;
-            reg_mapping = mapping.as_ptr();
-        } else if self.bar0_wc.is_some() && (register_addr as u64) < self.bar0_wc_size {
-            let mapping = self.bar0_wc.as_ref().unwrap_unchecked();
-
-            reg_mapping = mapping.as_ptr();
-        } else {
-            register_addr -= self.bar0_uc_offset as u32;
-            reg_mapping = self.bar0_uc.as_ptr();
-        }
-
-        reg_mapping.offset(register_addr as isize) as *const T
-    }
-
     unsafe fn register_address_mut<T>(&self, mut register_addr: u32) -> *mut T {
         let reg_mapping: *mut u8;
 
@@ -137,6 +117,10 @@ impl PciDevice {
         }
 
         reg_mapping.offset(register_addr as isize) as *mut T
+    }
+
+    unsafe fn register_address<T>(&self, register_addr: u32) -> *const T {
+        self.register_address_mut(register_addr) as *const T
     }
 
     #[inline]

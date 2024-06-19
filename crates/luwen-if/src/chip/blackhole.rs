@@ -26,6 +26,16 @@ use super::{
 
 pub mod message;
 
+fn u64_from_slice(data: &[u8]) -> u64 {
+    let mut output = 0;
+    for i in data.iter().rev().copied() {
+        output <<= 8;
+        output |= i as u64;
+    }
+
+    output
+}
+
 #[derive(Clone)]
 pub struct Blackhole {
     pub chip_if: Arc<dyn ChipInterface + Send + Sync>,
@@ -36,7 +46,7 @@ pub struct Blackhole {
     pub eth_locations: [EthCore; 14],
     pub eth_addrs: EthAddresses,
 
-    telemetry_addr: Arc<once_cell::sync::OnceCell<u32>>,
+    telemetry_addr: AxiData,
 }
 
 impl HlComms for Blackhole {
@@ -107,10 +117,11 @@ impl Blackhole {
                 fw_int: arc_if.axi_translate("arc_ss.reset_unit.ARC_MISC_CNTL.irq0_trig")?,
             },
 
-            arc_if: Arc::new(arc_if),
             eth_addrs: EthAddresses::default(),
 
-            telemetry_addr: Arc::new(once_cell::sync::OnceCell::new()),
+            telemetry_addr: arc_if.axi_translate("arc_ss.reset_unit.SCRATCH_RAM[12]")?,
+
+            arc_if: Arc::new(arc_if),
 
             eth_locations: [
                 EthCore {
@@ -365,7 +376,17 @@ impl ChipImpl for Blackhole {
     }
 
     fn get_telemetry(&self) -> Result<super::Telemetry, PlatformError> {
-        unimplemented!("No telemetry support")
+        let mut addr = [0u8; 4];
+        self.axi_read_field(&self.telemetry_addr, &mut addr)?;
+        let addr = u32::from_le_bytes(addr);
+
+        let mut data_block = [0u8; 33 * 4];
+        self.axi_read(addr as u64, &mut data_block)?;
+
+        Ok(super::Telemetry {
+            board_id: u64_from_slice(&data_block[0..8]),
+            ..Default::default()
+        })
     }
 
     fn get_device_info(&self) -> Result<Option<crate::DeviceInfo>, PlatformError> {

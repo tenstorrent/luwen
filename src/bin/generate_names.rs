@@ -335,6 +335,7 @@ fn parse_yaml_translation_file(
     Ok(slices)
 }
 
+#[allow(dead_code)]
 fn parse_yaml_and_serialize_translation(
     path: &str,
     file: &str,
@@ -530,7 +531,7 @@ fn parse_json_translation_file(
     path: &str,
     file: &str,
 ) -> Result<HashMap<String, MemorySlice>, Box<dyn std::error::Error>> {
-    fn parse_field(addr: u64, name: &str, field: &RdlField) -> MemorySlice {
+    fn parse_field(name: &str, field: &RdlField) -> MemorySlice {
         match field {
             RdlField::MemoryRef {
                 mask,
@@ -548,24 +549,23 @@ fn parse_json_translation_file(
                     children: HashMap::new(),
                 }
             }
-            RdlField::Field(field) => convert_to_memory_slice(addr, name, field),
+            RdlField::Field(field) => convert_to_memory_slice(name, field),
         }
     }
 
-    fn convert_to_memory_slice(base_addr: u64, name: &str, def: &RdlDef) -> MemorySlice {
+    fn convert_to_memory_slice(name: &str, def: &RdlDef) -> MemorySlice {
         let mut output = MemorySlice {
             name: name.to_string(),
-            offset: base_addr,
+            offset: def.address,
             size: 0,
             array_count: def.array_size,
             bit_mask: None,
             children: HashMap::with_capacity(def.fields.len()),
         };
         for (region_name, def) in &def.fields {
-            output.children.insert(
-                region_name.clone(),
-                parse_field(base_addr, region_name.as_str(), def),
-            );
+            output
+                .children
+                .insert(region_name.clone(), parse_field(region_name.as_str(), def));
         }
 
         output.size = if let Some(incr) = &def.address_increment {
@@ -584,7 +584,7 @@ fn parse_json_translation_file(
     for (name, top) in top_level {
         println!("Parsing {name}");
 
-        slices.insert(name.clone(), convert_to_memory_slice(0, &name, &top));
+        slices.insert(name.clone(), convert_to_memory_slice(&name, &top));
     }
 
     Ok(slices)
@@ -610,13 +610,15 @@ fn parse_json_and_serialize_translation_singlelayer(
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    parse_yaml_and_serialize_translation(
-        "data/grayskull",
-        "axi-pci.yaml",
-        "grayskull-axi-pci.bin",
-    )?;
-    parse_yaml_and_serialize_translation("data/wormhole", "axi-pci.yaml", "wormhole-axi-pci.bin")?;
-    parse_yaml_and_serialize_translation("data/wormhole", "axi-noc.yaml", "wormhole-axi-noc.bin")?;
+    /*
+        parse_yaml_and_serialize_translation(
+            "data/grayskull",
+            "axi-pci.yaml",
+            "grayskull-axi-pci.bin",
+        )?;
+        parse_yaml_and_serialize_translation("data/wormhole", "axi-pci.yaml", "wormhole-axi-pci.bin")?;
+        parse_yaml_and_serialize_translation("data/wormhole", "axi-noc.yaml", "wormhole-axi-noc.bin")?;
+    */
 
     let os_keys = [
         "ARC_CSM.ARC_PCIE_DMA_REQUEST",
@@ -675,6 +677,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "arc_ss.reset_unit.ARC_MISC_CNTL",
         "arc_ss.reset_unit.ARC_MISC_CNTL.irq0_trig",
         "arc_ss.reset_unit.SCRATCH_RAM[11]",
+        "arc_ss.reset_unit.SCRATCH_RAM[12]",
+        "arc_ss.reset_unit.SCRATCH_RAM[13]",
     ];
     parse_json_and_serialize_translation_singlelayer(
         "data/blackhole/a0",
