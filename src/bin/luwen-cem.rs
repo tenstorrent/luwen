@@ -146,6 +146,23 @@ fn main() -> Result<(), LuwenError> {
             mmio_chips.push((ident.clone(), gs.get_device_info()?.map(|v| v.interface_id)));
 
             (ident, data)
+        } else if let Some(bh) = chip.as_bh() {
+            let ident = ChipIdent {
+                arch: Arch::Blackhole,
+                board_id: None,
+                interface: bh.get_device_info()?.map(|v| v.interface_id),
+                coord: None,
+            };
+
+            let data = ChipData {
+                noc_translation_en: false,
+                harvest_mask: 0,
+                boardtype: telemetry.try_board_type().map(|v| v.to_string()),
+            };
+
+            mmio_chips.push((ident.clone(), bh.get_device_info()?.map(|v| v.interface_id)));
+
+            (ident, data)
         } else {
             unimplemented!("Unknown chip type")
         };
