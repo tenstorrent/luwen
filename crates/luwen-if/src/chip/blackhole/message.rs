@@ -58,7 +58,8 @@ impl<const N: usize> MessageQueue<N> {
 
     fn trigger_int(&self, chip: &Blackhole) -> Result<bool, PlatformError> {
         let mut mvalue = vec![0u8; self.fw_int.size as usize];
-        let value = crate::chip::HlCommsInterface::axi_read_field(&chip, &self.fw_int, &mut mvalue)?;
+        let value =
+            crate::chip::HlCommsInterface::axi_read_field(&chip, &self.fw_int, &mut mvalue)?;
 
         if value[0] & 1 != 0 {
             return Ok(false);
@@ -66,11 +67,7 @@ impl<const N: usize> MessageQueue<N> {
 
         mvalue[0] |= 1;
 
-        crate::chip::HlCommsInterface::axi_write_field(
-            &chip,
-            &self.fw_int,
-            mvalue.as_slice(),
-        )?;
+        crate::chip::HlCommsInterface::axi_write_field(&chip, &self.fw_int, mvalue.as_slice())?;
 
         Ok(true)
     }
@@ -86,7 +83,7 @@ impl<const N: usize> MessageQueue<N> {
 
         let start_time = std::time::Instant::now();
         loop {
-            let request_queue_rptr = self.qread32(&chip, index, 1)?;
+            let request_queue_rptr = self.qread32(&chip, index, 4)?;
 
             // Check if the queue is full
             if request_queue_rptr.abs_diff(request_queue_wptr) % (2 * self.queue_size)
@@ -125,7 +122,7 @@ impl<const N: usize> MessageQueue<N> {
         result: &mut [u32; N],
         timeout: std::time::Duration,
     ) -> Result<(), PlatformError> {
-        let response_queue_rptr = self.qread32(&chip, index, 4)?;
+        let response_queue_rptr = self.qread32(&chip, index, 1)?;
 
         let start_time = std::time::Instant::now();
         loop {
@@ -139,7 +136,7 @@ impl<const N: usize> MessageQueue<N> {
             let elapsed = start_time.elapsed();
             if elapsed > timeout {
                 return Err(MessageError::Timeout {
-                    phase: "push".to_string(),
+                    phase: "pop".to_string(),
                     timeout: elapsed,
                 })?;
             }
@@ -152,7 +149,7 @@ impl<const N: usize> MessageQueue<N> {
         }
 
         let response_queue_rptr = (response_queue_rptr + 1) % (2 * self.queue_size);
-        self.qwrite32(&chip, index, 4, response_queue_rptr)?;
+        self.qwrite32(&chip, index, 1, response_queue_rptr)?;
 
         Ok(())
     }

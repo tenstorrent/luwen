@@ -178,7 +178,7 @@ impl ExtendedPciDevice {
                 command_q_addr: 0,
                 fake_block: false,
 
-                default_tlb: 184,
+                default_tlb: 190,
 
                 ethernet_dma_buffer: HashMap::with_capacity(16),
             })),

@@ -24,20 +24,17 @@ fn main() {
                 };
 
                 if let Some(bh) = v.as_bh() {
-                    /*
-                                        let result = bh.arc_msg(luwen_if::chip::ArcMsgOptions {
-                                            msg: luwen_if::ArcMsg::Raw {
-                                                msg: 0x90,
-                                                arg0: 100,
-                                                arg1: 0,
-                                            },
-                                            ..Default::default()
-                                        });
-                    */
+                    let result = bh.arc_msg(luwen_if::chip::ArcMsgOptions {
+                        msg: luwen_if::ArcMsg::Raw {
+                            msg: 0x90,
+                            arg0: 103,
+                            arg1: 0,
+                        },
+                        ..Default::default()
+                    });
+                    dbg!(result);
 
                     dbg!(bh.get_telemetry());
-
-                    // dbg!(result);
                 }
 
                 (v.get_arch(), remote, status, eth_status)

@@ -97,9 +97,8 @@ impl Blackhole {
         // let version = u32::from_le_bytes(version);
         let _version = 0x0;
 
-        let message_queue_info_address = arc_if
-            .axi_translate("arc_ss.reset_unit.SCRATCH_RAM[11]")?
-            .addr;
+        let message_queue_info_address =
+            arc_if.axi_sread32(&chip_if, "arc_ss.reset_unit.SCRATCH_RAM[11]")? as u64;
         let queue_base = arc_if.axi_read32(&chip_if, message_queue_info_address)?;
         let queue_sizing = arc_if.axi_read32(&chip_if, message_queue_info_address + 4)?;
         let queue_size = queue_sizing & 0xFF;
@@ -330,7 +329,7 @@ impl ChipImpl for Blackhole {
 
         let response = self.message_queue.send_message(
             &self,
-            3,
+            2,
             [
                 code as u32,
                 args.0 as u32 | ((args.1 as u32) << 16),
@@ -348,7 +347,7 @@ impl ChipImpl for Blackhole {
         if status < 240 {
             Ok(ArcMsgOk::Ok {
                 rc: response[0] >> 16,
-                arg: 0,
+                arg: response[1],
             })
         } else if status == 0xFF {
             Err(PlatformError::ArcMsgError(
