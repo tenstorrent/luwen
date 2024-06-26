@@ -749,6 +749,7 @@ impl ChipImpl for Grayskull {
             smbus_tx_boot_date,
             smbus_tx_rt_seconds,
             smbus_tx_tt_flash_version,
+            smbus_tx_fw_bundle_version,
             ..Default::default()
         })
     }
