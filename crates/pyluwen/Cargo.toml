@@ -1,6 +1,6 @@
 [package]
 name = "pyluwen"
-version = "0.5.5"
+version = "0.5.6"
 description = "Python bindings for luwen"
 edition = "2021"
 license = "Apache-2.0"
@@ -11,7 +11,7 @@ crate-type = ["cdylib"]
 [dependencies]
 ttkmd-if = {path = "../ttkmd-if", version = "0.1.0"}
 luwen-core = {path = "../luwen-core", version = "0.1.0"}
-luwen-if = {path = "../luwen-if", version = "0.4.5"}
+luwen-if = {path = "../luwen-if", version = "0.4.6"}
 luwen-ref = {path = "../luwen-ref", version = "0.3.1"}
 
 pyo3 = { version = "0.19.2", features = ["extension-module", "multiple-pymethods"] }
