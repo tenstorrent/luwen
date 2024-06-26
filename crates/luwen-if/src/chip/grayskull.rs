@@ -692,8 +692,9 @@ impl ChipImpl for Grayskull {
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (38 * 4))?;
         
-            let threshold: u32 = 0x02190000;  // arc fw 2.25.0.0
+            let threshold: u32 = 0x01070000;  // arc fw 1.7.0.0
             let smbus_tx_fw_bundle_version: u32;
+            println!("smbus_tx_arc0_fw_version: {}", smbus_tx_arc0_fw_version);
             if smbus_tx_arc0_fw_version >= threshold {
                 smbus_tx_fw_bundle_version = self
                     .arc_if
