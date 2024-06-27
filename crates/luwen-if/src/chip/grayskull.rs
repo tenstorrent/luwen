@@ -694,7 +694,6 @@ impl ChipImpl for Grayskull {
         
             let threshold: u32 = 0x01070000;  // arc fw 1.7.0.0
             let smbus_tx_fw_bundle_version: u32;
-            println!("smbus_tx_arc0_fw_version: {}", smbus_tx_arc0_fw_version);
             if smbus_tx_arc0_fw_version >= threshold {
                 smbus_tx_fw_bundle_version = self
                     .arc_if
