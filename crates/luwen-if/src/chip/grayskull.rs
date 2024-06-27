@@ -691,7 +691,16 @@ impl ChipImpl for Grayskull {
         let smbus_tx_tt_flash_version = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (38 * 4))?;
-
+        
+            let threshold: u32 = 0x01070000;  // arc fw 1.7.0.0
+            let smbus_tx_fw_bundle_version: u32;
+            if smbus_tx_arc0_fw_version >= threshold {
+                smbus_tx_fw_bundle_version = self
+                    .arc_if
+                    .axi_read32(&self.chip_if, telemetry_struct_offset + (39 * 4))?;            
+            } else {
+                smbus_tx_fw_bundle_version = 0;
+            }
         // let board_id_high =
         //     self.arc_if
         //         .axi_read32(&self.chip_if, telemetry_struct_offset + (4 * 4))? as u64;
@@ -740,6 +749,7 @@ impl ChipImpl for Grayskull {
             smbus_tx_boot_date,
             smbus_tx_rt_seconds,
             smbus_tx_tt_flash_version,
+            smbus_tx_fw_bundle_version,
             ..Default::default()
         })
     }
