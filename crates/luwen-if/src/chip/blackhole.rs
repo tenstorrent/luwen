@@ -213,14 +213,90 @@ impl Blackhole {
         self.chip_if.as_any().downcast_ref::<T>()
     }
 
-    pub fn spi_write(&self, addr: u32, value: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
-        unimplemented!("Need CMFW support for spi_write impl");
+    fn bh_arc_msg(
+        &self,
+        code: u16,
+        data: &[u32],
+        timeout: Option<std::time::Duration>,
+    ) -> Result<(u8, u16, [u32; 7]), PlatformError> {
+        let mut request = [0; 8];
+        request[0] = code as u32;
+        for (i, o) in data.iter().zip(request[1..].iter_mut()) {
+            *o = *i;
+        }
+
+        let timeout = timeout.unwrap_or(std::time::Duration::from_millis(500));
+
+        let response = self
+            .message_queue
+            .send_message(&self, 2, request, timeout)?;
+        let status = (response[0] & 0xFF) as u8;
+        let rc = (response[0] >> 16) as u16;
+
+        if status < 240 {
+            let data = [
+                response[1],
+                response[2],
+                response[3],
+                response[4],
+                response[5],
+                response[6],
+                response[7],
+            ];
+            Ok((status, rc, data))
+        } else if status == 0xFF {
+            Err(PlatformError::ArcMsgError(
+                crate::ArcMsgError::ProtocolError {
+                    source: crate::ArcMsgProtocolError::MsgNotRecognized(code),
+                    backtrace: BtWrapper::capture(),
+                },
+            ))
+        } else {
+            Err(PlatformError::ArcMsgError(
+                crate::ArcMsgError::ProtocolError {
+                    source: crate::ArcMsgProtocolError::UnknownErrorCode(status),
+                    backtrace: BtWrapper::capture(),
+                },
+            ))
+        }
+    }
+
+    pub fn spi_write(&self, mut addr: u32, value: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+        let (_, _, result) = self.bh_arc_msg(0x29, &[], None)?;
+        let buffer_addr = result[0];
+        let buffer_size_bytes = result[1];
+
+        if buffer_size_bytes == 0 {
+            return Err("SPI Buffer is not allocated".into());
+        }
+
+        for chunk in value.chunks(buffer_size_bytes as usize) {
+            self.axi_write(buffer_addr as u64, chunk)?;
+            self.bh_arc_msg(0x2B, &[addr, chunk.len() as u32], None)?;
+            addr += chunk.len() as u32;
+        }
 
         Ok(())
     }
 
-    pub fn spi_read(&self, addr: u32, value: &mut [u8]) -> Result<(), Box<dyn std::error::Error>> {
-        unimplemented!("Need CMFW support for spi_read impl");
+    pub fn spi_read(
+        &self,
+        mut addr: u32,
+        value: &mut [u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let (_, _, result) = self.bh_arc_msg(0x29, &[], None)?;
+        let buffer_addr = result[0];
+        let buffer_size_bytes = result[1];
+
+        if buffer_size_bytes == 0 {
+            return Err("SPI Buffer is not allocated".into());
+        }
+
+        for chunk in value.chunks_mut(buffer_size_bytes as usize) {
+            self.bh_arc_msg(0x2A, &[addr, chunk.len() as u32], None)?;
+            self.axi_read(buffer_addr as u64, chunk)?;
+            addr += chunk.len() as u32;
+        }
 
         Ok(())
     }
@@ -327,43 +403,15 @@ impl ChipImpl for Blackhole {
         let code = msg.msg.msg_code();
         let args = msg.msg.args();
 
-        let response = self.message_queue.send_message(
-            &self,
-            2,
-            [
-                code as u32,
-                args.0 as u32 | ((args.1 as u32) << 16),
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-            ],
-            msg.timeout,
+        let (_status, rc, response) = self.bh_arc_msg(
+            code,
+            &[args.0 as u32 | ((args.1 as u32) << 16)],
+            Some(msg.timeout),
         )?;
-        let status = (response[0] & 0xFF) as u8;
-
-        if status < 240 {
-            Ok(ArcMsgOk::Ok {
-                rc: response[0] >> 16,
-                arg: response[1],
-            })
-        } else if status == 0xFF {
-            Err(PlatformError::ArcMsgError(
-                crate::ArcMsgError::ProtocolError {
-                    source: crate::ArcMsgProtocolError::MsgNotRecognized(code),
-                    backtrace: BtWrapper::capture(),
-                },
-            ))
-        } else {
-            Err(PlatformError::ArcMsgError(
-                crate::ArcMsgError::ProtocolError {
-                    source: crate::ArcMsgProtocolError::UnknownErrorCode(status),
-                    backtrace: BtWrapper::capture(),
-                },
-            ))
-        }
+        Ok(ArcMsgOk::Ok {
+            rc: rc as u32,
+            arg: response[0],
+        })
     }
 
     fn get_neighbouring_chips(&self) -> Result<Vec<NeighbouringChip>, crate::error::PlatformError> {

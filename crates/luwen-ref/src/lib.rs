@@ -169,7 +169,6 @@ impl ExtendedPciDevice {
 
         Ok(ExtendedPciDeviceWrapper {
             inner: Arc::new(RwLock::new(ExtendedPciDevice {
-                device,
                 harvested_rows: 0,
                 grid_size_x,
                 grid_size_y,
@@ -178,7 +177,13 @@ impl ExtendedPciDevice {
                 command_q_addr: 0,
                 fake_block: false,
 
-                default_tlb: 190,
+                default_tlb: match device.arch {
+                    luwen_core::Arch::Grayskull | luwen_core::Arch::Wormhole => 184,
+                    luwen_core::Arch::Blackhole => 190,
+                    luwen_core::Arch::Unknown(id) => unreachable!("Found unrecognizable id {id:x}"),
+                },
+
+                device,
 
                 ethernet_dma_buffer: HashMap::with_capacity(16),
             })),

@@ -35,6 +35,15 @@ fn main() {
                     dbg!(result);
 
                     dbg!(bh.get_telemetry());
+
+                    let mut output = vec![0; 100];
+                    dbg!(bh.spi_read(0, &mut output));
+                    let mut addr = 0;
+                    for o in output.chunks_exact(4) {
+                        let value = u32::from_le_bytes([o[0], o[1], o[2], o[3]]);
+                        println!("0x{addr:08x} 0x{value:08x}");
+                        addr += 4;
+                    }
                 }
 
                 (v.get_arch(), remote, status, eth_status)
