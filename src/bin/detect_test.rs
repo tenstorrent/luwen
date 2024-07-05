@@ -15,7 +15,7 @@ fn main() {
                 let eth_status = chip.eth_safe();
                 let remote = if let Some(wh) = v.as_wh() {
                     if chip.arc_alive() {
-                        println!("{:X}", wh.get_telemetry().unwrap().smbus_tx_board_id_low);
+                        println!("{:X}", wh.get_telemetry().unwrap().board_id_low);
                     }
 
                     wh.is_remote

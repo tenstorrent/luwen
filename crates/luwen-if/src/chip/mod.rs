@@ -63,89 +63,99 @@ pub struct NeighbouringChip {
 #[derive(Default, Debug)]
 pub struct Telemetry {
     pub board_id: u64,
-    pub smbus_tx_enum_version: u32,
-    pub smbus_tx_device_id: u32,
-    pub smbus_tx_asic_ro: u32,
-    pub smbus_tx_asic_idd: u32,
-    pub smbus_tx_board_id_high: u32,
-    pub smbus_tx_board_id_low: u32,
-    pub smbus_tx_arc0_fw_version: u32,
-    pub smbus_tx_arc1_fw_version: u32,
-    pub smbus_tx_arc2_fw_version: u32,
-    pub smbus_tx_arc3_fw_version: u32,
-    pub smbus_tx_spibootrom_fw_version: u32,
-    pub smbus_tx_eth_fw_version: u32,
-    pub smbus_tx_m3_bl_fw_version: u32,
-    pub smbus_tx_m3_app_fw_version: u32,
-    pub smbus_tx_ddr_speed: Option<u32>,
-    pub smbus_tx_ddr_status: u32,
-    pub smbus_tx_eth_status0: u32,
-    pub smbus_tx_eth_status1: u32,
-    pub smbus_tx_pcie_status: u32,
-    pub smbus_tx_faults: u32,
-    pub smbus_tx_arc0_health: u32,
-    pub smbus_tx_arc1_health: u32,
-    pub smbus_tx_arc2_health: u32,
-    pub smbus_tx_arc3_health: u32,
-    pub smbus_tx_fan_speed: u32,
-    pub smbus_tx_aiclk: u32,
-    pub smbus_tx_axiclk: u32,
-    pub smbus_tx_arcclk: u32,
-    pub smbus_tx_throttler: u32,
-    pub smbus_tx_vcore: u32,
-    pub smbus_tx_asic_temperature: u32,
-    pub smbus_tx_vreg_temperature: u32,
-    pub smbus_tx_board_temperature: u32,
-    pub smbus_tx_tdp: u32,
-    pub smbus_tx_tdc: u32,
-    pub smbus_tx_vdd_limits: u32,
-    pub smbus_tx_thm_limits: u32,
-    pub smbus_tx_wh_fw_date: u32,
-    pub smbus_tx_asic_tmon0: u32,
-    pub smbus_tx_asic_tmon1: u32,
-    pub smbus_tx_mvddq_power: u32,
-    pub smbus_tx_gddr_train_temp0: u32,
-    pub smbus_tx_gddr_train_temp1: u32,
-    pub smbus_tx_asic_power: Option<u32>,
-    pub smbus_tx_aux_status: Option<u32>,
-    pub smbus_tx_boot_date: u32,
-    pub smbus_tx_rt_seconds: u32,
-    pub smbus_tx_eth_debug_status0: u32,
-    pub smbus_tx_eth_debug_status1: u32,
-    pub smbus_tx_tt_flash_version: u32,
-    pub smbus_tx_fw_bundle_version: u32,
+    pub enum_version: u32,
+    pub entry_count: u32,
+    pub device_id: u32,
+    pub asic_id: u32,
+    pub asic_ro: u32,
+    pub asic_idd: u32,
+    pub board_id_high: u32,
+    pub board_id_low: u32,
+    pub update_telem_speed: u32,
+    pub arc0_fw_version: u32,
+    pub arc1_fw_version: u32,
+    pub arc2_fw_version: u32,
+    pub arc3_fw_version: u32,
+    pub spibootrom_fw_version: u32,
+    pub eth_fw_version: u32,
+    pub ddr_fw_version: u32,
+    pub l2cpu_fw_version: u32,
+    pub m3_bl_fw_version: u32,
+    pub m3_app_fw_version: u32,
+    pub ddr_speed: Option<u32>,
+    pub ddr_status: u32,
+    pub eth_status0: u32,
+    pub eth_status1: u32,
+    pub pcie_status: u32,
+    pub faults: u32,
+    pub arc0_health: u32,
+    pub arc1_health: u32,
+    pub arc2_health: u32,
+    pub arc3_health: u32,
+    pub fan_speed: u32,
+    pub aiclk: u32,
+    pub axiclk: u32,
+    pub arcclk: u32,
+    pub l2cpuclk0: u32,
+    pub l2cpuclk1: u32,
+    pub l2cpuclk2: u32,
+    pub l2cpuclk3: u32,
+    pub throttler: u32,
+    pub vcore: u32,
+    pub asic_temperature: u32,
+    pub vreg_temperature: u32,
+    pub board_temperature: u32,
+    pub tdp: u32,
+    pub tdc: u32,
+    pub vdd_limits: u32,
+    pub thm_limits: u32,
+    pub wh_fw_date: u32,
+    pub asic_tmon0: u32,
+    pub asic_tmon1: u32,
+    pub mvddq_power: u32,
+    pub gddr_train_temp0: u32,
+    pub gddr_train_temp1: u32,
+    pub asic_power: Option<u32>,
+    pub aux_status: Option<u32>,
+    pub boot_date: u32,
+    pub rt_seconds: u32,
+    pub eth_debug_status0: u32,
+    pub eth_debug_status1: u32,
+    pub tt_flash_version: u32,
+    pub fw_bundle_version: u32,
+    pub timer_heartbeat: u32,
 }
 
 impl Telemetry {
     /// Return firmware date in YYYY-MM-DD format.
     pub fn firmware_date(&self) -> String {
-        let year = (self.smbus_tx_wh_fw_date >> 28 & 0xF) + 2020;
-        let month = (self.smbus_tx_wh_fw_date >> 24) & 0xF;
-        let day = (self.smbus_tx_wh_fw_date >> 16) & 0xFF;
-        let _hour = (self.smbus_tx_wh_fw_date >> 8) & 0xFF;
-        let _minute = self.smbus_tx_wh_fw_date & 0xFF;
+        let year = (self.wh_fw_date >> 28 & 0xF) + 2020;
+        let month = (self.wh_fw_date >> 24) & 0xF;
+        let day = (self.wh_fw_date >> 16) & 0xFF;
+        let _hour = (self.wh_fw_date >> 8) & 0xFF;
+        let _minute = self.wh_fw_date & 0xFF;
         format!("{:04}-{:02}-{:02}", year, month, day)
     }
 
     /// Return ARC firmware version in MAJOR.MINOR.PATCH format.
     pub fn arc_fw_version(&self) -> String {
-        let major = (self.smbus_tx_arc0_fw_version >> 16) & 0xFF;
-        let minor = (self.smbus_tx_arc0_fw_version >> 8) & 0xFF;
-        let patch = self.smbus_tx_arc0_fw_version & 0xFF;
+        let major = (self.arc0_fw_version >> 16) & 0xFF;
+        let minor = (self.arc0_fw_version >> 8) & 0xFF;
+        let patch = self.arc0_fw_version & 0xFF;
         format!("{}.{}.{}", major, minor, patch)
     }
 
     /// Return Ethernet firmware version in MAJOR.MINOR.PATCH format.
     pub fn eth_fw_version(&self) -> String {
-        let major = (self.smbus_tx_eth_fw_version >> 16) & 0x0FF;
-        let minor = (self.smbus_tx_eth_fw_version >> 12) & 0x00F;
-        let patch = self.smbus_tx_eth_fw_version & 0xFFF;
+        let major = (self.eth_fw_version >> 16) & 0x0FF;
+        let minor = (self.eth_fw_version >> 12) & 0x00F;
+        let patch = self.eth_fw_version & 0xFFF;
         format!("{}.{}.{}", major, minor, patch)
     }
 
     /// Return the board serial number as an integer.
     pub fn board_serial_number(&self) -> u64 {
-        ((self.smbus_tx_board_id_high as u64) << 32) | self.smbus_tx_board_id_low as u64
+        ((self.board_id_high as u64) << 32) | self.board_id_low as u64
     }
 
     /// Return the board serial number as a hex-formatted string.
@@ -182,57 +192,57 @@ impl Telemetry {
 
     /// Return the AI clock speed in MHz.
     pub fn ai_clk(&self) -> u32 {
-        self.smbus_tx_aiclk & 0xffff
+        self.aiclk & 0xffff
     }
 
     /// Return the AXI clock speed in MHz.
     pub fn axi_clk(&self) -> u32 {
-        self.smbus_tx_axiclk
+        self.axiclk
     }
 
     /// Return the ARC clock speed in MHz.
     pub fn arc_clk(&self) -> u32 {
-        self.smbus_tx_arcclk
+        self.arcclk
     }
 
     /// Return the core voltage in volts.
     pub fn voltage(&self) -> f64 {
-        self.smbus_tx_vcore as f64 / 1000.0
+        self.vcore as f64 / 1000.0
     }
 
     /// Return the ASIC temperature in degrees celsius.
     pub fn asic_temperature(&self) -> f64 {
-        ((self.smbus_tx_asic_temperature & 0xffff) >> 4) as f64
+        ((self.asic_temperature & 0xffff) >> 4) as f64
     }
 
     /// Return the voltage regulator temperature in degrees celsius.
     pub fn vreg_temperature(&self) -> f64 {
-        (self.smbus_tx_vreg_temperature & 0xffff) as f64
+        (self.vreg_temperature & 0xffff) as f64
     }
 
     /// Return the inlet temperature in degrees celsius.
     pub fn inlet_temperature(&self) -> f64 {
-        ((self.smbus_tx_board_temperature >> 0x10) & 0xff) as f64
+        ((self.board_temperature >> 0x10) & 0xff) as f64
     }
 
     /// Return the first outlet temperature in degrees celsius.
     pub fn outlet_temperature1(&self) -> f64 {
-        ((self.smbus_tx_board_temperature >> 0x08) & 0xff) as f64
+        ((self.board_temperature >> 0x08) & 0xff) as f64
     }
 
     /// Return the second outlet temperature in degrees celsius.
     pub fn outlet_temperature2(&self) -> f64 {
-        (self.smbus_tx_board_temperature & 0xff) as f64
+        (self.board_temperature & 0xff) as f64
     }
 
     /// Return the power consumption in watts.
     pub fn power(&self) -> f64 {
-        (self.smbus_tx_tdp & 0xffff) as f64
+        (self.tdp & 0xffff) as f64
     }
 
     /// Return the current consumption in amperes.
     pub fn current(&self) -> f64 {
-        (self.smbus_tx_tdc & 0xffff) as f64
+        (self.tdc & 0xffff) as f64
     }
 }
 

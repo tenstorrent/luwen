@@ -734,7 +734,7 @@ impl ActiveSpi {
 
     fn get_clock(&self, chip: &impl ChipImpl) -> Result<u32, Box<dyn std::error::Error>> {
         let arcclk = if let Ok(telemetry) = chip.get_telemetry() {
-            telemetry.smbus_tx_arcclk
+            telemetry.arcclk
         } else {
             // If teletry failed then we are pessemistic and assume 540 MHz
             540

@@ -120,157 +120,178 @@ pub struct Telemetry {
     #[pyo3(get)]
     board_id: u64,
     #[pyo3(get)]
-    smbus_tx_enum_version: u32,
+    enum_version: u32,
     #[pyo3(get)]
-    smbus_tx_device_id: u32,
+    entry_count: u32,
     #[pyo3(get)]
-    smbus_tx_asic_ro: u32,
+    device_id: u32,
     #[pyo3(get)]
-    smbus_tx_asic_idd: u32,
+    asic_id: u32,
     #[pyo3(get)]
-    smbus_tx_board_id_high: u32,
+    asic_ro: u32,
     #[pyo3(get)]
-    smbus_tx_board_id_low: u32,
+    asic_idd: u32,
     #[pyo3(get)]
-    smbus_tx_arc0_fw_version: u32,
+    board_id_high: u32,
     #[pyo3(get)]
-    smbus_tx_arc1_fw_version: u32,
+    board_id_low: u32,
     #[pyo3(get)]
-    smbus_tx_arc2_fw_version: u32,
+    arc0_fw_version: u32,
     #[pyo3(get)]
-    smbus_tx_arc3_fw_version: u32,
+    arc1_fw_version: u32,
     #[pyo3(get)]
-    smbus_tx_spibootrom_fw_version: u32,
+    arc2_fw_version: u32,
     #[pyo3(get)]
-    smbus_tx_eth_fw_version: u32,
+    arc3_fw_version: u32,
     #[pyo3(get)]
-    smbus_tx_m3_bl_fw_version: u32,
+    spibootrom_fw_version: u32,
     #[pyo3(get)]
-    smbus_tx_m3_app_fw_version: u32,
+    eth_fw_version: u32,
     #[pyo3(get)]
-    smbus_tx_ddr_speed: Option<u32>,
+    m3_bl_fw_version: u32,
     #[pyo3(get)]
-    smbus_tx_ddr_status: u32,
+    m3_app_fw_version: u32,
     #[pyo3(get)]
-    smbus_tx_eth_status0: u32,
+    ddr_speed: Option<u32>,
     #[pyo3(get)]
-    smbus_tx_eth_status1: u32,
+    ddr_status: u32,
     #[pyo3(get)]
-    smbus_tx_pcie_status: u32,
+    eth_status0: u32,
     #[pyo3(get)]
-    smbus_tx_faults: u32,
+    eth_status1: u32,
     #[pyo3(get)]
-    smbus_tx_arc0_health: u32,
+    pcie_status: u32,
     #[pyo3(get)]
-    smbus_tx_arc1_health: u32,
+    faults: u32,
     #[pyo3(get)]
-    smbus_tx_arc2_health: u32,
+    arc0_health: u32,
     #[pyo3(get)]
-    smbus_tx_arc3_health: u32,
+    arc1_health: u32,
     #[pyo3(get)]
-    smbus_tx_fan_speed: u32,
+    arc2_health: u32,
     #[pyo3(get)]
-    smbus_tx_aiclk: u32,
+    arc3_health: u32,
     #[pyo3(get)]
-    smbus_tx_axiclk: u32,
+    fan_speed: u32,
     #[pyo3(get)]
-    smbus_tx_arcclk: u32,
+    aiclk: u32,
     #[pyo3(get)]
-    smbus_tx_throttler: u32,
+    axiclk: u32,
     #[pyo3(get)]
-    smbus_tx_vcore: u32,
+    arcclk: u32,
     #[pyo3(get)]
-    smbus_tx_asic_temperature: u32,
+    l2cpuclk0: u32,
     #[pyo3(get)]
-    smbus_tx_vreg_temperature: u32,
+    l2cpuclk1: u32,
     #[pyo3(get)]
-    smbus_tx_board_temperature: u32,
+    l2cpuclk2: u32,
     #[pyo3(get)]
-    smbus_tx_tdp: u32,
+    l2cpuclk3: u32,
     #[pyo3(get)]
-    smbus_tx_tdc: u32,
+    throttler: u32,
     #[pyo3(get)]
-    smbus_tx_vdd_limits: u32,
+    vcore: u32,
     #[pyo3(get)]
-    smbus_tx_thm_limits: u32,
+    asic_temperature: u32,
     #[pyo3(get)]
-    smbus_tx_wh_fw_date: u32,
+    vreg_temperature: u32,
     #[pyo3(get)]
-    smbus_tx_asic_tmon0: u32,
+    board_temperature: u32,
     #[pyo3(get)]
-    smbus_tx_asic_tmon1: u32,
+    tdp: u32,
     #[pyo3(get)]
-    smbus_tx_mvddq_power: u32,
+    tdc: u32,
     #[pyo3(get)]
-    smbus_tx_gddr_train_temp0: u32,
+    vdd_limits: u32,
     #[pyo3(get)]
-    smbus_tx_gddr_train_temp1: u32,
+    thm_limits: u32,
     #[pyo3(get)]
-    smbus_tx_boot_date: u32,
+    wh_fw_date: u32,
     #[pyo3(get)]
-    smbus_tx_rt_seconds: u32,
+    asic_tmon0: u32,
     #[pyo3(get)]
-    smbus_tx_eth_debug_status0: u32,
+    asic_tmon1: u32,
     #[pyo3(get)]
-    smbus_tx_eth_debug_status1: u32,
+    mvddq_power: u32,
     #[pyo3(get)]
-    smbus_tx_tt_flash_version: u32,
+    fw_bundle_version: u32,
     #[pyo3(get)]
-    smbus_tx_fw_bundle_version: u32,
+    gddr_train_temp0: u32,
+    #[pyo3(get)]
+    gddr_train_temp1: u32,
+    #[pyo3(get)]
+    boot_date: u32,
+    #[pyo3(get)]
+    rt_seconds: u32,
+    #[pyo3(get)]
+    eth_debug_status0: u32,
+    #[pyo3(get)]
+    eth_debug_status1: u32,
+    #[pyo3(get)]
+    tt_flash_version: u32,
+    #[pyo3(get)]
+    timer_heartbeat: u32,
 }
 impl From<luwen_if::chip::Telemetry> for Telemetry {
     fn from(value: luwen_if::chip::Telemetry) -> Self {
         Self {
             board_id: value.board_id,
-            smbus_tx_enum_version: value.smbus_tx_enum_version,
-            smbus_tx_device_id: value.smbus_tx_device_id,
-            smbus_tx_asic_ro: value.smbus_tx_asic_ro,
-            smbus_tx_asic_idd: value.smbus_tx_asic_idd,
-            smbus_tx_board_id_high: value.smbus_tx_board_id_high,
-            smbus_tx_board_id_low: value.smbus_tx_board_id_low,
-            smbus_tx_arc0_fw_version: value.smbus_tx_arc0_fw_version,
-            smbus_tx_arc1_fw_version: value.smbus_tx_arc1_fw_version,
-            smbus_tx_arc2_fw_version: value.smbus_tx_arc2_fw_version,
-            smbus_tx_arc3_fw_version: value.smbus_tx_arc3_fw_version,
-            smbus_tx_spibootrom_fw_version: value.smbus_tx_spibootrom_fw_version,
-            smbus_tx_eth_fw_version: value.smbus_tx_eth_fw_version,
-            smbus_tx_m3_bl_fw_version: value.smbus_tx_m3_bl_fw_version,
-            smbus_tx_m3_app_fw_version: value.smbus_tx_m3_app_fw_version,
-            smbus_tx_ddr_speed: value.smbus_tx_ddr_speed,
-            smbus_tx_ddr_status: value.smbus_tx_ddr_status,
-            smbus_tx_eth_status0: value.smbus_tx_eth_status0,
-            smbus_tx_eth_status1: value.smbus_tx_eth_status1,
-            smbus_tx_pcie_status: value.smbus_tx_pcie_status,
-            smbus_tx_faults: value.smbus_tx_faults,
-            smbus_tx_arc0_health: value.smbus_tx_arc0_health,
-            smbus_tx_arc1_health: value.smbus_tx_arc1_health,
-            smbus_tx_arc2_health: value.smbus_tx_arc2_health,
-            smbus_tx_arc3_health: value.smbus_tx_arc3_health,
-            smbus_tx_fan_speed: value.smbus_tx_fan_speed,
-            smbus_tx_aiclk: value.smbus_tx_aiclk,
-            smbus_tx_axiclk: value.smbus_tx_axiclk,
-            smbus_tx_arcclk: value.smbus_tx_arcclk,
-            smbus_tx_throttler: value.smbus_tx_throttler,
-            smbus_tx_vcore: value.smbus_tx_vcore,
-            smbus_tx_asic_temperature: value.smbus_tx_asic_temperature,
-            smbus_tx_vreg_temperature: value.smbus_tx_vreg_temperature,
-            smbus_tx_board_temperature: value.smbus_tx_board_temperature,
-            smbus_tx_tdp: value.smbus_tx_tdp,
-            smbus_tx_tdc: value.smbus_tx_tdc,
-            smbus_tx_vdd_limits: value.smbus_tx_vdd_limits,
-            smbus_tx_thm_limits: value.smbus_tx_thm_limits,
-            smbus_tx_wh_fw_date: value.smbus_tx_wh_fw_date,
-            smbus_tx_asic_tmon0: value.smbus_tx_asic_tmon0,
-            smbus_tx_asic_tmon1: value.smbus_tx_asic_tmon1,
-            smbus_tx_mvddq_power: value.smbus_tx_mvddq_power,
-            smbus_tx_gddr_train_temp0: value.smbus_tx_gddr_train_temp0,
-            smbus_tx_gddr_train_temp1: value.smbus_tx_gddr_train_temp1,
-            smbus_tx_boot_date: value.smbus_tx_boot_date,
-            smbus_tx_rt_seconds: value.smbus_tx_rt_seconds,
-            smbus_tx_eth_debug_status0: value.smbus_tx_eth_debug_status0,
-            smbus_tx_eth_debug_status1: value.smbus_tx_eth_debug_status1,
-            smbus_tx_tt_flash_version: value.smbus_tx_tt_flash_version,
-            smbus_tx_fw_bundle_version: value.smbus_tx_fw_bundle_version,
+            enum_version: value.enum_version,
+            entry_count: value.entry_count,
+            device_id: value.device_id,
+            asic_id: value.asic_id,
+            asic_ro: value.asic_ro,
+            asic_idd: value.asic_idd,
+            board_id_high: value.board_id_high,
+            board_id_low: value.board_id_low,
+            arc0_fw_version: value.arc0_fw_version,
+            arc1_fw_version: value.arc1_fw_version,
+            arc2_fw_version: value.arc2_fw_version,
+            arc3_fw_version: value.arc3_fw_version,
+            spibootrom_fw_version: value.spibootrom_fw_version,
+            eth_fw_version: value.eth_fw_version,
+            m3_bl_fw_version: value.m3_bl_fw_version,
+            m3_app_fw_version: value.m3_app_fw_version,
+            ddr_speed: value.ddr_speed,
+            ddr_status: value.ddr_status,
+            eth_status0: value.eth_status0,
+            eth_status1: value.eth_status1,
+            pcie_status: value.pcie_status,
+            faults: value.faults,
+            arc0_health: value.arc0_health,
+            arc1_health: value.arc1_health,
+            arc2_health: value.arc2_health,
+            arc3_health: value.arc3_health,
+            fan_speed: value.fan_speed,
+            aiclk: value.aiclk,
+            axiclk: value.axiclk,
+            arcclk: value.arcclk,
+            l2cpuclk0: value.l2cpuclk0,
+            l2cpuclk1: value.l2cpuclk1,
+            l2cpuclk2: value.l2cpuclk2,
+            l2cpuclk3: value.l2cpuclk3,
+            throttler: value.throttler,
+            vcore: value.vcore,
+            asic_temperature: value.asic_temperature,
+            vreg_temperature: value.vreg_temperature,
+            board_temperature: value.board_temperature,
+            tdp: value.tdp,
+            tdc: value.tdc,
+            vdd_limits: value.vdd_limits,
+            thm_limits: value.thm_limits,
+            wh_fw_date: value.wh_fw_date,
+            asic_tmon0: value.asic_tmon0,
+            asic_tmon1: value.asic_tmon1,
+            mvddq_power: value.mvddq_power,
+            gddr_train_temp0: value.gddr_train_temp0,
+            gddr_train_temp1: value.gddr_train_temp1,
+            boot_date: value.boot_date,
+            rt_seconds: value.rt_seconds,
+            eth_debug_status0: value.eth_debug_status0,
+            eth_debug_status1: value.eth_debug_status1,
+            tt_flash_version: value.tt_flash_version,
+            fw_bundle_version: value.fw_bundle_version,
+            timer_heartbeat: value.timer_heartbeat,
         }
     }
 }

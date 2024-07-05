@@ -25,6 +25,11 @@ use super::{
 };
 
 pub mod message;
+#[macro_use]
+pub mod telemetry_tags;
+use crate::chip::blackhole::telemetry_tags::TelemetryTags;
+
+// pub use telemetry_tags::telemetry_tags_to_u32;
 
 fn u64_from_slice(data: &[u8]) -> u64 {
     let mut output = 0;
@@ -33,6 +38,17 @@ fn u64_from_slice(data: &[u8]) -> u64 {
         output |= i as u64;
     }
 
+    output
+}
+
+fn u32_from_slice(data: &[u8], index: u8) -> u32 {
+    let mut output = 0;
+    let index = index * 4;
+    let data_chunk = &data[index as usize..(index+4) as usize];
+    for i in data_chunk.iter().rev().copied() {
+        output <<= 8;
+        output |= i as u32;
+    }
     output
 }
 
@@ -47,6 +63,7 @@ pub struct Blackhole {
     pub eth_addrs: EthAddresses,
 
     telemetry_addr: AxiData,
+    telemetry_struct_addr: AxiData,
 }
 
 impl HlComms for Blackhole {
@@ -119,6 +136,7 @@ impl Blackhole {
             eth_addrs: EthAddresses::default(),
 
             telemetry_addr: arc_if.axi_translate("arc_ss.reset_unit.SCRATCH_RAM[12]")?,
+            telemetry_struct_addr: arc_if.axi_translate("arc_ss.reset_unit.SCRATCH_RAM[13]")?,
 
             arc_if: Arc::new(arc_if),
 
@@ -203,7 +221,7 @@ impl Blackhole {
         if self.eth_addrs.masked_version == 0 {
             let telemetry = self.get_telemetry()?;
 
-            self.eth_addrs = EthAddresses::new(telemetry.smbus_tx_eth_fw_version);
+            self.eth_addrs = EthAddresses::new(telemetry.eth_fw_version);
         }
 
         Ok(())
@@ -423,17 +441,73 @@ impl ChipImpl for Blackhole {
     }
 
     fn get_telemetry(&self) -> Result<super::Telemetry, PlatformError> {
-        let mut addr = [0u8; 4];
-        self.axi_read_field(&self.telemetry_addr, &mut addr)?;
-        let addr = u32::from_le_bytes(addr);
+        // Get chip telemetry and device data 
+        // Read telemetry data block address from scratch ram
+        // Then read and parse telemetry data
 
-        let mut data_block = [0u8; 33 * 4];
-        self.axi_read(addr as u64, &mut data_block)?;
+        // Get address of telem struct from scratch ram
+        let mut scratch_reg_13_value = [0u8; 4];
+        self.axi_read_field(&self.telemetry_struct_addr, &mut scratch_reg_13_value)?;
+        let telem_struct_addr = u32::from_le_bytes(scratch_reg_13_value);
 
-        Ok(super::Telemetry {
-            board_id: u64_from_slice(&data_block[0..8]),
-            ..Default::default()
-        })
+        // Read the data block from the address in sctrach 13 
+        // Parse out the version and entry count before reading the data block
+        let mut version: [u8; 4] = [0u8; 4];
+        let mut entry_count = [0u8; 4];
+        self.axi_read(telem_struct_addr as u64, &mut version)?;
+        self.axi_read((telem_struct_addr + 4) as u64, &mut entry_count)?;
+        
+        // TODO: Implement version check and data block parsing based on version
+        // For now, assume version 1 and parse data block as is
+        // let version = u32::from_le_bytes(version);
+        let entry_count = u32::from_le_bytes(entry_count);
+
+        // Get telemetry tags data block and telemetry data data block
+        let mut telemetry_tags_data_block: Vec<u8> = vec![0u8; entry_count as usize * 4];
+        let mut telem_data_block: Vec<u8> = vec![0u8; entry_count as usize * 4];
+
+        self.axi_read((telem_struct_addr + 8) as u64, &mut telemetry_tags_data_block)?;
+        self.axi_read((telem_struct_addr + 8 + entry_count * 4) as u64, &mut telem_data_block)?;
+        
+        // Parse telemetry data
+        let mut telemetry_data = super::Telemetry::default();
+        for i in 0..entry_count as u8 {
+            let tag =  u32_from_slice(&telemetry_tags_data_block, i) & 0xFF;
+            // TODO: Implement offset use
+            // let offset = u32_from_slice(&telemetry_tags_data_block, i) >> 16 & 0xFF;
+            let data = u32_from_slice(&telem_data_block, i);
+            // print!("Tag: {:#02x} Data: {:#02x} Offset {:#02x}\n", tag, data, offset);
+            match u32_to_telemetry_tags!(tag) {
+                TelemetryTags::ENUM_VERSION => telemetry_data.enum_version = data,
+                TelemetryTags::ENTRY_COUNT => telemetry_data.entry_count = data,
+                TelemetryTags::BOARD_ID_HIGH => telemetry_data.board_id_high = data,
+                TelemetryTags::BOARD_ID_LOW => telemetry_data.board_id_low = data,
+                TelemetryTags::ASIC_ID => telemetry_data.asic_id = data,
+                TelemetryTags::AICLK => telemetry_data.aiclk = data,
+                TelemetryTags::AXICLK => telemetry_data.axiclk = data,
+                TelemetryTags::ARCCLK => telemetry_data.arcclk = data,
+                TelemetryTags::VCORE => telemetry_data.vcore = data,
+                TelemetryTags::TDP => telemetry_data.tdp = data,
+                TelemetryTags::TDC => telemetry_data.tdc = data,
+                TelemetryTags::VDD_LIMITS => telemetry_data.vdd_limits = data,
+                TelemetryTags::THM_LIMITS => telemetry_data.thm_limits = data,
+                TelemetryTags::ASIC_TEMPERATURE => telemetry_data.asic_temperature = data,
+                TelemetryTags::VREG_TEMPERATURE => telemetry_data.vreg_temperature = data,
+                TelemetryTags::BOARD_TEMPERATURE => telemetry_data.board_temperature = data,
+                TelemetryTags::L2CPUCLK0 => telemetry_data.l2cpuclk0 = data,
+                TelemetryTags::L2CPUCLK1 => telemetry_data.l2cpuclk1 = data,
+                TelemetryTags::L2CPUCLK2 => telemetry_data.l2cpuclk2 = data,
+                TelemetryTags::L2CPUCLK3 => telemetry_data.l2cpuclk3 = data,
+                TelemetryTags::TIMER_HEARTBEAT => telemetry_data.timer_heartbeat = data,
+                TelemetryTags::DDR_STATUS => telemetry_data.ddr_status = data,
+                TelemetryTags::DDR_SPEED => telemetry_data.ddr_speed = Some(data),
+                TelemetryTags::FAN_SPEED => telemetry_data.fan_speed = data,
+                _ => (),
+            }
+        }
+        telemetry_data.board_id = 0xb1ac401e;
+        Ok(telemetry_data)
+ 
     }
 
     fn get_device_info(&self) -> Result<Option<crate::DeviceInfo>, PlatformError> {
