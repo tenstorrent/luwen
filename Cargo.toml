@@ -10,7 +10,7 @@ authors = [ "Daniel Rosen <drosen@tenstorrent.com>", ]
 
 [dependencies]
 luwen-core = {path = "crates/luwen-core", version="0.1.0"}
-luwen-if = {path = "crates/luwen-if", version="0.4.6"}
+luwen-if = {path = "crates/luwen-if", version="0.4.7"}
 luwen-ref = {path = "crates/luwen-ref", version="0.3.1"}
 ttkmd-if = {path = "crates/ttkmd-if", version="0.1.0"}
 
