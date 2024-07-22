@@ -271,6 +271,7 @@ pub fn comms_callback_inner(
 
                             vendor: borrow.device.physical.vendor_id,
                             device_id: borrow.device.physical.device_id,
+                            board_id: borrow.device.physical.subsystem_id,
                             bar_size: borrow.device.physical.bar_size_bytes,
                         });
                     }

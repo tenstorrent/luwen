@@ -206,10 +206,25 @@ impl Spi {
 
         // Write sectors to lock
         chip.axi_write32(self.spi_dr, SPI_WR_STATUS_CMD as u32)?;
-        if sections < 5 {
-            chip.axi_write32(self.spi_dr, 0x3 << 5 | (sections as u32) << 2)?;
+        
+        // Figure out which SPI to use
+        let simple_spi = if let Ok(Some(info)) = chip.get_device_info() {
+            info.board_id == 0x35
         } else {
-            chip.axi_write32(self.spi_dr, 0x1 << 5 | (sections as u32 - 5) << 2)?;
+            let telem = chip.get_telemetry()?;
+            let upi = (telem.board_id >> (32 + 4)) & 0xFFFFF;
+            upi == 0x35
+        };
+
+        // Write sector lock info
+        if simple_spi {
+            chip.axi_write32(self.spi_dr, (1 << 6) | (sections as u32) << 2)?;
+        } else {
+            if sections < 5 {
+                chip.axi_write32(self.spi_dr, 0x3 << 5 | (sections as u32) << 2)?;
+            } else {
+                chip.axi_write32(self.spi_dr, 0x1 << 5 | (sections as u32 - 5) << 2)?;
+            }
         }
         chip.axi_write32(self.spi_ser, spi_ser_slave_enable(0))?;
 
