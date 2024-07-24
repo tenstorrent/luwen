@@ -1,6 +1,6 @@
 [package]
 name = "luwen"
-version = "0.3.12"
+version = "0.4.0"
 description = "A high-level interface for safe and efficient access Tenstorrent AI accelerators"
 edition = "2021"
 license = "Apache-2.0"
@@ -9,10 +9,10 @@ authors = [ "Daniel Rosen <drosen@tenstorrent.com>", ]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-luwen-core = {path = "crates/luwen-core", version="0.1.0"}
-luwen-if = {path = "crates/luwen-if", version="0.4.7"}
-luwen-ref = {path = "crates/luwen-ref", version="0.3.1"}
-ttkmd-if = {path = "crates/ttkmd-if", version="0.1.0"}
+luwen-core = {path = "crates/luwen-core", version="0.2.0"}
+luwen-if = {path = "crates/luwen-if", version="0.5.0"}
+luwen-ref = {path = "crates/luwen-ref", version="0.4.0"}
+ttkmd-if = {path = "crates/ttkmd-if", version="0.2.0"}
 
 serde = {"version" = "1.0.164", features = ["derive"]}
 serde_yaml = "0.9.22"
