@@ -98,61 +98,6 @@ pub trait HlComms {
 }
 
 /// Take a value and place it onto the existing value shifting by, `lower` and masking off at `upper`
-fn write_modify0(existing: &mut [u8], value: &[u8], lower: u32, upper: u32) {
-    let (array_shift, element_shift) = if lower == 0 {
-        (0, 0)
-    } else {
-        (lower / 8, lower % 8)
-    };
-
-    let (upper_shift, upper_element_shift) = if upper == 0 {
-        (0, 0)
-    } else {
-        (upper / 8, upper % 8)
-    };
-
-    // We can shift off the lower elements for "free"
-    // let mut existing = vec![0u8; (value.len() - array_shift as u64) as usize];
-    // arc_if.axi_read(chip_if, addr.addr + array_shift as u64, &mut existing)?;
-
-    assert!(existing.len() * 8 > upper as usize);
-    assert!(upper >= lower);
-
-    let mut it = existing;
-
-    // We are able to skip the bottom elements of existing
-    if array_shift > 0 {
-        it = &mut it[array_shift as usize..]
-    }
-
-    // We are doing both modifications with a bitmask
-    if upper_shift - array_shift == 0 {
-        it[array_shift as usize] =
-            (value[0] & (1 << (upper_element_shift - element_shift)) - 1) << element_shift;
-    } else {
-        // We are doing a byte modification before (and after our bit mod)
-        let mut carry = it[0] & ((1 << element_shift) - 1);
-        let carry_mask = ((1 << element_shift) - 1) << (8 - element_shift);
-
-        let byte_count = (upper_shift - array_shift) as usize;
-
-        for i in 0..byte_count {
-            // This is our bytemod, for this region the existing value will be equal to the "value"
-            // shifted up and the carray from the previous shift in the lower bits. For the first
-            // iteration we make the carry equal to the lower bits of the existing value to emulate
-            // a rmw operation.
-            it[i] = (value[i] << element_shift) | carry;
-            carry = (value[i] & carry_mask) >> (8 - element_shift);
-        }
-
-        // For the final bitop we just do our normal setup, but mask off at the upper shift. And
-        // perform a mw to the existing value
-        let bitmask = (1 << upper_element_shift) - 1;
-        let value = value[byte_count] << element_shift | carry;
-        it[byte_count] = (it[byte_count] & !bitmask) | (value & bitmask);
-    }
-}
-
 fn write_modify(existing: &mut [u8], value: &[u8], lower: u32, upper: u32) {
     assert!(upper >= lower);
     assert!(existing.len() * 8 > upper as usize);

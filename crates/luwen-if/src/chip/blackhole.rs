@@ -44,7 +44,7 @@ fn u64_from_slice(data: &[u8]) -> u64 {
 fn u32_from_slice(data: &[u8], index: u8) -> u32 {
     let mut output = 0;
     let index = index * 4;
-    let data_chunk = &data[index as usize..(index+4) as usize];
+    let data_chunk = &data[index as usize..(index + 4) as usize];
     for i in data_chunk.iter().rev().copied() {
         output <<= 8;
         output |= i as u32;
@@ -280,21 +280,7 @@ impl Blackhole {
     }
 
     pub fn spi_write(&self, mut addr: u32, value: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
-        let (_, _, result) = self.bh_arc_msg(0x29, &[], None)?;
-        let buffer_addr = result[0];
-        let buffer_size_bytes = result[1];
-
-        if buffer_size_bytes == 0 {
-            return Err("SPI Buffer is not allocated".into());
-        }
-
-        for chunk in value.chunks(buffer_size_bytes as usize) {
-            self.axi_write(buffer_addr as u64, chunk)?;
-            self.bh_arc_msg(0x2B, &[addr, chunk.len() as u32], None)?;
-            addr += chunk.len() as u32;
-        }
-
-        Ok(())
+        unimplemented!("No SPI write implementation yet");
     }
 
     pub fn spi_read(
@@ -302,21 +288,7 @@ impl Blackhole {
         mut addr: u32,
         value: &mut [u8],
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let (_, _, result) = self.bh_arc_msg(0x29, &[], None)?;
-        let buffer_addr = result[0];
-        let buffer_size_bytes = result[1];
-
-        if buffer_size_bytes == 0 {
-            return Err("SPI Buffer is not allocated".into());
-        }
-
-        for chunk in value.chunks_mut(buffer_size_bytes as usize) {
-            self.bh_arc_msg(0x2A, &[addr, chunk.len() as u32], None)?;
-            self.axi_read(buffer_addr as u64, chunk)?;
-            addr += chunk.len() as u32;
-        }
-
-        Ok(())
+        unimplemented!("No SPI read implementation yet");
     }
 
     pub fn get_local_chip_coord(&self) -> Result<EthAddr, PlatformError> {
@@ -441,7 +413,7 @@ impl ChipImpl for Blackhole {
     }
 
     fn get_telemetry(&self) -> Result<super::Telemetry, PlatformError> {
-        // Get chip telemetry and device data 
+        // Get chip telemetry and device data
         // Read telemetry data block address from scratch ram
         // Then read and parse telemetry data
 
@@ -450,13 +422,13 @@ impl ChipImpl for Blackhole {
         self.axi_read_field(&self.telemetry_struct_addr, &mut scratch_reg_13_value)?;
         let telem_struct_addr = u32::from_le_bytes(scratch_reg_13_value);
 
-        // Read the data block from the address in sctrach 13 
+        // Read the data block from the address in sctrach 13
         // Parse out the version and entry count before reading the data block
         let mut version: [u8; 4] = [0u8; 4];
         let mut entry_count = [0u8; 4];
         self.axi_read(telem_struct_addr as u64, &mut version)?;
         self.axi_read((telem_struct_addr + 4) as u64, &mut entry_count)?;
-        
+
         // TODO: Implement version check and data block parsing based on version
         // For now, assume version 1 and parse data block as is
         // let version = u32::from_le_bytes(version);
@@ -466,13 +438,19 @@ impl ChipImpl for Blackhole {
         let mut telemetry_tags_data_block: Vec<u8> = vec![0u8; entry_count as usize * 4];
         let mut telem_data_block: Vec<u8> = vec![0u8; entry_count as usize * 4];
 
-        self.axi_read((telem_struct_addr + 8) as u64, &mut telemetry_tags_data_block)?;
-        self.axi_read((telem_struct_addr + 8 + entry_count * 4) as u64, &mut telem_data_block)?;
-        
+        self.axi_read(
+            (telem_struct_addr + 8) as u64,
+            &mut telemetry_tags_data_block,
+        )?;
+        self.axi_read(
+            (telem_struct_addr + 8 + entry_count * 4) as u64,
+            &mut telem_data_block,
+        )?;
+
         // Parse telemetry data
         let mut telemetry_data = super::Telemetry::default();
         for i in 0..entry_count as u8 {
-            let tag =  u32_from_slice(&telemetry_tags_data_block, i) & 0xFF;
+            let tag = u32_from_slice(&telemetry_tags_data_block, i) & 0xFF;
             // TODO: Implement offset use
             // let offset = u32_from_slice(&telemetry_tags_data_block, i) >> 16 & 0xFF;
             let data = u32_from_slice(&telem_data_block, i);
@@ -507,7 +485,6 @@ impl ChipImpl for Blackhole {
         }
         telemetry_data.board_id = 0xb1ac401e;
         Ok(telemetry_data)
- 
     }
 
     fn get_device_info(&self) -> Result<Option<crate::DeviceInfo>, PlatformError> {
