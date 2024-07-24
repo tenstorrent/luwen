@@ -90,7 +90,10 @@ impl Wormhole {
             is_remote,
             use_arc_for_spi,
 
-            arc_addrs: ArcMsgAddr::try_from(&arc_if as &dyn ChipComms)?,
+            arc_addrs: ArcMsgAddr {
+                scratch_base: arc_if.axi_translate("ARC_RESET.SCRATCH[0]")?.addr,
+                arc_misc_cntl: arc_if.axi_translate("ARC_RESET.ARC_MISC_CNTL")?.addr,
+            },
 
             arc_if: Arc::new(arc_if),
             eth_addrs: EthAddresses::default(),
@@ -188,7 +191,7 @@ impl Wormhole {
         if self.eth_addrs.masked_version == 0 {
             let telemetry = self.get_telemetry()?;
 
-            self.eth_addrs = EthAddresses::new(telemetry.smbus_tx_eth_fw_version);
+            self.eth_addrs = EthAddresses::new(telemetry.eth_fw_version);
         }
 
         Ok(())
@@ -422,7 +425,17 @@ impl ChipImpl for Wormhole {
 
                                     // The fact that this is here means that our result is too generic, for now we just ignore it.
                                     PlatformError::ArcMsgError(error) => {
-                                        return Ok(ChipInitResult::ErrorContinue(error.to_string(), backtrace::Backtrace::capture()));
+                                        return Ok(ChipInitResult::ErrorContinue(
+                                            error.to_string(),
+                                            backtrace::Backtrace::capture(),
+                                        ));
+                                    }
+
+                                    PlatformError::MessageError(error) => {
+                                        return Ok(ChipInitResult::ErrorContinue(
+                                            error.to_string(),
+                                            backtrace::Backtrace::capture(),
+                                        ));
                                     }
 
                                     // This is fine to hit at this stage (though it should have been already verified to not be the case).
@@ -440,27 +453,57 @@ impl ChipImpl for Wormhole {
                                     // This is an "expected error" but we probably can't recover from it, so we should abort the init.
                                     PlatformError::AxiError(error) => {
                                         *comms = CommsStatus::CommunicationError(error.to_string());
-                                        return Ok(ChipInitResult::ErrorAbort(format!("ARC AXI error: {}", error.to_string()), backtrace::Backtrace::capture()));
+                                        return Ok(ChipInitResult::ErrorAbort(
+                                            format!("ARC AXI error: {}", error.to_string()),
+                                            backtrace::Backtrace::capture(),
+                                        ));
                                     }
 
                                     // We don't expect to hit these cases so if we do, we should assume that something went terribly
                                     // wrong and abort the init.
-                                    PlatformError::WrongChipArch {actual, expected, backtrace} => {
-                                        return Ok(ChipInitResult::ErrorAbort(format!("expected chip: {}, actual detected chip: {}", expected, actual), backtrace.0))
+                                    PlatformError::WrongChipArch {
+                                        actual,
+                                        expected,
+                                        backtrace,
+                                    } => {
+                                        return Ok(ChipInitResult::ErrorAbort(
+                                            format!(
+                                                "expected chip: {}, actual detected chip: {}",
+                                                expected, actual
+                                            ),
+                                            backtrace.0,
+                                        ))
                                     }
 
-                                    PlatformError::WrongChipArchs {actual, expected, backtrace} => {
-                                        let expected_chips = expected.iter().map(|arch| arch.to_string()).collect::<Vec<_>>().join(", ");
-                                        return Ok(ChipInitResult::ErrorAbort(format!("expected chip: {}, actual detected chips: {}", expected_chips, actual), backtrace.0));
+                                    PlatformError::WrongChipArchs {
+                                        actual,
+                                        expected,
+                                        backtrace,
+                                    } => {
+                                        let expected_chips = expected
+                                            .iter()
+                                            .map(|arch| arch.to_string())
+                                            .collect::<Vec<_>>()
+                                            .join(", ");
+                                        return Ok(ChipInitResult::ErrorAbort(
+                                            format!(
+                                                "expected chip: {}, actual detected chips: {}",
+                                                expected_chips, actual
+                                            ),
+                                            backtrace.0,
+                                        ));
                                     }
 
                                     PlatformError::Generic(error, backtrace) => {
                                         return Ok(ChipInitResult::ErrorAbort(error, backtrace.0));
                                     }
 
-                                    | PlatformError::GenericError(error, backtrace) => {
+                                    PlatformError::GenericError(error, backtrace) => {
                                         let err_msg = error.to_string();
-                                        return Ok(ChipInitResult::ErrorAbort(err_msg, backtrace.0));
+                                        return Ok(ChipInitResult::ErrorAbort(
+                                            err_msg,
+                                            backtrace.0,
+                                        ));
                                     }
                                 }
                             }
@@ -527,6 +570,10 @@ impl ChipImpl for Wormhole {
                                 return Ok(ChipInitResult::ErrorContinue(format!("Telemetry ARC message error: {}; we expected to have communication, but lost it.", error.to_string()), backtrace::Backtrace::capture()));
                             }
 
+                            PlatformError::MessageError(error) => {
+                                return Ok(ChipInitResult::ErrorContinue(format!("Telemetry ARC message error: {:?}; we expected to have communication, but lost it.", error), backtrace::Backtrace::capture()));
+                            }
+
                             // This is an "expected error" but we probably can't recover from it, so we should abort the init.
                             PlatformError::AxiError(error) => return Ok(ChipInitResult::ErrorAbort(error.to_string(), backtrace::Backtrace::capture())),
 
@@ -553,7 +600,7 @@ impl ChipImpl for Wormhole {
                     };
 
                     if let Some(telem) = telem {
-                        let dram_status = telem.smbus_tx_ddr_status;
+                        let dram_status = telem.ddr_status;
 
                         let mut channels = [None; 6];
                         for (i, channel) in channels.iter_mut().enumerate() {
@@ -631,23 +678,45 @@ impl ChipImpl for Wormhole {
                                 // ARC should be initialized at this point, hitting an error here means
                                 // that we can no longer progress in the init.
                                 PlatformError::ArcMsgError(error) => {
-                                    return Ok(ChipInitResult::ErrorContinue(error.to_string(), backtrace::Backtrace::capture()));
+                                    return Ok(ChipInitResult::ErrorContinue(
+                                        error.to_string(),
+                                        backtrace::Backtrace::capture(),
+                                    ));
+                                }
+
+                                PlatformError::MessageError(error) => {
+                                    return Ok(ChipInitResult::ErrorContinue(
+                                        error.to_string(),
+                                        backtrace::Backtrace::capture(),
+                                    ));
                                 }
 
                                 PlatformError::ArcNotReady(error, backtrace) => {
-                                    return Ok(ChipInitResult::ErrorContinue(error.to_string(), backtrace.0));
+                                    return Ok(ChipInitResult::ErrorContinue(
+                                        error.to_string(),
+                                        backtrace.0,
+                                    ));
                                 }
 
                                 // We are checking for ethernet training to complete... if we hit this than
                                 // something has gone terribly wrong
                                 PlatformError::EthernetTrainingNotComplete(eth_cores) => {
                                     let false_count = eth_cores.iter().filter(|&&x| !x).count();
-                                    return Ok(ChipInitResult::ErrorContinue(format!("Ethernet training not complete on [{}/16] ports", false_count), backtrace::Backtrace::capture()));
-                                    }
+                                    return Ok(ChipInitResult::ErrorContinue(
+                                        format!(
+                                            "Ethernet training not complete on [{}/16] ports",
+                                            false_count
+                                        ),
+                                        backtrace::Backtrace::capture(),
+                                    ));
+                                }
 
                                 // This is an "expected error" but we probably can't recover from it, so we should abort the init.
                                 PlatformError::AxiError(error) => {
-                                    return Ok(ChipInitResult::ErrorAbort(error.to_string(), backtrace::Backtrace::capture()));
+                                    return Ok(ChipInitResult::ErrorAbort(
+                                        error.to_string(),
+                                        backtrace::Backtrace::capture(),
+                                    ));
                                 }
 
                                 // We don't expect to hit these cases so if we do, we should assume that something went terribly
@@ -655,20 +724,44 @@ impl ChipImpl for Wormhole {
                                 PlatformError::UnsupportedFwVersion { version, required } => {
                                     return Ok(ChipInitResult::ErrorAbort(format!("Required Ethernet Firmware Version: {}, current version: {:?}", required, version), backtrace::Backtrace::capture()));
                                 }
-                                PlatformError::WrongChipArch {actual, expected, backtrace} => {
-                                    return Ok(ChipInitResult::ErrorAbort(format!("expected chip: {}, actual detected chip: {}", expected, actual), backtrace.0))
+                                PlatformError::WrongChipArch {
+                                    actual,
+                                    expected,
+                                    backtrace,
+                                } => {
+                                    return Ok(ChipInitResult::ErrorAbort(
+                                        format!(
+                                            "expected chip: {}, actual detected chip: {}",
+                                            expected, actual
+                                        ),
+                                        backtrace.0,
+                                    ))
                                 }
-    
-                                PlatformError::WrongChipArchs {actual, expected, backtrace} => {
-                                    let expected_chips = expected.iter().map(|arch| arch.to_string()).collect::<Vec<_>>().join(", ");
-                                    return Ok(ChipInitResult::ErrorAbort(format!("expected chip: {}, actual detected chips: {}", expected_chips, actual), backtrace.0));
+
+                                PlatformError::WrongChipArchs {
+                                    actual,
+                                    expected,
+                                    backtrace,
+                                } => {
+                                    let expected_chips = expected
+                                        .iter()
+                                        .map(|arch| arch.to_string())
+                                        .collect::<Vec<_>>()
+                                        .join(", ");
+                                    return Ok(ChipInitResult::ErrorAbort(
+                                        format!(
+                                            "expected chip: {}, actual detected chips: {}",
+                                            expected_chips, actual
+                                        ),
+                                        backtrace.0,
+                                    ));
                                 }
-    
+
                                 PlatformError::Generic(error, backtrace) => {
                                     return Ok(ChipInitResult::ErrorAbort(error, backtrace.0));
                                 }
-    
-                                | PlatformError::GenericError(error, backtrace) => {
+
+                                PlatformError::GenericError(error, backtrace) => {
                                     let err_msg = error.to_string();
                                     return Ok(ChipInitResult::ErrorAbort(err_msg, backtrace.0));
                                 }
@@ -864,209 +957,209 @@ impl ChipImpl for Wormhole {
         let csm_offset = self.arc_if.axi_translate("ARC_CSM.DATA[0]")?;
 
         let telemetry_struct_offset = csm_offset.addr + (offset - 0x10000000) as u64;
-        let smbus_tx_enum_version = self
+        let enum_version = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset)?;
-        let smbus_tx_device_id = self
+        let device_id = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + 4)?;
-        let smbus_tx_asic_ro = self
+        let asic_ro = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (2 * 4))?;
-        let smbus_tx_asic_idd = self
+        let asic_idd = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (3 * 4))?;
 
-        let smbus_tx_board_id_high = self
+        let board_id_high = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (4 * 4))?;
-        let smbus_tx_board_id_low = self
+        let board_id_low = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (5 * 4))?;
-        let smbus_tx_arc0_fw_version = self
+        let arc0_fw_version = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (6 * 4))?;
-        let smbus_tx_arc1_fw_version = self
+        let arc1_fw_version = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (7 * 4))?;
-        let smbus_tx_arc2_fw_version = self
+        let arc2_fw_version = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (8 * 4))?;
-        let smbus_tx_arc3_fw_version = self
+        let arc3_fw_version = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (9 * 4))?;
-        let smbus_tx_spibootrom_fw_version = self
+        let spibootrom_fw_version = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (10 * 4))?;
-        let smbus_tx_eth_fw_version = self
+        let eth_fw_version = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (11 * 4))?;
-        let smbus_tx_m3_bl_fw_version = self
+        let m3_bl_fw_version = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (12 * 4))?;
-        let smbus_tx_m3_app_fw_version = self
+        let m3_app_fw_version = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (13 * 4))?;
-        let smbus_tx_ddr_status = self
+        let ddr_status = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (14 * 4))?;
-        let smbus_tx_eth_status0 = self
+        let eth_status0 = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (15 * 4))?;
-        let smbus_tx_eth_status1 = self
+        let eth_status1 = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (16 * 4))?;
-        let smbus_tx_pcie_status = self
+        let pcie_status = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (17 * 4))?;
-        let smbus_tx_faults = self
+        let faults = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (18 * 4))?;
-        let smbus_tx_arc0_health = self
+        let arc0_health = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (19 * 4))?;
-        let smbus_tx_arc1_health = self
+        let arc1_health = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (20 * 4))?;
-        let smbus_tx_arc2_health = self
+        let arc2_health = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (21 * 4))?;
-        let smbus_tx_arc3_health = self
+        let arc3_health = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (22 * 4))?;
-        let smbus_tx_fan_speed = self
+        let fan_speed = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (23 * 4))?;
-        let smbus_tx_aiclk = self
+        let aiclk = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (24 * 4))?;
-        let smbus_tx_axiclk = self
+        let axiclk = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (25 * 4))?;
-        let smbus_tx_arcclk = self
+        let arcclk = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (26 * 4))?;
-        let smbus_tx_throttler = self
+        let throttler = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (27 * 4))?;
-        let smbus_tx_vcore = self
+        let vcore = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (28 * 4))?;
-        let smbus_tx_asic_temperature = self
+        let asic_temperature = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (29 * 4))?;
-        let smbus_tx_vreg_temperature = self
+        let vreg_temperature = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (30 * 4))?;
-        let smbus_tx_board_temperature = self
+        let board_temperature = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (31 * 4))?;
-        let smbus_tx_tdp = self
+        let tdp = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (32 * 4))?;
-        let smbus_tx_tdc = self
+        let tdc = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (33 * 4))?;
-        let smbus_tx_vdd_limits = self
+        let vdd_limits = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (34 * 4))?;
-        let smbus_tx_thm_limits = self
+        let thm_limits = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (35 * 4))?;
-        let smbus_tx_wh_fw_date = self
+        let wh_fw_date = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (36 * 4))?;
-        let smbus_tx_asic_tmon0 = self
+        let asic_tmon0 = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (37 * 4))?;
-        let smbus_tx_asic_tmon1 = self
+        let asic_tmon1 = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (38 * 4))?;
-        let smbus_tx_mvddq_power = self
+        let mvddq_power = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (39 * 4))?;
-        let smbus_tx_gddr_train_temp0 = self
+        let gddr_train_temp0 = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (40 * 4))?;
-        let smbus_tx_gddr_train_temp1 = self
+        let gddr_train_temp1 = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (41 * 4))?;
-        let smbus_tx_boot_date = self
+        let boot_date = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (42 * 4))?;
-        let smbus_tx_rt_seconds = self
+        let rt_seconds = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (43 * 4))?;
-        let smbus_tx_eth_debug_status0 = self
+        let eth_debug_status0 = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (44 * 4))?;
-        let smbus_tx_eth_debug_status1 = self
+        let eth_debug_status1 = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (45 * 4))?;
-        let smbus_tx_tt_flash_version = self
+        let tt_flash_version = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (46 * 4))?;
         
         let threshold: u32 = 0x02190000;  // arc fw 2.25.0.0
-        let smbus_tx_fw_bundle_version: u32;
-        if smbus_tx_arc0_fw_version >= threshold {
-            smbus_tx_fw_bundle_version = self
+        let fw_bundle_version: u32;
+        if arc0_fw_version >= threshold {
+            fw_bundle_version = self
                 .arc_if
                 .axi_read32(&self.chip_if, telemetry_struct_offset + (49 * 4))?;            
         } else {
-            smbus_tx_fw_bundle_version = 0;
+            fw_bundle_version = 0;
         }
 
         Ok(super::Telemetry {
-            board_id: ((smbus_tx_board_id_high as u64) << 32) | (smbus_tx_board_id_low as u64),
-            smbus_tx_enum_version,
-            smbus_tx_device_id,
-            smbus_tx_asic_ro,
-            smbus_tx_asic_idd,
-            smbus_tx_board_id_high,
-            smbus_tx_board_id_low,
-            smbus_tx_arc0_fw_version,
-            smbus_tx_arc1_fw_version,
-            smbus_tx_arc2_fw_version,
-            smbus_tx_arc3_fw_version,
-            smbus_tx_spibootrom_fw_version,
-            smbus_tx_eth_fw_version,
-            smbus_tx_m3_bl_fw_version,
-            smbus_tx_m3_app_fw_version,
-            smbus_tx_ddr_status,
-            smbus_tx_eth_status0,
-            smbus_tx_eth_status1,
-            smbus_tx_pcie_status,
-            smbus_tx_faults,
-            smbus_tx_arc0_health,
-            smbus_tx_arc1_health,
-            smbus_tx_arc2_health,
-            smbus_tx_arc3_health,
-            smbus_tx_fan_speed,
-            smbus_tx_aiclk,
-            smbus_tx_axiclk,
-            smbus_tx_arcclk,
-            smbus_tx_throttler,
-            smbus_tx_vcore,
-            smbus_tx_asic_temperature,
-            smbus_tx_vreg_temperature,
-            smbus_tx_board_temperature,
-            smbus_tx_tdp,
-            smbus_tx_tdc,
-            smbus_tx_vdd_limits,
-            smbus_tx_thm_limits,
-            smbus_tx_wh_fw_date,
-            smbus_tx_asic_tmon0,
-            smbus_tx_asic_tmon1,
-            smbus_tx_mvddq_power,
-            smbus_tx_gddr_train_temp0,
-            smbus_tx_gddr_train_temp1,
-            smbus_tx_boot_date,
-            smbus_tx_rt_seconds,
-            smbus_tx_eth_debug_status0,
-            smbus_tx_eth_debug_status1,
-            smbus_tx_tt_flash_version,
-            smbus_tx_fw_bundle_version,
+            board_id: ((board_id_high as u64) << 32) | (board_id_low as u64),
+            enum_version,
+            device_id,
+            asic_ro,
+            asic_idd,
+            board_id_high,
+            board_id_low,
+            arc0_fw_version,
+            arc1_fw_version,
+            arc2_fw_version,
+            arc3_fw_version,
+            spibootrom_fw_version,
+            eth_fw_version,
+            m3_bl_fw_version,
+            m3_app_fw_version,
+            ddr_status,
+            eth_status0,
+            eth_status1,
+            pcie_status,
+            faults,
+            arc0_health,
+            arc1_health,
+            arc2_health,
+            arc3_health,
+            fan_speed,
+            aiclk,
+            axiclk,
+            arcclk,
+            throttler,
+            vcore,
+            asic_temperature,
+            vreg_temperature,
+            board_temperature,
+            tdp,
+            tdc,
+            vdd_limits,
+            thm_limits,
+            wh_fw_date,
+            asic_tmon0,
+            asic_tmon1,
+            mvddq_power,
+            gddr_train_temp0,
+            gddr_train_temp1,
+            boot_date,
+            rt_seconds,
+            eth_debug_status0,
+            eth_debug_status1,
+            tt_flash_version,
+            fw_bundle_version,
             ..Default::default()
         })
     }

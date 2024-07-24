@@ -37,6 +37,8 @@ fn clone_chip(chip: &Chip) -> Chip {
         Chip::from(Box::new(wh.clone()) as Box<dyn ChipImpl>)
     } else if let Some(gs) = chip.as_gs() {
         Chip::from(Box::new(gs.clone()) as Box<dyn ChipImpl>)
+    } else if let Some(bh) = chip.as_bh() {
+        Chip::from(Box::new(bh.clone()) as Box<dyn ChipImpl>)
     } else {
         unimplemented!(
             "Don't have a clone handler for chip with arch {:?}.",

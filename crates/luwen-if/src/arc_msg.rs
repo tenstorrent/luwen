@@ -196,6 +196,8 @@ pub enum ArcMsgProtocolError {
     FwIntFailed,
     #[error("Mailbox {0} is invalid")]
     InvalidMailbox(usize),
+    #[error("Unknown error code {0}")]
+    UnknownErrorCode(u8)
 }
 
 impl ArcMsgProtocolError {
@@ -220,6 +222,7 @@ pub enum ArcMsgError {
     AxiError(#[from] AxiError),
 }
 
+#[derive(Debug)]
 pub enum ArcMsgOk {
     Ok { rc: u32, arg: u32 },
     OkNoWait,
@@ -246,17 +249,6 @@ fn trigger_fw_int<T: HlComms>(comms: &T, addrs: &ArcMsgAddr) -> Result<bool, Pla
 pub struct ArcMsgAddr {
     pub scratch_base: u64,
     pub arc_misc_cntl: u64,
-}
-
-impl TryFrom<&dyn ChipComms> for ArcMsgAddr {
-    type Error = AxiError;
-
-    fn try_from(value: &dyn ChipComms) -> Result<Self, Self::Error> {
-        Ok(ArcMsgAddr {
-            scratch_base: value.axi_translate("ARC_RESET.SCRATCH[0]")?.addr,
-            arc_misc_cntl: value.axi_translate("ARC_RESET.ARC_MISC_CNTL")?.addr,
-        })
-    }
 }
 
 pub fn arc_msg<T: HlComms>(

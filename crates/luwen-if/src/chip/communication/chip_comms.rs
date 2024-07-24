@@ -328,6 +328,71 @@ impl ChipComms for ArcIf {
     }
 }
 
+pub struct NocIf {
+    pub axi_data: MemorySlices,
+    pub noc_id: u8,
+    pub x: u8,
+    pub y: u8,
+}
+
+impl ChipComms for NocIf {
+    fn axi_translate(&self, addr: &str) -> Result<AxiData, AxiError> {
+        axi_translate(Some(&self.axi_data), addr)
+    }
+
+    fn axi_read(
+        &self,
+        chip_if: &dyn ChipInterface,
+        addr: u64,
+        data: &mut [u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        chip_if.noc_read(self.noc_id, self.x, self.y, addr, data)
+    }
+
+    fn axi_write(
+        &self,
+        chip_if: &dyn ChipInterface,
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        chip_if.noc_write(self.noc_id, self.x, self.y, addr, data)
+    }
+
+    fn noc_read(
+        &self,
+        chip_if: &dyn ChipInterface,
+        noc_id: u8,
+        x: u8,
+        y: u8,
+        addr: u64,
+        data: &mut [u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        chip_if.noc_read(noc_id, x, y, addr, data)
+    }
+
+    fn noc_write(
+        &self,
+        chip_if: &dyn ChipInterface,
+        noc_id: u8,
+        x: u8,
+        y: u8,
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        chip_if.noc_write(noc_id, x, y, addr, data)
+    }
+
+    fn noc_broadcast(
+        &self,
+        chip_if: &dyn ChipInterface,
+        noc_id: u8,
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        chip_if.noc_broadcast(noc_id, addr, data)
+    }
+}
+
 impl ChipComms for Arc<dyn ChipComms> {
     fn axi_translate(&self, addr: &str) -> Result<AxiData, AxiError> {
         self.as_ref().axi_translate(addr)

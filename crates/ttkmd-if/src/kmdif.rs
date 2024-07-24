@@ -3,6 +3,10 @@
 
 pub const MAX_DMA_BYTES: u32 = 4 * 1024 * 1024;
 pub const GS_BAR0_WC_MAPPING_SIZE: u64 = (156 << 20) + (10 << 21) + (18 << 24);
+pub const BH_BAR0_WC_MAPPING_SIZE: u64 = 188 << 21;
+
+pub const GS_WH_ARC_SCRATCH6_ADDR: u32 = 0x1ff30078;
+pub const BH_NOC_NODE_ID_OFFSET: u32 = 0x1FD04044;
 
 #[repr(u32)]
 #[derive(Debug, Clone, Copy)]

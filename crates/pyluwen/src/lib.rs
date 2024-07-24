@@ -65,6 +65,23 @@ impl DerefMut for PciGrayskull {
 }
 
 #[pyclass]
+pub struct PciBlackhole(luwen_if::chip::Blackhole);
+
+impl Deref for PciBlackhole {
+    type Target = luwen_if::chip::Blackhole;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for PciBlackhole {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+#[pyclass]
 pub struct DmaBuffer(luwen_ref::DmaBuffer);
 
 #[pymethods]
@@ -103,157 +120,178 @@ pub struct Telemetry {
     #[pyo3(get)]
     board_id: u64,
     #[pyo3(get)]
-    smbus_tx_enum_version: u32,
+    enum_version: u32,
     #[pyo3(get)]
-    smbus_tx_device_id: u32,
+    entry_count: u32,
     #[pyo3(get)]
-    smbus_tx_asic_ro: u32,
+    device_id: u32,
     #[pyo3(get)]
-    smbus_tx_asic_idd: u32,
+    asic_id: u32,
     #[pyo3(get)]
-    smbus_tx_board_id_high: u32,
+    asic_ro: u32,
     #[pyo3(get)]
-    smbus_tx_board_id_low: u32,
+    asic_idd: u32,
     #[pyo3(get)]
-    smbus_tx_arc0_fw_version: u32,
+    board_id_high: u32,
     #[pyo3(get)]
-    smbus_tx_arc1_fw_version: u32,
+    board_id_low: u32,
     #[pyo3(get)]
-    smbus_tx_arc2_fw_version: u32,
+    arc0_fw_version: u32,
     #[pyo3(get)]
-    smbus_tx_arc3_fw_version: u32,
+    arc1_fw_version: u32,
     #[pyo3(get)]
-    smbus_tx_spibootrom_fw_version: u32,
+    arc2_fw_version: u32,
     #[pyo3(get)]
-    smbus_tx_eth_fw_version: u32,
+    arc3_fw_version: u32,
     #[pyo3(get)]
-    smbus_tx_m3_bl_fw_version: u32,
+    spibootrom_fw_version: u32,
     #[pyo3(get)]
-    smbus_tx_m3_app_fw_version: u32,
+    eth_fw_version: u32,
     #[pyo3(get)]
-    smbus_tx_ddr_speed: Option<u32>,
+    m3_bl_fw_version: u32,
     #[pyo3(get)]
-    smbus_tx_ddr_status: u32,
+    m3_app_fw_version: u32,
     #[pyo3(get)]
-    smbus_tx_eth_status0: u32,
+    ddr_speed: Option<u32>,
     #[pyo3(get)]
-    smbus_tx_eth_status1: u32,
+    ddr_status: u32,
     #[pyo3(get)]
-    smbus_tx_pcie_status: u32,
+    eth_status0: u32,
     #[pyo3(get)]
-    smbus_tx_faults: u32,
+    eth_status1: u32,
     #[pyo3(get)]
-    smbus_tx_arc0_health: u32,
+    pcie_status: u32,
     #[pyo3(get)]
-    smbus_tx_arc1_health: u32,
+    faults: u32,
     #[pyo3(get)]
-    smbus_tx_arc2_health: u32,
+    arc0_health: u32,
     #[pyo3(get)]
-    smbus_tx_arc3_health: u32,
+    arc1_health: u32,
     #[pyo3(get)]
-    smbus_tx_fan_speed: u32,
+    arc2_health: u32,
     #[pyo3(get)]
-    smbus_tx_aiclk: u32,
+    arc3_health: u32,
     #[pyo3(get)]
-    smbus_tx_axiclk: u32,
+    fan_speed: u32,
     #[pyo3(get)]
-    smbus_tx_arcclk: u32,
+    aiclk: u32,
     #[pyo3(get)]
-    smbus_tx_throttler: u32,
+    axiclk: u32,
     #[pyo3(get)]
-    smbus_tx_vcore: u32,
+    arcclk: u32,
     #[pyo3(get)]
-    smbus_tx_asic_temperature: u32,
+    l2cpuclk0: u32,
     #[pyo3(get)]
-    smbus_tx_vreg_temperature: u32,
+    l2cpuclk1: u32,
     #[pyo3(get)]
-    smbus_tx_board_temperature: u32,
+    l2cpuclk2: u32,
     #[pyo3(get)]
-    smbus_tx_tdp: u32,
+    l2cpuclk3: u32,
     #[pyo3(get)]
-    smbus_tx_tdc: u32,
+    throttler: u32,
     #[pyo3(get)]
-    smbus_tx_vdd_limits: u32,
+    vcore: u32,
     #[pyo3(get)]
-    smbus_tx_thm_limits: u32,
+    asic_temperature: u32,
     #[pyo3(get)]
-    smbus_tx_wh_fw_date: u32,
+    vreg_temperature: u32,
     #[pyo3(get)]
-    smbus_tx_asic_tmon0: u32,
+    board_temperature: u32,
     #[pyo3(get)]
-    smbus_tx_asic_tmon1: u32,
+    tdp: u32,
     #[pyo3(get)]
-    smbus_tx_mvddq_power: u32,
+    tdc: u32,
     #[pyo3(get)]
-    smbus_tx_gddr_train_temp0: u32,
+    vdd_limits: u32,
     #[pyo3(get)]
-    smbus_tx_gddr_train_temp1: u32,
+    thm_limits: u32,
     #[pyo3(get)]
-    smbus_tx_boot_date: u32,
+    wh_fw_date: u32,
     #[pyo3(get)]
-    smbus_tx_rt_seconds: u32,
+    asic_tmon0: u32,
     #[pyo3(get)]
-    smbus_tx_eth_debug_status0: u32,
+    asic_tmon1: u32,
     #[pyo3(get)]
-    smbus_tx_eth_debug_status1: u32,
+    mvddq_power: u32,
     #[pyo3(get)]
-    smbus_tx_tt_flash_version: u32,
+    fw_bundle_version: u32,
     #[pyo3(get)]
-    smbus_tx_fw_bundle_version: u32,
+    gddr_train_temp0: u32,
+    #[pyo3(get)]
+    gddr_train_temp1: u32,
+    #[pyo3(get)]
+    boot_date: u32,
+    #[pyo3(get)]
+    rt_seconds: u32,
+    #[pyo3(get)]
+    eth_debug_status0: u32,
+    #[pyo3(get)]
+    eth_debug_status1: u32,
+    #[pyo3(get)]
+    tt_flash_version: u32,
+    #[pyo3(get)]
+    timer_heartbeat: u32,
 }
 impl From<luwen_if::chip::Telemetry> for Telemetry {
     fn from(value: luwen_if::chip::Telemetry) -> Self {
         Self {
             board_id: value.board_id,
-            smbus_tx_enum_version: value.smbus_tx_enum_version,
-            smbus_tx_device_id: value.smbus_tx_device_id,
-            smbus_tx_asic_ro: value.smbus_tx_asic_ro,
-            smbus_tx_asic_idd: value.smbus_tx_asic_idd,
-            smbus_tx_board_id_high: value.smbus_tx_board_id_high,
-            smbus_tx_board_id_low: value.smbus_tx_board_id_low,
-            smbus_tx_arc0_fw_version: value.smbus_tx_arc0_fw_version,
-            smbus_tx_arc1_fw_version: value.smbus_tx_arc1_fw_version,
-            smbus_tx_arc2_fw_version: value.smbus_tx_arc2_fw_version,
-            smbus_tx_arc3_fw_version: value.smbus_tx_arc3_fw_version,
-            smbus_tx_spibootrom_fw_version: value.smbus_tx_spibootrom_fw_version,
-            smbus_tx_eth_fw_version: value.smbus_tx_eth_fw_version,
-            smbus_tx_m3_bl_fw_version: value.smbus_tx_m3_bl_fw_version,
-            smbus_tx_m3_app_fw_version: value.smbus_tx_m3_app_fw_version,
-            smbus_tx_ddr_speed: value.smbus_tx_ddr_speed,
-            smbus_tx_ddr_status: value.smbus_tx_ddr_status,
-            smbus_tx_eth_status0: value.smbus_tx_eth_status0,
-            smbus_tx_eth_status1: value.smbus_tx_eth_status1,
-            smbus_tx_pcie_status: value.smbus_tx_pcie_status,
-            smbus_tx_faults: value.smbus_tx_faults,
-            smbus_tx_arc0_health: value.smbus_tx_arc0_health,
-            smbus_tx_arc1_health: value.smbus_tx_arc1_health,
-            smbus_tx_arc2_health: value.smbus_tx_arc2_health,
-            smbus_tx_arc3_health: value.smbus_tx_arc3_health,
-            smbus_tx_fan_speed: value.smbus_tx_fan_speed,
-            smbus_tx_aiclk: value.smbus_tx_aiclk,
-            smbus_tx_axiclk: value.smbus_tx_axiclk,
-            smbus_tx_arcclk: value.smbus_tx_arcclk,
-            smbus_tx_throttler: value.smbus_tx_throttler,
-            smbus_tx_vcore: value.smbus_tx_vcore,
-            smbus_tx_asic_temperature: value.smbus_tx_asic_temperature,
-            smbus_tx_vreg_temperature: value.smbus_tx_vreg_temperature,
-            smbus_tx_board_temperature: value.smbus_tx_board_temperature,
-            smbus_tx_tdp: value.smbus_tx_tdp,
-            smbus_tx_tdc: value.smbus_tx_tdc,
-            smbus_tx_vdd_limits: value.smbus_tx_vdd_limits,
-            smbus_tx_thm_limits: value.smbus_tx_thm_limits,
-            smbus_tx_wh_fw_date: value.smbus_tx_wh_fw_date,
-            smbus_tx_asic_tmon0: value.smbus_tx_asic_tmon0,
-            smbus_tx_asic_tmon1: value.smbus_tx_asic_tmon1,
-            smbus_tx_mvddq_power: value.smbus_tx_mvddq_power,
-            smbus_tx_gddr_train_temp0: value.smbus_tx_gddr_train_temp0,
-            smbus_tx_gddr_train_temp1: value.smbus_tx_gddr_train_temp1,
-            smbus_tx_boot_date: value.smbus_tx_boot_date,
-            smbus_tx_rt_seconds: value.smbus_tx_rt_seconds,
-            smbus_tx_eth_debug_status0: value.smbus_tx_eth_debug_status0,
-            smbus_tx_eth_debug_status1: value.smbus_tx_eth_debug_status1,
-            smbus_tx_tt_flash_version: value.smbus_tx_tt_flash_version,
-            smbus_tx_fw_bundle_version: value.smbus_tx_fw_bundle_version,
+            enum_version: value.enum_version,
+            entry_count: value.entry_count,
+            device_id: value.device_id,
+            asic_id: value.asic_id,
+            asic_ro: value.asic_ro,
+            asic_idd: value.asic_idd,
+            board_id_high: value.board_id_high,
+            board_id_low: value.board_id_low,
+            arc0_fw_version: value.arc0_fw_version,
+            arc1_fw_version: value.arc1_fw_version,
+            arc2_fw_version: value.arc2_fw_version,
+            arc3_fw_version: value.arc3_fw_version,
+            spibootrom_fw_version: value.spibootrom_fw_version,
+            eth_fw_version: value.eth_fw_version,
+            m3_bl_fw_version: value.m3_bl_fw_version,
+            m3_app_fw_version: value.m3_app_fw_version,
+            ddr_speed: value.ddr_speed,
+            ddr_status: value.ddr_status,
+            eth_status0: value.eth_status0,
+            eth_status1: value.eth_status1,
+            pcie_status: value.pcie_status,
+            faults: value.faults,
+            arc0_health: value.arc0_health,
+            arc1_health: value.arc1_health,
+            arc2_health: value.arc2_health,
+            arc3_health: value.arc3_health,
+            fan_speed: value.fan_speed,
+            aiclk: value.aiclk,
+            axiclk: value.axiclk,
+            arcclk: value.arcclk,
+            l2cpuclk0: value.l2cpuclk0,
+            l2cpuclk1: value.l2cpuclk1,
+            l2cpuclk2: value.l2cpuclk2,
+            l2cpuclk3: value.l2cpuclk3,
+            throttler: value.throttler,
+            vcore: value.vcore,
+            asic_temperature: value.asic_temperature,
+            vreg_temperature: value.vreg_temperature,
+            board_temperature: value.board_temperature,
+            tdp: value.tdp,
+            tdc: value.tdc,
+            vdd_limits: value.vdd_limits,
+            thm_limits: value.thm_limits,
+            wh_fw_date: value.wh_fw_date,
+            asic_tmon0: value.asic_tmon0,
+            asic_tmon1: value.asic_tmon1,
+            mvddq_power: value.mvddq_power,
+            gddr_train_temp0: value.gddr_train_temp0,
+            gddr_train_temp1: value.gddr_train_temp1,
+            boot_date: value.boot_date,
+            rt_seconds: value.rt_seconds,
+            eth_debug_status0: value.eth_debug_status0,
+            eth_debug_status1: value.eth_debug_status1,
+            tt_flash_version: value.tt_flash_version,
+            fw_bundle_version: value.fw_bundle_version,
+            timer_heartbeat: value.timer_heartbeat,
         }
     }
 }
@@ -499,6 +537,10 @@ impl PciChip {
         self.0.as_gs().map(|v| PciGrayskull(v.clone()))
     }
 
+    pub fn as_bh(&self) -> Option<PciBlackhole> {
+        self.0.as_bh().map(|v| PciBlackhole(v.clone()))
+    }
+
     pub fn is_remote(&self) -> bool {
         if let Some(wh) = self.0.as_wh() {
             wh.is_remote
@@ -731,6 +773,14 @@ impl PciInterface<'_> {
             })
     }
 
+    pub fn from_bh(bh: &PciBlackhole) -> Option<PciInterface> {
+        bh.0.get_if::<CallbackStorage<ExtendedPciDeviceWrapper>>()
+            .map(|v| PciInterface {
+                pci_interface: &v.user_data,
+            })
+    }
+
+
     #[allow(clippy::too_many_arguments)]
     pub fn setup_tlb(
         &self,
@@ -759,6 +809,7 @@ impl PciInterface<'_> {
                     mcast,
                     ordering,
                     linked,
+                    ..Default::default()
                 },
             )
             .unwrap()
@@ -1082,6 +1133,173 @@ impl RemoteWormhole {
     }
 }
 
+#[pymethods]
+impl PciBlackhole {
+    #[allow(clippy::too_many_arguments)]
+    pub fn setup_tlb(
+        &mut self,
+        index: u32,
+        addr: u64,
+        x_start: u8,
+        y_start: u8,
+        x_end: u8,
+        y_end: u8,
+        noc_sel: u8,
+        mcast: bool,
+        ordering: u8,
+        linked: bool,
+    ) -> PyResult<(u64, u64)> {
+        let value = PciInterface::from_bh(self);
+
+        if let Some(value) = value {
+            match ttkmd_if::tlb::Ordering::from(ordering) {
+                ttkmd_if::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
+                    "Invalid ordering {ordering}."
+                ))),
+                ordering => Ok(value.setup_tlb(
+                    index, addr, x_start, y_start, x_end, y_end, noc_sel, mcast, ordering, linked,
+                )),
+            }
+        } else {
+            Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ))
+        }
+    }
+
+    pub fn set_default_tlb(&self, index: u32) -> PyResult<()> {
+        let value = PciInterface::from_bh(self);
+
+        if let Some(value) = value {
+            value.pci_interface.borrow_mut().default_tlb = index;
+            Ok(())
+        } else {
+            Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ))
+        }
+    }
+
+    pub fn allocate_dma_buffer(&self, size: u32) -> PyResult<DmaBuffer> {
+        let value = PciInterface::from_bh(self);
+
+        if let Some(value) = value {
+            Ok(value.allocate_dma_buffer(size).map_err(|v| {
+                PyException::new_err(format!("Could not allocate DMA buffer: {}", v))
+            })?)
+        } else {
+            Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ))
+        }
+    }
+
+    #[pyo3(signature = (dma_64_bit_addr, csm_pcie_ctrl_dma_request_offset, arc_misc_cntl_addr, msi, read_threshold, write_threshold))]
+    pub fn config_dma(
+        &self,
+        dma_64_bit_addr: Option<u32>,
+        csm_pcie_ctrl_dma_request_offset: u32,
+        arc_misc_cntl_addr: u32,
+        msi: bool,
+        read_threshold: u32,
+        write_threshold: u32,
+    ) -> PyResult<()> {
+        let value = PciInterface::from_bh(self);
+
+        if let Some(value) = value {
+            Ok(value
+                .config_dma(
+                    dma_64_bit_addr,
+                    csm_pcie_ctrl_dma_request_offset,
+                    arc_misc_cntl_addr,
+                    msi,
+                    read_threshold,
+                    write_threshold,
+                )
+                .map_err(|v| PyException::new_err(format!("Could perform dma config: {}", v)))?)
+        } else {
+            Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ))
+        }
+    }
+
+    pub fn dma_transfer_turbo(
+        &self,
+        addr: u32,
+        physical_dma_buffer: u64,
+        size: u32,
+        write: bool,
+    ) -> PyResult<()> {
+        let value = PciInterface::from_bh(self);
+
+        if let Some(value) = value {
+            Ok(value
+                .dma_transfer_turbo(addr, physical_dma_buffer, size, write)
+                .map_err(|v| PyException::new_err(format!("Could perform dma transfer: {}", v)))?)
+        } else {
+            Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ))
+        }
+    }
+
+    pub fn pci_board_type(&self) -> PyResult<u16> {
+        let value = PciInterface::from_bh(self);
+        if let Some(value) = value {
+            Ok(value.pci_interface.borrow().device.physical.subsystem_id)
+        } else {
+            Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ))
+        }
+    }
+
+    pub fn pci_interface_id(&self) -> PyResult<usize> {
+        let value = PciInterface::from_bh(self);
+        if let Some(value) = value {
+            Ok(value.pci_interface.borrow().device.id)
+        } else {
+            Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ))
+        }
+    }
+
+    pub fn spi_read(&self, addr: u32, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
+        Python::with_gil(|_py| {
+            let ptr: *mut u8 = data.buf_ptr().cast();
+            let len = data.len_bytes();
+
+            let data = unsafe { std::slice::from_raw_parts_mut(ptr, len) };
+            self.0
+                .spi_read(addr, data)
+                .map_err(|v| PyException::new_err(v.to_string()))
+        })
+    }
+
+    pub fn spi_write(&self, addr: u32, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
+        Python::with_gil(|_py| {
+            let ptr: *mut u8 = data.buf_ptr().cast();
+            let len = data.len_bytes();
+
+            let data = unsafe { std::slice::from_raw_parts(ptr, len) };
+            self.0
+                .spi_write(addr, data)
+                .map_err(|v| PyException::new_err(v.to_string()))
+        })
+    }
+
+    pub fn get_local_coord(&self) -> PyResult<EthAddr> {
+        self.0
+            .get_local_chip_coord()
+            .map(|v| v.into())
+            .map_err(|v| PyException::new_err(v.to_string()))
+    }
+}
+
+common_chip_comms_impls!(PciBlackhole);
+
 #[pyclass]
 pub struct UninitPciChip {
     pub chip: UninitChip,
@@ -1177,7 +1395,14 @@ pub fn detect_chips_fallible(
 
         // First let's test basic pcie communication we may be in a hang state so it's
         // important that we let the detect function know
-        let result = chip.axi_sread32("ARC_RESET.SCRATCH[0]");
+
+        // Hack(drosen): Basic init procedure should resolve this
+        let scratch_0 = if chip.get_arch().is_blackhole() {
+            "arc_ss.reset_unit.SCRATCH_0"
+        } else {
+            "ARC_RESET.SCRATCH[0]"
+        };
+        let result = chip.axi_sread32(scratch_0);
         if let Err(err) = result {
             // Basic comms have failed... we should output a nice error message on the console
             failed_chips.push((interface, chip, err));
@@ -1281,6 +1506,8 @@ fn pyluwen(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<DmaBuffer>()?;
     m.add_class::<AxiData>()?;
     m.add_class::<Telemetry>()?;
+
+    m.add_class::<PciBlackhole>()?;
 
     m.add_wrapped(wrap_pyfunction!(detect_chips))?;
     m.add_wrapped(wrap_pyfunction!(detect_chips_fallible))?;

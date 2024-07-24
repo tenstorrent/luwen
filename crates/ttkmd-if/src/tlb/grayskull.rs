@@ -32,6 +32,8 @@ pub struct Tlb1M {
 
 impl From<Tlb> for Tlb1M {
     fn from(value: Tlb) -> Self {
+        assert!(!matches!(value.ordering, Ordering::PostedStrict));
+
         Self::new()
             .with_local_offset(value.local_offset as u16)
             .with_x_end(value.x_end)
@@ -57,6 +59,8 @@ impl From<Tlb1M> for Tlb {
             mcast: value.mcast(),
             ordering: Ordering::from(value.ordering()),
             linked: value.linked(),
+
+            ..Default::default()
         }
     }
 }
@@ -85,6 +89,8 @@ pub struct Tlb2M {
 
 impl From<Tlb> for Tlb2M {
     fn from(value: Tlb) -> Self {
+        assert!(!matches!(value.ordering, Ordering::PostedStrict));
+
         Self::new()
             .with_local_offset(value.local_offset as u16)
             .with_x_end(value.x_end)
@@ -110,6 +116,8 @@ impl From<Tlb2M> for Tlb {
             mcast: value.mcast(),
             ordering: Ordering::from(value.ordering()),
             linked: value.linked(),
+
+            ..Default::default()
         }
     }
 }
@@ -148,12 +156,16 @@ impl From<Tlb16M> for Tlb {
             mcast: value.mcast(),
             ordering: Ordering::from(value.ordering()),
             linked: value.linked(),
+
+            ..Default::default()
         }
     }
 }
 
 impl From<Tlb> for Tlb16M {
     fn from(value: Tlb) -> Self {
+        assert!(!matches!(value.ordering, Ordering::PostedStrict));
+
         Self::new()
             .with_local_offset(value.local_offset as u16)
             .with_x_end(value.x_end)
