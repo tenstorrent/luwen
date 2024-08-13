@@ -84,6 +84,135 @@ fn main() {
 
             let readback = raw_device.read32(aligned_addr as u32 + 3).unwrap();
             assert_eq!(readback, 0xabcdef01, "{:x} != abcdef01", readback);
+
+            // Block write test
+            let mut write_buffer = Vec::new();
+            write_buffer.extend(0xcdcd_cdcdu32.to_le_bytes());
+            write_buffer.extend(0xcdcd_cdcdu32.to_le_bytes());
+            raw_device
+                .write_block(aligned_addr as u32, &write_buffer)
+                .unwrap();
+
+            let mut readback_buffer = vec![0u8; write_buffer.len()];
+            raw_device
+                .read_block(aligned_addr as u32, &mut readback_buffer)
+                .unwrap();
+            assert_eq!(write_buffer, readback_buffer);
+
+            let mut write_buffer = Vec::new();
+            write_buffer.push(0xad);
+            write_buffer.push(0xde);
+            raw_device
+                .write_block(aligned_addr as u32 + 1, &write_buffer)
+                .unwrap();
+
+            let mut readback_buffer = vec![0u8; 4];
+            raw_device
+                .read_block(aligned_addr as u32, &mut readback_buffer)
+                .unwrap();
+            assert_eq!([0xcd, 0xad, 0xde, 0xcd], readback_buffer.as_slice());
+
+            let mut write_buffer = Vec::new();
+            write_buffer.extend(0xcdcd_cdcdu32.to_le_bytes());
+            write_buffer.extend(0xcdcd_cdcdu32.to_le_bytes());
+            raw_device
+                .write_block(aligned_addr as u32, &write_buffer)
+                .unwrap();
+
+            let mut readback_buffer = vec![0u8; write_buffer.len()];
+            raw_device
+                .read_block(aligned_addr as u32, &mut readback_buffer)
+                .unwrap();
+            assert_eq!(write_buffer, readback_buffer);
+
+            let mut write_buffer = Vec::new();
+            write_buffer.push(0xad);
+            write_buffer.push(0xde);
+            raw_device
+                .write_block(aligned_addr as u32 + 3, &write_buffer)
+                .unwrap();
+
+            let mut readback_buffer = vec![0u8; 7];
+            raw_device
+                .read_block(aligned_addr as u32, &mut readback_buffer)
+                .unwrap();
+            assert_eq!(
+                [0xcd, 0xcd, 0xcd, 0xad, 0xde, 0xcd, 0xcd],
+                readback_buffer.as_slice()
+            );
+
+            let mut write_buffer = Vec::new();
+            write_buffer.extend(0x01234567u32.to_le_bytes());
+            write_buffer.extend(0xabcdefu32.to_le_bytes());
+            raw_device
+                .write_block(aligned_addr as u32, &write_buffer)
+                .unwrap();
+
+            let mut readback_buffer = vec![0u8; write_buffer.len()];
+            raw_device
+                .read_block(aligned_addr as u32, &mut readback_buffer)
+                .unwrap();
+            assert_eq!(write_buffer, readback_buffer);
+
+            let readback = raw_device.read32(aligned_addr as u32 + 1).unwrap();
+            assert_eq!(readback, 0xef012345, "{:x} != ef012345", readback);
+
+            let mut readback_buffer = vec![0u8; 4];
+            raw_device
+                .read_block(aligned_addr as u32 + 1, &mut readback_buffer)
+                .unwrap();
+            assert_eq!([0x45, 0x23, 0x01, 0xef], readback_buffer.as_slice());
+
+            let mut readback_buffer = vec![0u8; 4];
+            raw_device
+                .read_block(aligned_addr as u32 + 3, &mut readback_buffer)
+                .unwrap();
+            assert_eq!([0x01, 0xef, 0xcd, 0xab], readback_buffer.as_slice());
+
+            let mut write_buffer = vec![0; 1024];
+            for (index, r) in write_buffer.iter_mut().enumerate() {
+                *r = index as u8;
+            }
+            raw_device
+                .write_block(aligned_addr as u32, &write_buffer)
+                .unwrap();
+
+            let mut readback_buffer = vec![0u8; write_buffer.len()];
+            raw_device
+                .read_block(aligned_addr as u32, &mut readback_buffer)
+                .unwrap();
+            assert_eq!(write_buffer, readback_buffer);
+
+            let mut write_buffer = vec![0; 1024];
+            for (index, r) in write_buffer.iter_mut().enumerate() {
+                *r = index as u8;
+            }
+            raw_device
+                .write_block(aligned_addr as u32, &write_buffer)
+                .unwrap();
+
+            let mut readback_buffer = vec![0u8; write_buffer.len()];
+            raw_device
+                .read_block(aligned_addr as u32 + 3, &mut readback_buffer)
+                .unwrap();
+            assert_eq!(
+                write_buffer[3..],
+                readback_buffer[..readback_buffer.len() - 3]
+            );
+
+            let mut write_buffer = vec![0; 1024];
+            for (index, r) in write_buffer.iter_mut().enumerate() {
+                *r = index as u8;
+            }
+            raw_device
+                .write_block(aligned_addr as u32 + 1, &write_buffer)
+                .unwrap();
+
+            let mut readback_buffer = vec![0u8; write_buffer.len()];
+            raw_device
+                .read_block(aligned_addr as u32 + 1, &mut readback_buffer)
+                .unwrap();
+            assert_eq!(write_buffer, readback_buffer);
         }
     }
 }
