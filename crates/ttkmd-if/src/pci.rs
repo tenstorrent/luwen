@@ -132,12 +132,13 @@ impl PciDevice {
                 let a = (aligned_read_pointer as *const u32).read_volatile();
                 let b = (aligned_read_pointer as *const u32).add(1).read_volatile();
 
-                let byte_offset = read_pointer & (core::mem::align_of::<u32>() - 1);
-                let bit_offset = byte_offset * 8;
-                let shift_mask = (1 << bit_offset) - 1;
+                let byte_offset = read_pointer % core::mem::align_of::<u32>();
+                let shift = byte_offset * 8;
+                let inverse_shift = (core::mem::size_of::<u32>() * 8) - shift;
+                let inverse_mask = (1 << inverse_shift) - 1;
+                let _mask = (1 << shift) - 1;
 
-                ((a >> bit_offset) & shift_mask)
-                    | ((b << ((core::mem::size_of::<u32>() * 8) - bit_offset)) & !shift_mask)
+                ((a >> shift) & inverse_mask) | ((b << inverse_shift) & !inverse_mask)
             }
         } else {
             unsafe { (read_pointer as *const u32).read_volatile() }
@@ -156,13 +157,14 @@ impl PciDevice {
                 let a = (aligned_write_pointer as *const u32).read_volatile();
                 let b = (aligned_write_pointer as *const u32).add(1).read_volatile();
 
-                let byte_offset = write_pointer & (core::mem::align_of::<u32>() - 1);
-                let bit_offset = byte_offset * 8;
-                let shift_mask = (1 << bit_offset) - 1;
+                let byte_offset = write_pointer % core::mem::align_of::<u32>();
+                let shift = byte_offset * 8;
+                let inverse_shift = (core::mem::size_of::<u32>() * 8) - shift;
+                let inverse_mask = (1 << inverse_shift) - 1;
+                let mask = (1 << shift) - 1;
 
-                let a = (a & shift_mask) | ((data << bit_offset) & !shift_mask);
-                let b = (b & !shift_mask)
-                    | ((data >> ((core::mem::size_of::<u32>() * 8) - bit_offset)) & shift_mask);
+                let a = (a & mask) | ((data & inverse_mask) << shift);
+                let b = (b & !mask) | ((data & !inverse_mask) >> inverse_shift);
 
                 (aligned_write_pointer as *mut u32).write_volatile(a);
                 (aligned_write_pointer as *mut u32).add(1).write_volatile(b);
@@ -351,7 +353,9 @@ impl PciDevice {
             }
         }
 
-        Self::memcpy_from_device(data, unsafe { self.register_address(addr) });
+        unsafe {
+            Self::memcpy_from_device(data, self.register_address(addr));
+        }
 
         if data.len() >= std::mem::size_of::<u32>() {
             self.detect_ffffffff_read(Some(unsafe { (data.as_ptr() as *const u32).read() }))?;
@@ -362,92 +366,146 @@ impl PciDevice {
 }
 
 impl PciDevice {
+    /// Copy to a memory location mapped to the PciDevice from a buffer passed in by the host.
+    /// Both dest and src may be unaligned.
+    ///
+    /// These the dest address is not bounds checked, passing in an unvalidated pointer may result
+    /// in hangs, or system reboots.
+    ///
     /// # Safety
-    /// This function requires that dest is a value gotten from the self.register_address
+    /// This function requires that dest is a value returned by the self.register_address
     /// function.
     pub unsafe fn memcpy_to_device(dest: *mut u8, src: &[u8]) {
-        // Start by aligning the destination (device) pointer. If needed, do RMW to fix up the
-        // first partial word.
-        let dest_misalignment = dest as usize % std::mem::size_of::<u32>();
-
-        let (dest, src) = if dest_misalignment != 0 {
-            // Read-modify-write for the first dest element.
-            let dest = unsafe { dest.offset(-(dest_misalignment as isize)) };
-            let dest = dest as *mut u32;
-
-            let tmp = unsafe { dest.read() };
-
-            let leading_len = (std::mem::size_of::<u32>() - dest_misalignment).min(src.len());
-
-            unsafe {
-                src.as_ptr()
-                    .copy_to_nonoverlapping(&tmp as *const u32 as *mut u8, leading_len)
-            };
-
-            unsafe { dest.write(tmp) };
-
-            (unsafe { dest.add(1) }, &src[leading_len..])
+        // Memcpy implementations on aarch64 systems seem to generate invalid code which does not
+        // properly respect alignment requirements of the aarch64 "memmove" instruction.
+        let align = if cfg!(target_arch = "aarch64") {
+            4 * core::mem::align_of::<u32>()
         } else {
-            (dest as *mut u32, src)
+            core::mem::align_of::<u32>()
         };
 
-        let byte_len = src.len();
-        let word_len = byte_len / std::mem::size_of::<u32>();
-        let word_src = src.as_ptr() as *const u32;
+        let mut offset = 0;
+        while offset < src.len() {
+            let bytes_left = src.len() - offset;
 
-        unsafe { dest.copy_from_nonoverlapping(word_src, word_len) };
+            let block_write_length = bytes_left & !(align - 1);
 
-        // Finally copy any sub-word trailer, again RMW on the destination.
-        let trailing_len = byte_len % std::mem::size_of::<u32>();
-        if trailing_len != 0 {
-            let tmp = unsafe { dest.add(word_len).read() };
+            let dest_misalign = ((dest as usize) + offset) % align;
+            let src_misalign = ((src.as_ptr() as usize) + offset) % align;
 
-            let sp = unsafe { word_src.add(word_len) } as *const u8;
-            unsafe { sp.copy_to_nonoverlapping(&tmp as *const u32 as *mut u8, trailing_len) };
+            // Our device pcie controller requires that we write in a minimum of 4 byte chunks, and
+            // that those chunks are aligned to 4 byte boundaries.
+            if bytes_left < 4
+                || dest_misalign != 0
+                || src_misalign != 0
+                || block_write_length < align
+            {
+                let addr = (dest as usize) + offset;
+                let byte_offset = addr % core::mem::align_of::<u32>();
 
-            unsafe { dest.add(word_len).write(tmp) };
+                let src_size_bytes = (core::mem::size_of::<u32>() - byte_offset).min(bytes_left);
+
+                let mut src_data = 0u32;
+                for i in (offset..(offset + src_size_bytes)).rev() {
+                    src_data <<= 8;
+                    src_data |= src[i] as u32;
+                }
+
+                let to_write = if byte_offset != 0 || src_size_bytes != 4 {
+                    // cannot do an unaligned read
+                    let dest_data =
+                        ((addr & !(core::mem::align_of::<u32>() - 1)) as *mut u32).read();
+
+                    let shift = byte_offset * 8;
+                    let src_mask = ((1 << (src_size_bytes * 8)) - 1) << shift;
+
+                    /*
+                    println!(
+                        "{dest_data:x} & {:x} = {:x}",
+                        !src_mask,
+                        dest_data & !src_mask
+                    );
+
+                    println!(
+                        "({src_data:x} << {}) & {:x} = {:x}",
+                        shift,
+                        src_mask,
+                        (src_data << shift) & src_mask
+                    );
+                    */
+
+                    (dest_data & !src_mask) | ((src_data << shift) & src_mask)
+                } else {
+                    src_data
+                };
+
+                // println!("{to_write:x}");
+
+                ((addr & !(core::mem::align_of::<u32>() - 1)) as *mut u32).write_volatile(to_write);
+
+                offset += src_size_bytes;
+            } else {
+                // Everything is aligned!
+                ((dest as usize + offset) as *mut u32).copy_from_nonoverlapping(
+                    (src.as_ptr() as usize + offset) as *const u32,
+                    block_write_length / core::mem::size_of::<u32>(),
+                );
+                offset += block_write_length;
+            }
         }
     }
 
-    fn memcpy_from_device(dest: &mut [u8], src: *const u8) {
-        type CopyT = u32;
+    /// Copy from a memory location mapped to the PciDevice to a buffer passed in by the host.
+    /// Both dest and src may be unaligned.
+    ///
+    /// These the src address is not bounds checked, passing in an unvalidated pointer may result
+    /// in hangs, or system reboots.
+    ///
+    /// # Safety
+    /// This function requires that dest is a value returned by the self.register_address
+    /// function.
+    unsafe fn memcpy_from_device(dest: &mut [u8], src: *const u8) {
+        let align = core::mem::align_of::<u32>();
 
-        let mut byte_len = dest.len();
-        let src_misalignment = src as usize % std::mem::size_of::<CopyT>();
+        let mut offset = 0;
+        while offset < dest.len() {
+            let bytes_left = dest.len() - offset;
 
-        let dest = dest.as_mut_ptr();
+            let block_write_length = bytes_left & !(core::mem::align_of::<u32>() - 1);
 
-        let (dest, src) = if src_misalignment != 0 {
-            let src = unsafe { src.offset(-(src_misalignment as isize)) };
-            let src = src as *const CopyT;
+            let dest_misalign = ((dest.as_ptr() as usize) + offset) % align;
+            let src_misalign = ((src as usize) + offset) % align;
 
-            let tmp = unsafe { src.read() };
+            // Our device pcie controller requires that we read in a minimum of 4 byte chunks, and
+            // that those chunks are aligned to 4 byte boundaries.
+            if bytes_left < 4
+                || dest_misalign != 0
+                || src_misalign != 0
+                || block_write_length < align
+            {
+                let addr = (src as usize) + offset;
+                let byte_offset = addr % core::mem::align_of::<u32>();
+                let shift = byte_offset * 8;
 
-            let leading_len = (std::mem::size_of::<CopyT>() - src_misalignment).min(byte_len);
-            unsafe {
-                dest.copy_from_nonoverlapping(
-                    (&tmp as *const u32 as *const u8).add(src_misalignment),
-                    leading_len,
-                )
-            };
-            byte_len -= leading_len;
+                let src_data = ((addr & !(core::mem::align_of::<u32>() - 1)) as *mut u32).read();
+                let read = src_data >> shift;
 
-            (unsafe { dest.add(leading_len) }, src)
-        } else {
-            (dest, src as *const CopyT)
-        };
+                let read_count = (core::mem::size_of::<u32>() - byte_offset).min(bytes_left);
 
-        let word_len = byte_len / std::mem::size_of::<CopyT>();
-        let dest = dest as *mut CopyT;
-        unsafe { dest.copy_from_nonoverlapping(src, word_len) };
+                let read = read.to_le_bytes();
+                for i in 0..read_count {
+                    dest[offset + i] = read[i];
+                }
 
-        let trailing_len = byte_len % std::mem::size_of::<CopyT>();
-        if trailing_len != 0 {
-            let tmp = unsafe { src.add(word_len).read() };
-            unsafe {
-                (dest.add(word_len) as *mut u8)
-                    .copy_from_nonoverlapping(&tmp as *const CopyT as *const u8, trailing_len)
-            };
+                offset += read_count
+            } else {
+                // Everything is aligned!
+                ((dest.as_ptr() as usize + offset) as *mut u32).copy_from_nonoverlapping(
+                    (src as usize + offset) as *const u32,
+                    block_write_length / core::mem::size_of::<u32>(),
+                );
+                offset += block_write_length;
+            }
         }
     }
 }
