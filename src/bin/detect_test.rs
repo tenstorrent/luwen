@@ -1,4 +1,4 @@
-use luwen_if::ChipImpl;
+use luwen_if::{chip::HlCommsInterface, ChipImpl};
 
 fn main() {
     let partial_chips = match luwen_ref::detect_chips_fallible() {
@@ -23,25 +23,88 @@ fn main() {
                     false
                 };
 
+                if let Some(gs) = v.as_gs() {
+                    println!(
+                        "{:x}",
+                        gs.axi_sread32(format!("ARC_RESET.SCRATCH[0]")).unwrap()
+                    );
+                }
+
                 if let Some(bh) = v.as_bh() {
-                    let result = bh.arc_msg(luwen_if::chip::ArcMsgOptions {
-                        msg: luwen_if::ArcMsg::Raw {
-                            msg: 0x90,
-                            arg0: 103,
-                            arg1: 0,
-                        },
-                        ..Default::default()
-                    });
+                    dbg!(bh.get_telemetry().unwrap());
+                    dbg!(bh.get_telemetry().unwrap());
+
+                    let result = bh
+                        .arc_msg(luwen_if::chip::ArcMsgOptions {
+                            msg: luwen_if::ArcMsg::Raw {
+                                msg: 0x90,
+                                arg0: 106,
+                                arg1: 0,
+                            },
+                            ..Default::default()
+                        })
+                        .unwrap();
                     dbg!(result);
 
-                    dbg!(bh.get_telemetry());
 
-                    let mut output = vec![0; 100];
-                    dbg!(bh.spi_read(0, &mut output));
+                    println!(
+                        "{:x}",
+                        bh.axi_sread32(format!("arc_ss.reset_unit.SCRATCH_RAM[0]"))
+                            .unwrap()
+                    );
+
+                    let mut output = vec![0u32; 100];
+                    {
+                        let output = output.as_mut_ptr() as *mut u8;
+
+                        let mut output =
+                            unsafe { core::slice::from_raw_parts_mut(output, 100 * 4) };
+                        bh.spi_read(0, &mut output).unwrap();
+                    }
+
                     let mut addr = 0;
-                    for o in output.chunks_exact(4) {
-                        let value = u32::from_le_bytes([o[0], o[1], o[2], o[3]]);
-                        println!("0x{addr:08x} 0x{value:08x}");
+                    for o in output {
+                        println!("0x{addr:08x} 0x{o:08x}");
+                        addr += 4;
+                    }
+
+
+                    for _ in 0..1 {
+                        dbg!(bh.message_queue.get_queue_info(&bh, 2).unwrap());
+
+                        std::thread::sleep(std::time::Duration::from_millis(10));
+                    }
+
+
+                    {
+                        let mut output = vec![0u32; 8 * 1024];
+                        for (index, o) in output.iter_mut().enumerate() {
+                            *o = index as u32;
+                        }
+
+                        {
+                            let output_ptr = output.as_ptr() as *const u8;
+
+                            let output = unsafe {
+                                core::slice::from_raw_parts(output_ptr, output.len() * 4)
+                            };
+                            bh.spi_write(0, &output).unwrap();
+                        }
+                    }
+
+                    let mut output = vec![0u32; 8 * 1024];
+                    {
+                        let output_ptr = output.as_mut_ptr() as *mut u8;
+
+                        let mut output = unsafe {
+                            core::slice::from_raw_parts_mut(output_ptr, output.len() * 4)
+                        };
+                        bh.spi_read(0, &mut output).unwrap();
+                    }
+
+                    let mut addr = 0;
+                    for o in output {
+                        println!("{:x} 0x{addr:08x} 0x{o:08x}", addr / 4);
                         addr += 4;
                     }
                 }

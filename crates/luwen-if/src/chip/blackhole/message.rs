@@ -174,3 +174,29 @@ impl<const N: usize> MessageQueue<N> {
         return Ok(request);
     }
 }
+
+#[derive(Debug)]
+pub struct QueueInfo {
+    pub req_rptr: u32,
+    pub req_wptr: u32,
+    pub resp_rptr: u32,
+    pub resp_wptr: u32,
+}
+
+impl<const N: usize> MessageQueue<N> {
+    pub fn get_queue_info(&self, chip: &Blackhole, index: u8) -> Result<QueueInfo, PlatformError> {
+        if index as u32 > self.queue_count {
+            return Err(MessageError::QueueIndexOutOfRange {
+                index: index as u32,
+                queue_count: self.queue_count,
+            })?;
+        }
+
+        Ok(QueueInfo {
+            req_rptr: self.qread32(&chip, index, 4)?,
+            req_wptr: self.qread32(&chip, index, 0)?,
+            resp_rptr: self.qread32(&chip, index, 1)?,
+            resp_wptr: self.qread32(&chip, index, 5)?,
+        })
+    }
+}

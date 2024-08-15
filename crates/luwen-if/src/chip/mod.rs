@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-mod communication;
+pub mod communication;
 mod creation;
 pub mod eth_addr;
 mod grayskull;
@@ -15,7 +15,7 @@ mod blackhole;
 pub use communication::chip_comms::{
     axi_translate, ArcIf, AxiData, AxiError, ChipComms, MemorySlice, MemorySlices,
 };
-pub use communication::chip_interface::ChipInterface;
+pub use communication::chip_interface::{ChipInterface, NocInterface};
 pub use grayskull::Grayskull;
 pub use hl_comms::{HlComms, HlCommsInterface};
 pub use init::status::InitStatus;

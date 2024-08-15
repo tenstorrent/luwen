@@ -676,6 +676,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "arc_ss.reset_unit.SCRATCH_0",
         "arc_ss.reset_unit.ARC_MISC_CNTL",
         "arc_ss.reset_unit.ARC_MISC_CNTL.irq0_trig",
+        "arc_ss.reset_unit.SCRATCH_RAM[0]",
+        "arc_ss.reset_unit.SCRATCH_RAM[10]",
         "arc_ss.reset_unit.SCRATCH_RAM[11]",
         "arc_ss.reset_unit.SCRATCH_RAM[12]",
         "arc_ss.reset_unit.SCRATCH_RAM[13]",

@@ -7,6 +7,7 @@ use std::str::FromStr;
 use luwen_core::Arch;
 use luwen_if::chip::{
     wait_for_init, ArcMsg, ArcMsgOk, ArcMsgOptions, ChipImpl, HlComms, HlCommsInterface, InitError,
+    NocInterface,
 };
 use luwen_if::{CallbackStorage, ChipDetectOptions, DeviceInfo, UninitChip};
 use luwen_ref::{DmaConfig, ExtendedPciDeviceWrapper};
@@ -774,12 +775,17 @@ impl PciInterface<'_> {
     }
 
     pub fn from_bh(bh: &PciBlackhole) -> Option<PciInterface> {
-        bh.0.get_if::<CallbackStorage<ExtendedPciDeviceWrapper>>()
+        bh.0.get_if::<NocInterface>()
+            .map(|v| &v.backing)
+            .map(|v| {
+                v.as_any()
+                    .downcast_ref::<CallbackStorage<ExtendedPciDeviceWrapper>>()
+            })
+            .flatten()
             .map(|v| PciInterface {
                 pci_interface: &v.user_data,
             })
     }
-
 
     #[allow(clippy::too_many_arguments)]
     pub fn setup_tlb(
@@ -1331,23 +1337,19 @@ impl UninitPciChip {
     }
 
     pub fn dram_safe(&self) -> bool {
-        self.chip
-            .dram_safe()
+        self.chip.dram_safe()
     }
 
     pub fn eth_safe(&self) -> bool {
-        self.chip
-            .eth_safe()
+        self.chip.eth_safe()
     }
 
     pub fn arc_alive(&self) -> bool {
-        self.chip
-            .arc_alive()
+        self.chip.arc_alive()
     }
 
     pub fn cpu_safe(&self) -> bool {
-        self.chip
-            .cpu_safe()
+        self.chip.cpu_safe()
     }
 }
 
