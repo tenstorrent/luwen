@@ -62,6 +62,7 @@ pub struct Blackhole {
     pub eth_locations: [EthCore; 14],
     pub eth_addrs: EthAddresses,
 
+    spi_buffer_addr: AxiData,
     telemetry_addr: AxiData,
     telemetry_struct_addr: AxiData,
 }
@@ -101,6 +102,11 @@ impl Default for EthCore {
     }
 }
 
+struct SpiBuffer {
+    addr: u32,
+    size: u32,
+}
+
 impl Blackhole {
     pub(crate) fn init<
         CC: ChipComms + Send + Sync + 'static,
@@ -135,6 +141,7 @@ impl Blackhole {
 
             eth_addrs: EthAddresses::default(),
 
+            spi_buffer_addr: arc_if.axi_translate("arc_ss.reset_unit.SCRATCH_RAM[10]")?,
             telemetry_addr: arc_if.axi_translate("arc_ss.reset_unit.SCRATCH_RAM[12]")?,
             telemetry_struct_addr: arc_if.axi_translate("arc_ss.reset_unit.SCRATCH_RAM[13]")?,
 
@@ -233,12 +240,13 @@ impl Blackhole {
 
     fn bh_arc_msg(
         &self,
-        code: u16,
+        code: u8,
+        zero_data: Option<u32>,
         data: &[u32],
         timeout: Option<std::time::Duration>,
     ) -> Result<(u8, u16, [u32; 7]), PlatformError> {
         let mut request = [0; 8];
-        request[0] = code as u32;
+        request[0] = code as u32 | zero_data.unwrap_or(0);
         for (i, o) in data.iter().zip(request[1..].iter_mut()) {
             *o = *i;
         }
@@ -265,7 +273,7 @@ impl Blackhole {
         } else if status == 0xFF {
             Err(PlatformError::ArcMsgError(
                 crate::ArcMsgError::ProtocolError {
-                    source: crate::ArcMsgProtocolError::MsgNotRecognized(code),
+                    source: crate::ArcMsgProtocolError::MsgNotRecognized(code as u16),
                     backtrace: BtWrapper::capture(),
                 },
             ))
@@ -279,8 +287,37 @@ impl Blackhole {
         }
     }
 
+    fn get_spi_buffer(&self) -> Result<SpiBuffer, Box<dyn std::error::Error>> {
+        let buffer_addr = self.axi_read32(self.spi_buffer_addr.addr)?;
+
+        Ok(SpiBuffer {
+            addr: (buffer_addr & 0xFFFFFF) + 0x10000000, /* magic offset to translate to the correct buffer address */
+            size: 1 << ((buffer_addr >> 24) & 0xFF),
+        })
+    }
+
     pub fn spi_write(&self, mut addr: u32, value: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
-        unimplemented!("No SPI write implementation yet");
+        let buffer = self.get_spi_buffer()?;
+
+        for chunk in value.chunks(buffer.size as usize) {
+            self.axi_write(buffer.addr as u64, chunk)?;
+            let (status, _, _) = self.bh_arc_msg(
+                0x1A,
+                Some(0 << 8),
+                &[addr, chunk.len() as u32, buffer.addr],
+                None,
+            )?;
+
+            std::thread::sleep(std::time::Duration::from_millis(100));
+
+            if status != 0 {
+                return Err("Failed to write to SPI".into());
+            }
+
+            addr += chunk.len() as u32;
+        }
+
+        Ok(())
     }
 
     pub fn spi_read(
@@ -288,7 +325,26 @@ impl Blackhole {
         mut addr: u32,
         value: &mut [u8],
     ) -> Result<(), Box<dyn std::error::Error>> {
-        unimplemented!("No SPI read implementation yet");
+        let buffer = self.get_spi_buffer()?;
+
+        for chunk in value.chunks_mut(buffer.size as usize) {
+            let (status, _, _) = self.bh_arc_msg(
+                0x19,
+                Some(0 << 8),
+                &[addr, chunk.len() as u32, buffer.addr],
+                None,
+            )?;
+
+            if status != 0 {
+                return Err("Failed to read from SPI".into());
+            }
+
+            self.axi_read(buffer.addr as u64, chunk)?;
+
+            addr += chunk.len() as u32;
+        }
+
+        Ok(())
     }
 
     pub fn get_local_chip_coord(&self) -> Result<EthAddr, PlatformError> {
@@ -394,7 +450,8 @@ impl ChipImpl for Blackhole {
         let args = msg.msg.args();
 
         let (_status, rc, response) = self.bh_arc_msg(
-            code,
+            code as u8,
+            None,
             &[args.0 as u32 | ((args.1 as u32) << 16)],
             Some(msg.timeout),
         )?;
