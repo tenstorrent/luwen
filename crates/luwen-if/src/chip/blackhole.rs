@@ -511,16 +511,13 @@ impl ChipImpl for Blackhole {
             // TODO: Implement offset use
             // let offset = u32_from_slice(&telemetry_tags_data_block, i) >> 16 & 0xFF;
             let data = u32_from_slice(&telem_data_block, i);
-            // print!("Tag: {:#02x} Data: {:#02x} Offset {:#02x}\n", tag, data, offset);
+            // print!("Tag: {:#02x} Data: {:#02x}\n", tag, data);
             match u32_to_telemetry_tags!(tag) {
-                TelemetryTags::ENUM_VERSION => telemetry_data.enum_version = data,
-                TelemetryTags::ENTRY_COUNT => telemetry_data.entry_count = data,
                 TelemetryTags::BOARD_ID_HIGH => telemetry_data.board_id_high = data,
                 TelemetryTags::BOARD_ID_LOW => telemetry_data.board_id_low = data,
                 TelemetryTags::ASIC_ID => telemetry_data.asic_id = data,
-                TelemetryTags::AICLK => telemetry_data.aiclk = data,
-                TelemetryTags::AXICLK => telemetry_data.axiclk = data,
-                TelemetryTags::ARCCLK => telemetry_data.arcclk = data,
+                TelemetryTags::HARVESTING_STATE => telemetry_data.harvesting_state = data,
+                TelemetryTags::UPDATE_TELEM_SPEED => telemetry_data.update_telem_speed = data,
                 TelemetryTags::VCORE => telemetry_data.vcore = data,
                 TelemetryTags::TDP => telemetry_data.tdp = data,
                 TelemetryTags::TDC => telemetry_data.tdc = data,
@@ -529,18 +526,30 @@ impl ChipImpl for Blackhole {
                 TelemetryTags::ASIC_TEMPERATURE => telemetry_data.asic_temperature = data,
                 TelemetryTags::VREG_TEMPERATURE => telemetry_data.vreg_temperature = data,
                 TelemetryTags::BOARD_TEMPERATURE => telemetry_data.board_temperature = data,
+                TelemetryTags::AICLK => telemetry_data.aiclk = data,
+                TelemetryTags::AXICLK => telemetry_data.axiclk = data,
+                TelemetryTags::ARCCLK => telemetry_data.arcclk = data,
                 TelemetryTags::L2CPUCLK0 => telemetry_data.l2cpuclk0 = data,
                 TelemetryTags::L2CPUCLK1 => telemetry_data.l2cpuclk1 = data,
                 TelemetryTags::L2CPUCLK2 => telemetry_data.l2cpuclk2 = data,
                 TelemetryTags::L2CPUCLK3 => telemetry_data.l2cpuclk3 = data,
-                TelemetryTags::TIMER_HEARTBEAT => telemetry_data.timer_heartbeat = data,
+                TelemetryTags::ETH_LIVE_STATUS => telemetry_data.eth_status0 = data,
                 TelemetryTags::DDR_STATUS => telemetry_data.ddr_status = data,
                 TelemetryTags::DDR_SPEED => telemetry_data.ddr_speed = Some(data),
+                TelemetryTags::ETH_FW_VERSION => telemetry_data.eth_fw_version = data,
+                TelemetryTags::DDR_FW_VERSION => telemetry_data.ddr_fw_version = data,
+                TelemetryTags::BM_APP_FW_VERSION => telemetry_data.m3_app_fw_version = data,
+                TelemetryTags::BM_BL_FW_VERSION => telemetry_data.m3_bl_fw_version = data,
+                TelemetryTags::FLASH_BUNDLE_VERSION => telemetry_data.fw_bundle_version = data,
+                // TelemetryTags::CM_FW_VERSION => telemetry_data.cm_fw_version = data,
+                TelemetryTags::L2CPU_FW_VERSION => telemetry_data.l2cpu_fw_version = data,
                 TelemetryTags::FAN_SPEED => telemetry_data.fan_speed = data,
+                TelemetryTags::TIMER_HEARTBEAT => telemetry_data.timer_heartbeat = data,
+                TelemetryTags::TELEM_ENUM_COUNT => telemetry_data.entry_count = data,
                 _ => (),
             }
         }
-        telemetry_data.board_id = 0xb1ac401e;
+        telemetry_data.board_id = (telemetry_data.board_id_high as u64) << 32 | telemetry_data.board_id_low as u64;
         Ok(telemetry_data)
     }
 
