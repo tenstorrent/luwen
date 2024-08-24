@@ -71,6 +71,7 @@ pub struct Telemetry {
     pub asic_idd: u32,
     pub board_id_high: u32,
     pub board_id_low: u32,
+    pub harvesting_state: u32,
     pub update_telem_speed: u32,
     pub arc0_fw_version: u32,
     pub arc1_fw_version: u32,
