@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: © 2024 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use num_traits::cast::FromPrimitive;
+
 use std::{backtrace, sync::Arc};
 
 use crate::{
@@ -481,19 +483,16 @@ impl ChipImpl for Blackhole {
 
         // Read the data block from the address in sctrach 13
         // Parse out the version and entry count before reading the data block
-        let mut version: [u8; 4] = [0u8; 4];
-        let mut entry_count = [0u8; 4];
-        self.axi_read(telem_struct_addr as u64, &mut version)?;
-        self.axi_read((telem_struct_addr + 4) as u64, &mut entry_count)?;
+        let version = self.axi_read32(telem_struct_addr as u64)?;
+        let entry_count = self.axi_read32(telem_struct_addr as u64 + 4)?;
 
         // TODO: Implement version check and data block parsing based on version
         // For now, assume version 1 and parse data block as is
         // let version = u32::from_le_bytes(version);
-        let entry_count = u32::from_le_bytes(entry_count);
 
         // Get telemetry tags data block and telemetry data data block
-        let mut telemetry_tags_data_block: Vec<u8> = vec![0u8; entry_count as usize * 4];
-        let mut telem_data_block: Vec<u8> = vec![0u8; entry_count as usize * 4];
+        let mut telemetry_tags_data_block: Vec<u8> = vec![0u8; (entry_count + 1) as usize * 4];
+        let mut telem_data_block: Vec<u8> = vec![0u8; (entry_count + 1) as usize * 4];
 
         self.axi_read(
             (telem_struct_addr + 8) as u64,
@@ -507,49 +506,52 @@ impl ChipImpl for Blackhole {
         // Parse telemetry data
         let mut telemetry_data = super::Telemetry::default();
         for i in 0..entry_count as u8 {
-            let tag = u32_from_slice(&telemetry_tags_data_block, i) & 0xFF;
-            // TODO: Implement offset use
-            // let offset = u32_from_slice(&telemetry_tags_data_block, i) >> 16 & 0xFF;
-            let data = u32_from_slice(&telem_data_block, i);
-            // print!("Tag: {:#02x} Data: {:#02x}\n", tag, data);
-            match u32_to_telemetry_tags!(tag) {
-                TelemetryTags::BOARD_ID_HIGH => telemetry_data.board_id_high = data,
-                TelemetryTags::BOARD_ID_LOW => telemetry_data.board_id_low = data,
-                TelemetryTags::ASIC_ID => telemetry_data.asic_id = data,
-                TelemetryTags::HARVESTING_STATE => telemetry_data.harvesting_state = data,
-                TelemetryTags::UPDATE_TELEM_SPEED => telemetry_data.update_telem_speed = data,
-                TelemetryTags::VCORE => telemetry_data.vcore = data,
-                TelemetryTags::TDP => telemetry_data.tdp = data,
-                TelemetryTags::TDC => telemetry_data.tdc = data,
-                TelemetryTags::VDD_LIMITS => telemetry_data.vdd_limits = data,
-                TelemetryTags::THM_LIMITS => telemetry_data.thm_limits = data,
-                TelemetryTags::ASIC_TEMPERATURE => telemetry_data.asic_temperature = data,
-                TelemetryTags::VREG_TEMPERATURE => telemetry_data.vreg_temperature = data,
-                TelemetryTags::BOARD_TEMPERATURE => telemetry_data.board_temperature = data,
-                TelemetryTags::AICLK => telemetry_data.aiclk = data,
-                TelemetryTags::AXICLK => telemetry_data.axiclk = data,
-                TelemetryTags::ARCCLK => telemetry_data.arcclk = data,
-                TelemetryTags::L2CPUCLK0 => telemetry_data.l2cpuclk0 = data,
-                TelemetryTags::L2CPUCLK1 => telemetry_data.l2cpuclk1 = data,
-                TelemetryTags::L2CPUCLK2 => telemetry_data.l2cpuclk2 = data,
-                TelemetryTags::L2CPUCLK3 => telemetry_data.l2cpuclk3 = data,
-                TelemetryTags::ETH_LIVE_STATUS => telemetry_data.eth_status0 = data,
-                TelemetryTags::DDR_STATUS => telemetry_data.ddr_status = data,
-                TelemetryTags::DDR_SPEED => telemetry_data.ddr_speed = Some(data),
-                TelemetryTags::ETH_FW_VERSION => telemetry_data.eth_fw_version = data,
-                TelemetryTags::DDR_FW_VERSION => telemetry_data.ddr_fw_version = data,
-                TelemetryTags::BM_APP_FW_VERSION => telemetry_data.m3_app_fw_version = data,
-                TelemetryTags::BM_BL_FW_VERSION => telemetry_data.m3_bl_fw_version = data,
-                TelemetryTags::FLASH_BUNDLE_VERSION => telemetry_data.fw_bundle_version = data,
-                // TelemetryTags::CM_FW_VERSION => telemetry_data.cm_fw_version = data,
-                TelemetryTags::L2CPU_FW_VERSION => telemetry_data.l2cpu_fw_version = data,
-                TelemetryTags::FAN_SPEED => telemetry_data.fan_speed = data,
-                TelemetryTags::TIMER_HEARTBEAT => telemetry_data.timer_heartbeat = data,
-                TelemetryTags::TELEM_ENUM_COUNT => telemetry_data.entry_count = data,
-                _ => (),
+            let entry = u32_from_slice(&telemetry_tags_data_block, i);
+            let tag = entry & 0xFF;
+            let offset = (entry >> 16) & 0xFF;
+            let data = u32_from_slice(&telem_data_block, offset as u8);
+            // print!("Tag: {} Data: {:#02x}\n", tag, data);
+            if let Some(tag) = TelemetryTags::from_u32(tag) {
+                match tag {
+                    TelemetryTags::BOARD_ID_HIGH => telemetry_data.board_id_high = data,
+                    TelemetryTags::BOARD_ID_LOW => telemetry_data.board_id_low = data,
+                    TelemetryTags::ASIC_ID => telemetry_data.asic_id = data,
+                    TelemetryTags::HARVESTING_STATE => telemetry_data.harvesting_state = data,
+                    TelemetryTags::UPDATE_TELEM_SPEED => telemetry_data.update_telem_speed = data,
+                    TelemetryTags::VCORE => telemetry_data.vcore = data,
+                    TelemetryTags::TDP => telemetry_data.tdp = data,
+                    TelemetryTags::TDC => telemetry_data.tdc = data,
+                    TelemetryTags::VDD_LIMITS => telemetry_data.vdd_limits = data,
+                    TelemetryTags::THM_LIMITS => telemetry_data.thm_limits = data,
+                    TelemetryTags::ASIC_TEMPERATURE => telemetry_data.asic_temperature = data,
+                    TelemetryTags::VREG_TEMPERATURE => telemetry_data.vreg_temperature = data,
+                    TelemetryTags::BOARD_TEMPERATURE => telemetry_data.board_temperature = data,
+                    TelemetryTags::AICLK => telemetry_data.aiclk = data,
+                    TelemetryTags::AXICLK => telemetry_data.axiclk = data,
+                    TelemetryTags::ARCCLK => telemetry_data.arcclk = data,
+                    TelemetryTags::L2CPUCLK0 => telemetry_data.l2cpuclk0 = data,
+                    TelemetryTags::L2CPUCLK1 => telemetry_data.l2cpuclk1 = data,
+                    TelemetryTags::L2CPUCLK2 => telemetry_data.l2cpuclk2 = data,
+                    TelemetryTags::L2CPUCLK3 => telemetry_data.l2cpuclk3 = data,
+                    TelemetryTags::ETH_LIVE_STATUS => telemetry_data.eth_status0 = data,
+                    TelemetryTags::DDR_STATUS => telemetry_data.ddr_status = data,
+                    TelemetryTags::DDR_SPEED => telemetry_data.ddr_speed = Some(data),
+                    TelemetryTags::ETH_FW_VERSION => telemetry_data.eth_fw_version = data,
+                    TelemetryTags::DDR_FW_VERSION => telemetry_data.ddr_fw_version = data,
+                    TelemetryTags::BM_APP_FW_VERSION => telemetry_data.m3_app_fw_version = data,
+                    TelemetryTags::BM_BL_FW_VERSION => telemetry_data.m3_bl_fw_version = data,
+                    TelemetryTags::FLASH_BUNDLE_VERSION => telemetry_data.fw_bundle_version = data,
+                    // TelemetryTags::CM_FW_VERSION => telemetry_data.cm_fw_version = data,
+                    TelemetryTags::L2CPU_FW_VERSION => telemetry_data.l2cpu_fw_version = data,
+                    TelemetryTags::FAN_SPEED => telemetry_data.fan_speed = data,
+                    TelemetryTags::TIMER_HEARTBEAT => telemetry_data.timer_heartbeat = data,
+                    TelemetryTags::TELEM_ENUM_COUNT => telemetry_data.entry_count = data,
+                    _ => (),
+                }
             }
         }
-        telemetry_data.board_id = (telemetry_data.board_id_high as u64) << 32 | telemetry_data.board_id_low as u64;
+        telemetry_data.board_id =
+            (telemetry_data.board_id_high as u64) << 32 | telemetry_data.board_id_low as u64;
         Ok(telemetry_data)
     }
 

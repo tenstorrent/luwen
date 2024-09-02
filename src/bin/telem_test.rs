@@ -33,6 +33,17 @@ fn main() {
                 if let Some(bh) = v.as_bh() {
                     dbg!(bh.get_telemetry().unwrap());
                     dbg!(bh.get_telemetry().unwrap());
+
+                    let subsystem = bh.get_if::<luwen_if::chip::NocInterface>()
+                        .map(|v| &v.backing)
+                        .map(|v| {
+                            v.as_any()
+                                .downcast_ref::<luwen_if::CallbackStorage<luwen_ref::ExtendedPciDeviceWrapper>>()
+                        })
+                        .flatten()
+                        .map(|v| v.user_data.borrow().device.physical.subsystem_id)
+                        .unwrap();
+                    dbg!(subsystem);
                 }
 
                 (v.get_arch(), remote, status, eth_status)
