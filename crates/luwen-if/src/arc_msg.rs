@@ -4,7 +4,7 @@
 use thiserror::Error;
 
 use crate::{
-    chip::{AxiError, ChipComms, HlComms},
+    chip::{AxiError, HlComms},
     error::PlatformError,
 };
 
@@ -197,7 +197,7 @@ pub enum ArcMsgProtocolError {
     #[error("Mailbox {0} is invalid")]
     InvalidMailbox(usize),
     #[error("Unknown error code {0}")]
-    UnknownErrorCode(u8)
+    UnknownErrorCode(u8),
 }
 
 impl ArcMsgProtocolError {

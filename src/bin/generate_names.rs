@@ -501,6 +501,7 @@ impl<'de> Deserialize<'de> for RdlField {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize)]
 pub struct RdlDef {
     #[serde(rename = "Address", deserialize_with = "deserialize_rdl_number")]
@@ -534,10 +535,10 @@ fn parse_json_translation_file(
     fn parse_field(name: &str, field: &RdlField) -> MemorySlice {
         match field {
             RdlField::MemoryRef {
-                mask,
+                mask: _,
                 upper_bits,
                 lower_bits,
-                description,
+                description: _,
             } => {
                 let size = ((upper_bits + 1 + 7) / 8) as u64;
                 MemorySlice {

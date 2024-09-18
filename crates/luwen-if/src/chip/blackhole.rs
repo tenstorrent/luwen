@@ -3,26 +3,23 @@
 
 use num_traits::cast::FromPrimitive;
 
-use std::{backtrace, sync::Arc};
+use std::sync::Arc;
 
 use crate::{
-    arc_msg::{ArcMsgAddr, ArcMsgOk, TypedArcMsg},
+    arc_msg::ArcMsgOk,
     chip::{
-        communication::{
-            chip_comms::{load_axi_table, ChipComms},
-            chip_interface::ChipInterface,
-        },
+        communication::{chip_comms::ChipComms, chip_interface::ChipInterface},
         hl_comms::HlCommsInterface,
     },
     error::{BtWrapper, PlatformError},
-    ArcMsg, ChipImpl, IntoChip,
+    ChipImpl,
 };
 
 use super::{
     eth_addr::EthAddr,
     hl_comms::HlComms,
-    init::status::{ComponentStatusInfo, EthernetPartialInitError, InitOptions, WaitStatus},
-    remote::{EthAddresses, RemoteArcIf},
+    init::status::{ComponentStatusInfo, InitOptions, WaitStatus},
+    remote::EthAddresses,
     ArcMsgOptions, AxiData, ChipInitResult, CommsStatus, InitStatus, NeighbouringChip,
 };
 
@@ -32,16 +29,6 @@ pub mod telemetry_tags;
 use crate::chip::blackhole::telemetry_tags::TelemetryTags;
 
 // pub use telemetry_tags::telemetry_tags_to_u32;
-
-fn u64_from_slice(data: &[u8]) -> u64 {
-    let mut output = 0;
-    for i in data.iter().rev().copied() {
-        output <<= 8;
-        output |= i as u64;
-    }
-
-    output
-}
 
 fn u32_from_slice(data: &[u8], index: u8) -> u32 {
     let mut output = 0;
@@ -65,7 +52,6 @@ pub struct Blackhole {
     pub eth_addrs: EthAddresses,
 
     spi_buffer_addr: AxiData,
-    telemetry_addr: AxiData,
     telemetry_struct_addr: AxiData,
 }
 
@@ -79,12 +65,6 @@ impl HlComms for &Blackhole {
     fn comms_obj(&self) -> (&dyn ChipComms, &dyn ChipInterface) {
         (self.arc_if.as_ref(), self.chip_if.as_ref())
     }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct L2Core {
-    pub x: u8,
-    pub y: u8,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -144,7 +124,6 @@ impl Blackhole {
             eth_addrs: EthAddresses::default(),
 
             spi_buffer_addr: arc_if.axi_translate("arc_ss.reset_unit.SCRATCH_RAM[10]")?,
-            telemetry_addr: arc_if.axi_translate("arc_ss.reset_unit.SCRATCH_RAM[12]")?,
             telemetry_struct_addr: arc_if.axi_translate("arc_ss.reset_unit.SCRATCH_RAM[13]")?,
 
             arc_if: Arc::new(arc_if),
@@ -483,7 +462,7 @@ impl ChipImpl for Blackhole {
 
         // Read the data block from the address in sctrach 13
         // Parse out the version and entry count before reading the data block
-        let version = self.axi_read32(telem_struct_addr as u64)?;
+        let _version = self.axi_read32(telem_struct_addr as u64)?;
         let entry_count = self.axi_read32(telem_struct_addr as u64 + 4)?;
 
         // TODO: Implement version check and data block parsing based on version
@@ -513,19 +492,19 @@ impl ChipImpl for Blackhole {
             // print!("Tag: {} Data: {:#02x}\n", tag, data);
             if let Some(tag) = TelemetryTags::from_u32(tag) {
                 match tag {
-                    TelemetryTags::BOARD_ID_HIGH => telemetry_data.board_id_high = data,
-                    TelemetryTags::BOARD_ID_LOW => telemetry_data.board_id_low = data,
-                    TelemetryTags::ASIC_ID => telemetry_data.asic_id = data,
-                    TelemetryTags::HARVESTING_STATE => telemetry_data.harvesting_state = data,
-                    TelemetryTags::UPDATE_TELEM_SPEED => telemetry_data.update_telem_speed = data,
+                    TelemetryTags::BoardIdHigh => telemetry_data.board_id_high = data,
+                    TelemetryTags::BoardIdLow => telemetry_data.board_id_low = data,
+                    TelemetryTags::AsicId => telemetry_data.asic_id = data,
+                    TelemetryTags::HarvestingState => telemetry_data.harvesting_state = data,
+                    TelemetryTags::UpdateTelemSpeed => telemetry_data.update_telem_speed = data,
                     TelemetryTags::VCORE => telemetry_data.vcore = data,
                     TelemetryTags::TDP => telemetry_data.tdp = data,
                     TelemetryTags::TDC => telemetry_data.tdc = data,
-                    TelemetryTags::VDD_LIMITS => telemetry_data.vdd_limits = data,
-                    TelemetryTags::THM_LIMITS => telemetry_data.thm_limits = data,
-                    TelemetryTags::ASIC_TEMPERATURE => telemetry_data.asic_temperature = data,
-                    TelemetryTags::VREG_TEMPERATURE => telemetry_data.vreg_temperature = data,
-                    TelemetryTags::BOARD_TEMPERATURE => telemetry_data.board_temperature = data,
+                    TelemetryTags::VddLimits => telemetry_data.vdd_limits = data,
+                    TelemetryTags::ThmLimits => telemetry_data.thm_limits = data,
+                    TelemetryTags::AsicTemperature => telemetry_data.asic_temperature = data,
+                    TelemetryTags::VregTemperature => telemetry_data.vreg_temperature = data,
+                    TelemetryTags::BoardTemperature => telemetry_data.board_temperature = data,
                     TelemetryTags::AICLK => telemetry_data.aiclk = data,
                     TelemetryTags::AXICLK => telemetry_data.axiclk = data,
                     TelemetryTags::ARCCLK => telemetry_data.arcclk = data,
@@ -533,19 +512,19 @@ impl ChipImpl for Blackhole {
                     TelemetryTags::L2CPUCLK1 => telemetry_data.l2cpuclk1 = data,
                     TelemetryTags::L2CPUCLK2 => telemetry_data.l2cpuclk2 = data,
                     TelemetryTags::L2CPUCLK3 => telemetry_data.l2cpuclk3 = data,
-                    TelemetryTags::ETH_LIVE_STATUS => telemetry_data.eth_status0 = data,
-                    TelemetryTags::DDR_STATUS => telemetry_data.ddr_status = data,
-                    TelemetryTags::DDR_SPEED => telemetry_data.ddr_speed = Some(data),
-                    TelemetryTags::ETH_FW_VERSION => telemetry_data.eth_fw_version = data,
-                    TelemetryTags::DDR_FW_VERSION => telemetry_data.ddr_fw_version = data,
-                    TelemetryTags::BM_APP_FW_VERSION => telemetry_data.m3_app_fw_version = data,
-                    TelemetryTags::BM_BL_FW_VERSION => telemetry_data.m3_bl_fw_version = data,
-                    TelemetryTags::FLASH_BUNDLE_VERSION => telemetry_data.fw_bundle_version = data,
+                    TelemetryTags::EthLiveStatus => telemetry_data.eth_status0 = data,
+                    TelemetryTags::DdrStatus => telemetry_data.ddr_status = data,
+                    TelemetryTags::DdrSpeed => telemetry_data.ddr_speed = Some(data),
+                    TelemetryTags::EthFwVersion => telemetry_data.eth_fw_version = data,
+                    TelemetryTags::DdrFwVersion => telemetry_data.ddr_fw_version = data,
+                    TelemetryTags::BmAppFwVersion => telemetry_data.m3_app_fw_version = data,
+                    TelemetryTags::BmBlFwVersion => telemetry_data.m3_bl_fw_version = data,
+                    TelemetryTags::FlashBundleVersion => telemetry_data.fw_bundle_version = data,
                     // TelemetryTags::CM_FW_VERSION => telemetry_data.cm_fw_version = data,
-                    TelemetryTags::L2CPU_FW_VERSION => telemetry_data.l2cpu_fw_version = data,
-                    TelemetryTags::FAN_SPEED => telemetry_data.fan_speed = data,
-                    TelemetryTags::TIMER_HEARTBEAT => telemetry_data.timer_heartbeat = data,
-                    TelemetryTags::TELEM_ENUM_COUNT => telemetry_data.entry_count = data,
+                    TelemetryTags::L2cpuFwVersion => telemetry_data.l2cpu_fw_version = data,
+                    TelemetryTags::FanSpeed => telemetry_data.fan_speed = data,
+                    TelemetryTags::TimerHeartbeat => telemetry_data.timer_heartbeat = data,
+                    TelemetryTags::TelemEnumCount => telemetry_data.entry_count = data,
                     _ => (),
                 }
             }

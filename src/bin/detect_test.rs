@@ -53,6 +53,7 @@ fn main() {
                             .unwrap()
                     );
 
+                    /*
                     let mut output = vec![0u32; 100];
                     {
                         let output = output.as_mut_ptr() as *mut u8;
@@ -67,7 +68,6 @@ fn main() {
                         println!("0x{addr:08x} 0x{o:08x}");
                         addr += 4;
                     }
-
 
                     for _ in 0..1 {
                         dbg!(bh.message_queue.get_queue_info(&bh, 2).unwrap());
@@ -107,6 +107,7 @@ fn main() {
                         println!("{:x} 0x{addr:08x} 0x{o:08x}", addr / 4);
                         addr += 4;
                     }
+                    */
                 }
 
                 (v.get_arch(), remote, status, eth_status)
