@@ -4,7 +4,6 @@
 use std::convert::Infallible;
 
 use indicatif::ProgressBar;
-use luwen_core::Arch;
 use luwen_if::{
     chip::{
         Chip, ChipDetectState, CommsStatus, ComponentStatusInfo, HlCommsInterface, InitError,

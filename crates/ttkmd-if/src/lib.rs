@@ -73,6 +73,7 @@ pub struct PhysicalDevice {
     pub bar_size_bytes: u64,
 }
 
+#[allow(dead_code)]
 pub struct PciDevice {
     pub id: usize,
 
@@ -203,7 +204,7 @@ impl PciDevice {
         let mut bar0_uc_mapping = Mapping::default();
         let mut bar0_wc_mapping = Mapping::default();
         let mut bar1_uc_mapping = Mapping::default();
-        let mut bar1_wc_mapping = Mapping::default();
+        let mut _bar1_wc_mapping = Mapping::default();
         let mut bar2_uc_mapping = Mapping::default();
         let mut _bar2_wc_mapping = Mapping::default();
 
@@ -219,7 +220,7 @@ impl PciDevice {
                     bar1_uc_mapping = mappings.output.mappings[i];
                 }
                 kmdif::MappingId::Resource1Wc => {
-                    bar1_wc_mapping = mappings.output.mappings[i];
+                    _bar1_wc_mapping = mappings.output.mappings[i];
                 }
                 kmdif::MappingId::Resource2Uc => {
                     bar2_uc_mapping = mappings.output.mappings[i];

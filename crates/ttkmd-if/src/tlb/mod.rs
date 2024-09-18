@@ -43,12 +43,12 @@ impl From<Ordering> for u8 {
 
 #[derive(Clone)]
 pub struct TlbStride {
-    stride_x: u8,
-    stride_y: u8,
-    quad_exclude_x: u8,
-    quad_exclude_y: u8,
-    quad_exclude_control: u8,
-    num_destinations: u8,
+    pub stride_x: u8,
+    pub stride_y: u8,
+    pub quad_exclude_x: u8,
+    pub quad_exclude_y: u8,
+    pub quad_exclude_control: u8,
+    pub num_destinations: u8,
 }
 
 #[derive(Clone, Default)]
