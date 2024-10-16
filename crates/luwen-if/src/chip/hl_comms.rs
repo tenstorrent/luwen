@@ -97,6 +97,81 @@ pub trait HlComms {
     }
 }
 
+#[inline]
+fn right_shift(existing: &mut [u8], shift: u32) {
+    let byte_shift = shift as usize / 8;
+    let bit_shift = shift as usize % 8;
+
+    if shift as usize >= existing.len() * 8 {
+        for o in existing {
+            *o = 0;
+        }
+        return;
+    }
+
+    if byte_shift > 0 {
+        for index in 0..existing.len() {
+            existing[index] = *existing.get(index + byte_shift).unwrap_or(&0);
+        }
+    }
+
+    if bit_shift > 0 {
+        let mut carry = 0;
+        for i in (0..existing.len()).rev() {
+            let next_carry = (existing[i] & ((1 << bit_shift) - 1)) << (8 - bit_shift);
+            existing[i] = (existing[i] >> bit_shift) | carry;
+            carry = next_carry;
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[inline]
+fn left_shift(existing: &mut [u8], shift: u32) {
+    let byte_shift = shift as usize / 8;
+    let bit_shift = shift as usize % 8;
+
+    if shift as usize >= existing.len() * 8 {
+        for o in existing {
+            *o = 0;
+        }
+        return;
+    }
+
+    if byte_shift > 0 {
+        for index in (0..existing.len()).rev() {
+            let shifted = if index < byte_shift {
+                0
+            } else {
+                existing[index - byte_shift]
+            };
+            existing[index] = shifted;
+        }
+    }
+
+    if bit_shift > 0 {
+        let mut carry = 0;
+        for i in (0..existing.len()).rev() {
+            let next_carry = (existing[i] & ((1 << bit_shift) - 1) << (8 - bit_shift)) >> bit_shift;
+            existing[i] = (existing[i] << bit_shift) | carry;
+            carry = next_carry;
+        }
+    }
+}
+
+#[inline]
+fn mask_off(existing: &mut [u8], high_bit: u32) -> &mut [u8] {
+    let top_byte = high_bit as usize / 8;
+    let top_bit = high_bit % 8;
+
+    if top_byte < existing.len() {
+        existing[top_byte] &= (1 << top_bit) - 1;
+    }
+
+    let len = existing.len();
+    &mut existing[0..(top_byte as usize + 1).min(len)]
+}
+
 /// Take a value and place it onto the existing value shifting by, `lower` and masking off at `upper`
 fn write_modify(existing: &mut [u8], value: &[u8], lower: u32, upper: u32) {
     assert!(upper >= lower);
@@ -137,31 +212,8 @@ fn read_modify(existing: &mut [u8], lower: u32, upper: u32) -> &[u8] {
     assert!(upper >= lower);
     assert!(existing.len() * 8 > upper as usize);
 
-    let mut shift_count = upper - lower + 1;
-    let mut read_ptr = lower / 8;
-    let read_shift = lower % 8;
-    let mut write_ptr = 0;
-    while shift_count > 0 {
-        let mut to_write = existing[read_ptr as usize] >> read_shift;
-        if read_shift > 0 {
-            to_write |= existing
-                .get((read_ptr + 1) as usize)
-                .map(|v| *v)
-                .unwrap_or(0)
-                << (8 - read_shift);
-        }
-        let write_count = shift_count.min(8) as u16;
-        let write_mask = ((1 << write_count) - 1) as u8;
-
-        existing[write_ptr as usize] = to_write & write_mask;
-
-        read_ptr += 1;
-        write_ptr += 1;
-
-        shift_count -= write_count as u32;
-    }
-
-    &existing[..write_ptr]
+    right_shift(existing, lower);
+    &*mask_off(existing, upper - lower + 1)
 }
 
 /// These functions can' be stored as a fat pointer so they are split out here.
@@ -311,6 +363,24 @@ mod test {
     }
 
     #[test]
+    fn test_read_modify_top() {
+        let mut a = [0, 0, 0, 0x80];
+
+        let a = super::read_modify(&mut a, 31, 31);
+
+        assert_eq!(a, vec![1]);
+    }
+
+    #[test]
+    fn test_read_modify_bottom() {
+        let mut a = [0x1, 0, 0, 0];
+
+        let a = super::read_modify(&mut a, 0, 0);
+
+        assert_eq!(a, vec![1]);
+    }
+
+    #[test]
     fn test_write_modify() {
         let mut a = vec![0, 1, 2, 3];
         let b = vec![0b110];
@@ -355,5 +425,15 @@ mod test {
         super::write_modify(&mut a, &b, 13, 19);
 
         assert_eq!(a, vec![0, 193, 0, 3]);
+    }
+
+    #[test]
+    fn test_write_modify_top() {
+        let mut a = vec![0, 0, 0, 0];
+        let b = vec![0b1];
+
+        super::write_modify(&mut a, &b, 31, 31);
+
+        assert_eq!(a, vec![0, 0, 0, 0x80]);
     }
 }
