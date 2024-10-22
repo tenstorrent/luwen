@@ -46,7 +46,7 @@ pub struct Blackhole {
     pub chip_if: Arc<dyn ChipInterface + Send + Sync>,
     pub arc_if: Arc<dyn ChipComms + Send + Sync>,
 
-    pub message_queue: message::MessageQueue<8>,
+    pub message_queue: once_cell::sync::OnceCell<message::MessageQueue<8>>,
 
     pub eth_locations: [EthCore; 14],
     pub eth_addrs: EthAddresses,
@@ -102,24 +102,10 @@ impl Blackhole {
         // let version = u32::from_le_bytes(version);
         let _version = 0x0;
 
-        let message_queue_info_address =
-            arc_if.axi_sread32(&chip_if, "arc_ss.reset_unit.SCRATCH_RAM[11]")? as u64;
-        let queue_base = arc_if.axi_read32(&chip_if, message_queue_info_address)?;
-        let queue_sizing = arc_if.axi_read32(&chip_if, message_queue_info_address + 4)?;
-        let queue_size = queue_sizing & 0xFF;
-        let queue_count = (queue_sizing >> 8) & 0xFF;
-
         let output = Blackhole {
             chip_if: Arc::new(chip_if),
 
-            message_queue: message::MessageQueue {
-                header_size: 8,
-                entry_size: 8,
-                queue_base: queue_base as u64,
-                queue_size,
-                queue_count,
-                fw_int: arc_if.axi_translate("arc_ss.reset_unit.ARC_MISC_CNTL.irq0_trig")?,
-            },
+            message_queue: once_cell::sync::OnceCell::new(),
 
             eth_addrs: EthAddresses::default(),
 
@@ -234,9 +220,33 @@ impl Blackhole {
 
         let timeout = timeout.unwrap_or(std::time::Duration::from_millis(500));
 
-        let response = self
-            .message_queue
-            .send_message(&self, 2, request, timeout)?;
+        let queue = self.message_queue.get_or_try_init::<_, PlatformError>(|| {
+            let message_queue_info_address = self
+                .arc_if
+                .axi_sread32(&self.chip_if, "arc_ss.reset_unit.SCRATCH_RAM[11]")?
+                as u64;
+            let queue_base = self
+                .arc_if
+                .axi_read32(&self.chip_if, message_queue_info_address)?;
+            let queue_sizing = self
+                .arc_if
+                .axi_read32(&self.chip_if, message_queue_info_address + 4)?;
+            let queue_size = queue_sizing & 0xFF;
+            let queue_count = (queue_sizing >> 8) & 0xFF;
+
+            Ok(message::MessageQueue {
+                header_size: 8,
+                entry_size: 8,
+                queue_base: queue_base as u64,
+                queue_size,
+                queue_count,
+                fw_int: self
+                    .arc_if
+                    .axi_translate("arc_ss.reset_unit.ARC_MISC_CNTL.irq0_trig")?,
+            })
+        })?;
+
+        let response = queue.send_message(&self, 2, request, timeout)?;
         let status = (response[0] & 0xFF) as u8;
         let rc = (response[0] >> 16) as u16;
 
