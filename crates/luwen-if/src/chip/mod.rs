@@ -180,6 +180,8 @@ impl Telemetry {
             0xB => "GALAXY",
             0x14 => "n300",
             0x18 => "n150",
+            0x36 => "p100",
+            0x40 => "p150A",
             _ => return None,
         };
 
