@@ -3,19 +3,12 @@
 
 use std::collections::{HashMap, HashSet};
 
-use clap::Parser;
-
 use luwen_core::Arch;
 use luwen_if::{
     chip::{ArcMsgOptions, HlComms, NeighbouringChip},
     ChipImpl, EthAddr,
 };
 use luwen_ref::error::LuwenError;
-
-#[derive(Parser)]
-pub struct CmdArgs {
-    file: String,
-}
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct ChipIdent {
@@ -32,9 +25,7 @@ pub struct ChipData {
     pub boardtype: Option<String>,
 }
 
-fn main() -> Result<(), LuwenError> {
-    let args = CmdArgs::parse();
-
+pub fn generate_map(file: impl AsRef<str>) -> Result<(), LuwenError> {
     let mut chips = HashMap::new();
     let mut chip_data = HashMap::new();
     let mut mmio_chips = Vec::new();
@@ -268,12 +259,30 @@ fn main() -> Result<(), LuwenError> {
     }
     output.push('}');
 
-    if let Err(_err) = std::fs::write(&args.file, output) {
+    let file = file.as_ref();
+
+    if let Err(_err) = std::fs::write(file, output) {
         Err(LuwenError::Custom(format!(
             "Failed to write to {}",
-            args.file
+            file
         )))
     } else {
         Ok(())
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn create_ethernet_map(file: *const std::ffi::c_char) -> std::ffi::c_int {
+    if file.is_null() {
+        eprintln!("Error file pointer is NULL!");
+        return -2;
+    }
+
+    let file = unsafe { std::ffi::CStr::from_ptr(file) };
+    if let Err(value) = generate_map(file.to_string_lossy()) {
+        eprintln!("Error while generating ethernet map!\n{value}");
+        -1
+    } else {
+        0
     }
 }

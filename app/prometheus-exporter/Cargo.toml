@@ -6,9 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-luwen-core = {path = "../luwen-core", version = "0.2.0"}
-luwen-if = {path = "../luwen-if", version = "0.5.3"}
-luwen-ref = {path = "../luwen-ref", version = "0.4.0"}
+luwen-core = {path = "../../crates/luwen-core", version = "0.2.0"}
+luwen-if = {path = "../../crates/luwen-if", version = "0.5.3"}
+luwen-ref = {path = "../../crates/luwen-ref", version = "0.4.0"}
 clap = { version = "4.4.6", features = ["derive"] }
 prometheus_exporter = "0.8.5"
 prometheus = { version = "0.13.3", features = ["process"] }
