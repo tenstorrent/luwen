@@ -3,6 +3,7 @@ PYTHON?=python3
 .py03-env:
 	$(PYTHON) -m venv .py03-env
 	. .py03-env/bin/activate && pip install --upgrade pip
+	. .py03-env/bin/activate && pip install maturin
 	. .py03-env/bin/activate && pip install -ve .
 
 .PHONY: whl
