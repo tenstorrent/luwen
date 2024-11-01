@@ -614,7 +614,7 @@ impl ChipImpl for Grayskull {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
-    
+
     fn get_telemetry(&self) -> Result<super::Telemetry, crate::error::PlatformError> {
         let offset = self
             .telemetry_addr
@@ -741,16 +741,16 @@ impl ChipImpl for Grayskull {
         let tt_flash_version = self
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (38 * 4))?;
-        
-            let threshold: u32 = 0x01070000;  // arc fw 1.7.0.0
-            let fw_bundle_version: u32;
-            if arc0_fw_version >= threshold {
-                fw_bundle_version = self
-                    .arc_if
-                    .axi_read32(&self.chip_if, telemetry_struct_offset + (39 * 4))?;            
-            } else {
-                fw_bundle_version = 0;
-            }
+
+        let threshold: u32 = 0x01070000; // arc fw 1.7.0.0
+        let fw_bundle_version: u32;
+        if arc0_fw_version >= threshold {
+            fw_bundle_version = self
+                .arc_if
+                .axi_read32(&self.chip_if, telemetry_struct_offset + (39 * 4))?;
+        } else {
+            fw_bundle_version = 0;
+        }
         // let board_id_high =
         //     self.arc_if
         //         .axi_read32(&self.chip_if, telemetry_struct_offset + (4 * 4))? as u64;

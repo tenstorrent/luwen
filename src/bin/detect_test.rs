@@ -46,7 +46,6 @@ fn main() {
                         .unwrap();
                     dbg!(result);
 
-
                     println!(
                         "{:x}",
                         bh.axi_sread32(format!("arc_ss.reset_unit.SCRATCH_RAM[0]"))

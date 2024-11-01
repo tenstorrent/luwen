@@ -206,7 +206,7 @@ impl Spi {
 
         // Write sectors to lock
         chip.axi_write32(self.spi_dr, SPI_WR_STATUS_CMD as u32)?;
-        
+
         // Figure out which SPI to use
         let simple_spi = if let Ok(Some(info)) = chip.get_device_info() {
             info.board_id == 0x35

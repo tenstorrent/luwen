@@ -783,9 +783,10 @@ impl ChipImpl for Wormhole {
                                     } else if status.start_time.elapsed() > status.timeout {
                                         *eth_status = WaitStatus::Timeout(status.timeout);
                                     } else {
-                                        *status_string = Some(
-                                            format!("{}: Waiting for initial training to complete", self.get_local_chip_coord()?),
-                                        );
+                                        *status_string = Some(format!(
+                                            "{}: Waiting for initial training to complete",
+                                            self.get_local_chip_coord()?
+                                        ));
                                     }
                                 }
                                 WaitStatus::JustFinished => {
@@ -1100,7 +1101,7 @@ impl ChipImpl for Wormhole {
             .arc_if
             .axi_read32(&self.chip_if, telemetry_struct_offset + (46 * 4))?;
 
-        let threshold: u32 = 0x02190000;  // arc fw 2.25.0.0
+        let threshold: u32 = 0x02190000; // arc fw 2.25.0.0
         let fw_bundle_version: u32;
         if arc0_fw_version >= threshold {
             fw_bundle_version = self

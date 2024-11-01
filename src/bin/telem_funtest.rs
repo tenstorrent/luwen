@@ -23,11 +23,17 @@ fn main() {
     }
 
     if telem_a.vcore < 700 || telem_a.vcore > 850 {
-        panic!("\x1b[0;31m[FAIL]\x1b[0m Board vcore reading is outside of the expected range {}", telem_a.vcore);
+        panic!(
+            "\x1b[0;31m[FAIL]\x1b[0m Board vcore reading is outside of the expected range {}",
+            telem_a.vcore
+        );
     }
 
     if telem_a.tdc < 3 && telem_a.tdc > 200 {
-        panic!("\x1b[0;31m[FAIL]\x1b[0m Board tdc reading is outside of the expected range {}", telem_a.tdc);
+        panic!(
+            "\x1b[0;31m[FAIL]\x1b[0m Board tdc reading is outside of the expected range {}",
+            telem_a.tdc
+        );
     }
 
     println!("\x1b[0;32m[PASS]\x1b[0m");

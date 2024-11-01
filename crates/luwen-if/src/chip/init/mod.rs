@@ -88,7 +88,10 @@ pub fn wait_for_init<E>(
             }
             super::ChipInitResult::ErrorAbort(error, bt_tracker) => {
                 return Err(PlatformError::Generic(
-                    format!("Chip initialization failed (aborted): {} \n{}", error, status),
+                    format!(
+                        "Chip initialization failed (aborted): {} \n{}",
+                        error, status
+                    ),
                     crate::error::BtWrapper(bt_tracker),
                 ))?;
             }
