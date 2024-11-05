@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+mod blackhole;
 pub mod communication;
 mod creation;
 pub mod eth_addr;
@@ -10,8 +11,8 @@ mod init;
 mod remote;
 mod spi;
 mod wormhole;
-mod blackhole;
 
+pub use blackhole::{message::MessageError, Blackhole};
 pub use communication::chip_comms::{
     axi_translate, ArcIf, AxiData, AxiError, ChipComms, MemorySlice, MemorySlices,
 };
@@ -25,7 +26,6 @@ pub use init::{
 };
 use luwen_core::Arch;
 pub use wormhole::Wormhole;
-pub use blackhole::{Blackhole, message::MessageError};
 
 use crate::arc_msg::TypedArcMsg;
 pub use crate::arc_msg::{ArcMsg, ArcMsgOk};

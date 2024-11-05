@@ -386,9 +386,7 @@ pub struct InitStatus {
 
 impl fmt::Display for InitStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fn write_component_status<P, E>(
-            status: &ComponentStatusInfo<P, E>,
-        ) -> String {
+        fn write_component_status<P, E>(status: &ComponentStatusInfo<P, E>) -> String {
             let mut init_status = String::new();
             if status.start_time.elapsed() > status.timeout {
                 init_status.push_str("Timeout");
@@ -406,16 +404,38 @@ impl fmt::Display for InitStatus {
                 }
             }
             if status.wait_status.len() > 0 {
-                init_status.push_str(format!(", {} out of {} initialized", completed_count, status.wait_status.len()).as_str());
+                init_status.push_str(
+                    format!(
+                        ", {} out of {} initialized",
+                        completed_count,
+                        status.wait_status.len()
+                    )
+                    .as_str(),
+                );
             }
             init_status
-            
         }
         writeln!(f, "   Communication Status: {}", self.comms_status)?;
-        writeln!(f, "   DRAM Status: {}", write_component_status(&self.dram_status))?;
-        writeln!(f, "   CPU Status: {}", write_component_status(&self.cpu_status))?;
-        writeln!(f, "   ARC Status: {}", write_component_status(&self.arc_status))?;
-        writeln!(f, "   Ethernet Status: {}", write_component_status(&self.eth_status))?;
+        writeln!(
+            f,
+            "   DRAM Status: {}",
+            write_component_status(&self.dram_status)
+        )?;
+        writeln!(
+            f,
+            "   CPU Status: {}",
+            write_component_status(&self.cpu_status)
+        )?;
+        writeln!(
+            f,
+            "   ARC Status: {}",
+            write_component_status(&self.arc_status)
+        )?;
+        writeln!(
+            f,
+            "   Ethernet Status: {}",
+            write_component_status(&self.eth_status)
+        )?;
         writeln!(f, "   Noc Safe: {:?}", self.init_options.noc_safe)?;
         writeln!(f, "   Unknown State: {}", self.unknown_state)
     }
