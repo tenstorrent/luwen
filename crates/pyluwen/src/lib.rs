@@ -1498,6 +1498,11 @@ pub fn detect_chips(
     Ok(output)
 }
 
+#[pyfunction]
+pub fn pci_scan() -> Vec<usize> {
+    luwen_ref::PciDevice::scan()
+}
+
 #[pymodule]
 fn pyluwen(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PciChip>()?;
@@ -1513,6 +1518,7 @@ fn pyluwen(_py: Python, m: &PyModule) -> PyResult<()> {
 
     m.add_wrapped(wrap_pyfunction!(detect_chips))?;
     m.add_wrapped(wrap_pyfunction!(detect_chips_fallible))?;
+    m.add_wrapped(wrap_pyfunction!(pci_scan))?;
 
     Ok(())
 }
