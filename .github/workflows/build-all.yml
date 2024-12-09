@@ -54,3 +54,10 @@ jobs:
       PATCH:  ${{ inputs.PATCH }}
       NUMBER_OF_COMMITS_SINCE_TAG:  ${{ inputs.NUMBER_OF_COMMITS_SINCE_TAG }}
     secrets: inherit
+  buildpypi:
+    needs:
+      - build_all_depends
+    uses: ./.github/workflows/build-pypi.yml
+    with:
+      ref: ${{ inputs.ref }}
+    secrets: inherit
