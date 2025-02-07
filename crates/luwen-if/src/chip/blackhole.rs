@@ -24,9 +24,16 @@ use super::{
 };
 
 pub mod message;
+pub mod boot_fs;
+pub mod spirom_tables;
+
 #[macro_use]
 pub mod telemetry_tags;
 use crate::chip::blackhole::telemetry_tags::TelemetryTags;
+use prost::Message;
+use std::collections::HashMap;
+use serde::Serialize;
+use serde_json::Value;
 
 // pub use telemetry_tags::telemetry_tags_to_u32;
 
@@ -374,6 +381,64 @@ impl Blackhole {
             shelf_x: 0,
             shelf_y: 0,
         })
+    }
+
+    pub fn get_boot_fs_tables_spi_read(&self, tag_name: &str) -> Result <Option<(u32, boot_fs::TtBootFsFd)>, Box<dyn std::error::Error>> {
+        let reader = |addr: u32, size: usize| {
+            let mut buf = vec![0; size];
+            self.spi_read(addr, &mut buf).unwrap();
+            return buf;
+        };
+        return Ok(boot_fs::read_tag(&reader as &dyn Fn(u32, usize) -> Vec<u8>, &tag_name));
+    }
+
+    fn remove_padding_proto_bin<'a>(&self, bincode: &'a [u8]) -> Result<&'a [u8], Box<dyn std::error::Error>> {
+        // The proto bins have to be padded to be a multiple of 4 bytes to fit into the spirom requirements
+        // This means that we have to read the last byte of the bin and remove num + 1 num of bytes
+        // 0: remove 1 byte (0)
+        // 1: remove 2 bytes (0, 1)
+        // 2: remove 3 bytes (0, X, 2)
+        // 3: remove 4 bytes (0, X, X, 3)
+
+        let last_byte = bincode[bincode.len() - 1] as usize;
+        // truncate the last byte and the padding bytes
+        Ok(&bincode[..bincode.len() - last_byte - 1])
+    }
+
+    /// Generic function to convert any serializable type into a HashMap
+    fn to_hash_map<T: Serialize>(&self, value: T) -> HashMap<String, Value> {
+        // Serialize the value to JSON
+        let json_string = serde_json::to_string(&value).unwrap();
+        // Deserialize the JSON into a HashMap
+        serde_json::from_str(&json_string).unwrap()
+    }
+
+    pub fn decode_boot_fs_table(&self, tag_name: &str) -> Result<HashMap<String, Value>, Box<dyn std::error::Error>> {
+        // Return the decoded boot fs table as a HashMap
+        // Get the spi address and image size of the tag and read the proto bin
+        // Decode the proto bin and convert it to a HashMap
+        let spi_addr = self.get_boot_fs_tables_spi_read(tag_name)?.unwrap().1.spi_addr;
+        let image_size = unsafe { self.get_boot_fs_tables_spi_read(tag_name)?.unwrap().1.flags.f.image_size() };
+        // declare as vec to allow non-const size
+        let mut proto_bin = vec![0u8; image_size as usize];
+        self.spi_read(spi_addr, &mut proto_bin)?;
+        let final_decode_map : HashMap<String, Value>;
+        // remove padding
+        proto_bin = self.remove_padding_proto_bin(&proto_bin)?.to_vec();
+
+        if tag_name == "cmfwcfg" || tag_name == "origcfg" {
+            final_decode_map = self.to_hash_map(spirom_tables::fw_table::FwTable::decode(&*proto_bin)?);
+        }
+        else if tag_name == "boardcfg" {
+            final_decode_map = self.to_hash_map(spirom_tables::read_only::ReadOnly::decode(&*proto_bin)?);
+        }
+        else if tag_name == "flshinfo" {
+            final_decode_map = self.to_hash_map(spirom_tables::flash_info::FlashInfoTable::decode(&*proto_bin)?);
+        }
+        else {
+            return Err(format!("Unsupported tag name: {}", tag_name).into());
+        };
+        Ok(final_decode_map)
     }
 }
 
