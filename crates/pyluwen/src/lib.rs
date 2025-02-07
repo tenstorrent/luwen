@@ -13,6 +13,8 @@ use luwen_if::{CallbackStorage, ChipDetectOptions, DeviceInfo, UninitChip};
 use luwen_ref::{DmaConfig, ExtendedPciDeviceWrapper};
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyList};
+use serde_json::Value;
 
 #[pyclass]
 pub struct PciChip(luwen_if::chip::Chip);
@@ -1302,6 +1304,39 @@ impl PciBlackhole {
             .map(|v| v.into())
             .map_err(|v| PyException::new_err(v.to_string()))
     }
+
+    pub fn decode_boot_fs_table(&self, tag_name: &str) -> PyResult<Py<PyDict>> {
+        // Deserialize the boot fs table given the tag name and return it as a pydict with the correct types
+        Python::with_gil(|py| {
+            let result = self.0
+                .decode_boot_fs_table(tag_name)
+                .map_err(|v| PyException::new_err(v.to_string()))?;
+            let py_dict = PyDict::new(py);
+            // Convert the HashMap<String, Value> to a pydict
+            for (key, value) in result {
+                let py_key: PyObject = key.into_py(py);
+                let py_value: PyObject = serde_json_value_to_pyobject(py, &value)?;
+                py_dict.set_item(py_key, py_value)?;
+            }
+            Ok(py_dict.into())
+        })
+    }
+
+    pub fn get_spirom_table_spi_addr(&self, tag_name: &str) -> PyResult<u32> {
+        // Return the spi address given the tagname
+        let result = self.0
+            .get_boot_fs_tables_spi_read(tag_name)
+            .map_err(|v| PyException::new_err(v.to_string()))?;
+        Ok(result.unwrap().1.spi_addr)
+    }
+
+    pub fn get_spirom_table_image_size(&self, tag_name: &str) -> PyResult<u32> {
+        // Return the spi image size when given the tagname
+        let result = self.0
+            .get_boot_fs_tables_spi_read(tag_name)
+            .map_err(|v| PyException::new_err(v.to_string()))?;
+        Ok(unsafe{result.unwrap().1.flags.f.image_size()})
+    }
 }
 
 common_chip_comms_impls!(PciBlackhole);
@@ -1521,4 +1556,43 @@ fn pyluwen(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(pci_scan))?;
 
     Ok(())
+}
+
+/// Helper function to convert serde_json::Value to PyObject
+fn serde_json_value_to_pyobject(py: Python, value: &Value) -> PyResult<PyObject> {
+    match value {
+        Value::Null => Ok(py.None()),
+        Value::Bool(b) => Ok(b.into_py(py)),
+        Value::Number(n) => {
+            if n.is_i64() {
+                Ok(n.as_i64().unwrap().into_py(py))
+            } else if n.is_u64() {
+                Ok(n.as_u64().unwrap().into_py(py))
+            } else if n.is_f64() {
+                Ok(n.as_f64().unwrap().into_py(py))
+            } else {
+                panic!("Unsupported number type");
+            }
+        }
+        Value::String(s) => Ok(s.into_py(py)),
+        Value::Array(arr) => {
+            // For the list we need to recursively convert each item
+            let py_list: &PyList = PyList::empty(py);
+            for item in arr {
+                let py_item: PyObject = serde_json_value_to_pyobject(py, item)?;
+                py_list.append(py_item)?;
+            }
+            Ok(py_list.into_py(py))
+        }
+        Value::Object(obj) => {
+            // For the dict we need to recursively convert each key and value
+            let py_dict: &PyDict = PyDict::new(py);
+            for (key, value) in obj {
+                let py_key: PyObject = key.into_py(py);
+                let py_value: PyObject = serde_json_value_to_pyobject(py, value)?;
+                py_dict.set_item(py_key, py_value)?;
+            }
+            Ok(py_dict.into_py(py))
+        }
+    }
 }

@@ -13,5 +13,6 @@ ttkmd-if = {path = "../ttkmd-if", version = "0.2.0"}
 luwen-core = {path = "../luwen-core", version = "0.2.0"}
 luwen-if = {path = "../luwen-if", version = "0.5.3"}
 luwen-ref = {path = "../luwen-ref", version = "0.4.1"}
+serde_json = "1.0.117"
 
 pyo3 = { version = "0.19.2", features = ["extension-module", "multiple-pymethods"] }
