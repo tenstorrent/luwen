@@ -54,6 +54,7 @@ variables:
     CARGO_OPTS: "--verbose"
   script:
     - rustc --version && cargo --version  # Print version info for debugging
+    - apt install -y protobuf-compiler
     - cargo build --target $TARGET $([[ $PROFILE == "release" ]] && echo "--release" || echo "") $CARGO_OPTS
   artifacts:
     paths:
