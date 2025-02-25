@@ -78,7 +78,7 @@ fn hang_noc(method: NocHangMethod, chip: Chip) -> Result<(), Box<dyn std::error:
             for _ in 0..100 {
                 // The total grid size is 10x12 with a virtual noc grid starting at coord [26, 26]
                 // We are there trying to access a register that doesn't exist
-                chip.noc_read32(0, 1, 13, 0x0)?;
+                chip.noc_read32(0, 1, 20, 0x0)?;
             }
         }
     }
