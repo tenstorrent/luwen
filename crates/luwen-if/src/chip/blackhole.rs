@@ -53,6 +53,7 @@ pub struct Blackhole {
 
     spi_buffer_addr: AxiData,
     telemetry_struct_addr: AxiData,
+    scratch_ram_base: AxiData,
 }
 
 impl HlComms for Blackhole {
@@ -111,6 +112,7 @@ impl Blackhole {
 
             spi_buffer_addr: arc_if.axi_translate("arc_ss.reset_unit.SCRATCH_RAM[10]")?,
             telemetry_struct_addr: arc_if.axi_translate("arc_ss.reset_unit.SCRATCH_RAM[13]")?,
+            scratch_ram_base: arc_if.axi_translate("arc_ss.reset_unit.SCRATCH_RAM[0]")?,
 
             arc_if: Arc::new(arc_if),
 
@@ -205,6 +207,26 @@ impl Blackhole {
         self.chip_if.as_any().downcast_ref::<T>()
     }
 
+    pub fn hw_ready(&self) -> bool {
+        if let Ok(boot_status_0) = self.axi_read32(self.scratch_ram_base.addr + (4 * 2)) {
+            (boot_status_0 >> 1) == 2
+        } else {
+            false
+        }
+    }
+
+    pub fn check_arc_msg_safe(&self) -> bool {
+        if !self.hw_ready() {
+            return false;
+        }
+
+        if let Ok(boot_status_0) = self.axi_read32(self.scratch_ram_base.addr + (4 * 2)) {
+            (boot_status_0 & 0x1) == 1
+        } else {
+            false
+        }
+    }
+
     fn bh_arc_msg(
         &self,
         code: u8,
@@ -212,6 +234,13 @@ impl Blackhole {
         data: &[u32],
         timeout: Option<std::time::Duration>,
     ) -> Result<(u8, u16, [u32; 7]), PlatformError> {
+        if !self.check_arc_msg_safe() {
+            return Err(PlatformError::ArcNotReady(
+                crate::error::ArcReadyError::BootIncomplete,
+                BtWrapper::capture(),
+            ));
+        }
+
         let mut request = [0; 8];
         request[0] = code as u32 | zero_data.unwrap_or(0);
         for (i, o) in data.iter().zip(request[1..].iter_mut()) {
@@ -356,7 +385,7 @@ fn default_status() -> InitStatus {
             wait_status: Box::new([WaitStatus::Waiting(None)]),
 
             start_time: std::time::Instant::now(),
-            timeout: std::time::Duration::from_secs(300),
+            timeout: std::time::Duration::from_secs(5),
         },
         dram_status: ComponentStatusInfo::init_waiting(
             "DRAM".to_string(),
@@ -404,7 +433,26 @@ impl ChipImpl for Blackhole {
         {
             let status = &mut status.arc_status;
             for s in status.wait_status.iter_mut() {
-                *s = WaitStatus::Done;
+                match s {
+                    WaitStatus::Waiting(status_string) => {
+                        if self.check_arc_msg_safe() {
+                            *s = WaitStatus::JustFinished;
+                        } else {
+                            *status_string = Some("BH FW boot not complete".to_string());
+                            if status.start_time.elapsed() > status.timeout {
+                                *s = WaitStatus::Error(
+                                    super::init::status::ArcInitError::WaitingForInit(
+                                        crate::error::ArcReadyError::BootIncomplete,
+                                    ),
+                                );
+                            }
+                        }
+                    }
+                    WaitStatus::JustFinished => {
+                        *s = WaitStatus::Done;
+                    }
+                    _ => {}
+                }
             }
         }
 
