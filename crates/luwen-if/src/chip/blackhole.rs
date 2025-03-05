@@ -518,6 +518,13 @@ impl ChipImpl for Blackhole {
         self.axi_read_field(&self.telemetry_struct_addr, &mut scratch_reg_13_value)?;
         let telem_struct_addr = u32::from_le_bytes(scratch_reg_13_value);
 
+        if telem_struct_addr == 0 {
+            return Err(PlatformError::ArcNotReady(
+                crate::error::ArcReadyError::BootIncomplete,
+                BtWrapper::capture(),
+            ));
+        }
+
         // Read the data block from the address in sctrach 13
         // Parse out the version and entry count before reading the data block
         let _version = self.axi_read32(telem_struct_addr as u64)?;
