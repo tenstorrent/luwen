@@ -107,6 +107,13 @@ pub fn wait_for_init<E>(
                 call: CallReason::ChipInitCompleted(&status),
             })
             .map_err(InitError::CallbackError)?;
+            if status.has_error() {
+                return Err(PlatformError::Generic(
+                    format!("Chip initialization failed:\n{} ", status),
+                    crate::error::BtWrapper::capture(),
+                ))?;
+            }
+
             return Ok(status);
         };
 
