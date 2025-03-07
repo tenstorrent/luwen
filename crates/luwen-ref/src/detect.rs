@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::convert::Infallible;
+use std::{convert::Infallible, io::IsTerminal};
 
 use indicatif::ProgressBar;
 use luwen_if::{
@@ -9,42 +9,100 @@ use luwen_if::{
         Chip, ChipDetectState, CommsStatus, ComponentStatusInfo, HlCommsInterface, InitError,
         InitStatus,
     },
+    error::PlatformError,
     CallbackStorage, ChipDetectOptions, ChipImpl, UninitChip,
 };
 use ttkmd_if::PciDevice;
 
 use crate::{comms_callback, error::LuwenError, ExtendedPciDevice};
 
-pub fn detect_chips_options(options: ChipDetectOptions) -> Result<Vec<UninitChip>, LuwenError> {
-    let mut chips = Vec::new();
-    let mut failed_chips = Vec::new();
-
-    let device_ids = PciDevice::scan();
-    for device_id in device_ids {
-        let ud = ExtendedPciDevice::open(device_id)?;
-
-        let arch = ud.borrow().device.arch;
-
-        let chip = Chip::open(arch, CallbackStorage::new(comms_callback, ud.clone()))?;
-
-        // First let's test basic pcie communication we may be in a hang state so it's
-        // important that we let the detect function know
-
-        // Hack(drosen): Basic init procedure should resolve this
-        let scratch_0 = if chip.get_arch().is_blackhole() {
-            "arc_ss.reset_unit.SCRATCH_0"
-        } else {
-            "ARC_RESET.SCRATCH[0]"
-        };
-        let result = chip.axi_sread32(scratch_0);
-        if let Err(err) = result {
-            // Basic comms have failed... we should output a nice error message on the console
-            failed_chips.push((device_id, chip, err));
-        } else {
-            chips.push(chip);
-        }
+pub fn detect_chips_options_notui(
+    options: ChipDetectOptions,
+    failed_chips: &[(usize, Chip, PlatformError)],
+    chips: Vec<Chip>,
+) -> Result<Vec<UninitChip>, LuwenError> {
+    // First we will output errors for the chips we already know have failed
+    for (id, _, err) in failed_chips {
+        eprintln!("Failed to communicate over pcie with chip {id}: {err}");
     }
 
+    let mut total_chips = failed_chips.len();
+
+    let mut last_output = String::new();
+
+    let mut init_callback = |status: ChipDetectState| {
+        match status.call {
+            luwen_if::chip::CallReason::NotNew => {
+                total_chips = total_chips.saturating_sub(1);
+                eprintln!("Ok I was wrong we actually have {total_chips} chips");
+            }
+            luwen_if::chip::CallReason::NewChip => {
+                total_chips = total_chips + 1;
+                eprintln!("New chip! We now have {total_chips} chips");
+            }
+            luwen_if::chip::CallReason::InitWait(status) => {
+                let mut output = String::new();
+                output.push_str(&status.arc_status.to_string());
+                output.push('\n');
+                output.push_str(&status.dram_status.to_string());
+                output.push('\n');
+                output.push_str(&status.eth_status.to_string());
+                output.push('\n');
+                output.push_str(&status.cpu_status.to_string());
+
+                if last_output != output {
+                    eprintln!("Initializing chip...\n{output}");
+                    last_output = output;
+                }
+            }
+            luwen_if::chip::CallReason::ChipInitCompleted(status) => {
+                eprintln!("Chip initialization complete (found {last_output})");
+
+                let mut output = String::new();
+                output.push_str(&status.arc_status.to_string());
+                output.push('\n');
+                output.push_str(&status.dram_status.to_string());
+                output.push('\n');
+                output.push_str(&status.eth_status.to_string());
+                output.push('\n');
+                output.push_str(&status.cpu_status.to_string());
+
+                if status.has_error() {
+                    eprintln!("Chip initializing failed...\n{output}");
+                } else {
+                    eprintln!("Chip initializing complete...\n{output}");
+                }
+            }
+        };
+
+        Ok::<(), Infallible>(())
+    };
+
+    let chips = match luwen_if::detect_chips(chips, &mut init_callback, options) {
+        Err(InitError::CallbackError(err)) => {
+            eprintln!("Ran into error from status callback;\n{}", err);
+            return Err(luwen_if::error::PlatformError::Generic(
+                "Hit error from status callback".to_string(),
+                luwen_if::error::BtWrapper::capture(),
+            ))?;
+        }
+        Err(InitError::PlatformError(err)) => {
+            return Err(err)?;
+        }
+
+        Ok(chips) => chips,
+    };
+
+    eprintln!("Chip detection complete (found {last_output})");
+
+    Ok(chips)
+}
+
+pub fn detect_chips_options_tui(
+    options: ChipDetectOptions,
+    failed_chips: &[(usize, Chip, PlatformError)],
+    chips: Vec<Chip>,
+) -> Result<Vec<UninitChip>, LuwenError> {
     let chip_detect_bar = indicatif::ProgressBar::new_spinner().with_style(
         indicatif::ProgressStyle::default_spinner()
             .template("{spinner:.green} Detecting chips (found {pos})")
@@ -107,7 +165,7 @@ pub fn detect_chips_options(options: ChipDetectOptions) -> Result<Vec<UninitChip
     chip_detect_bar.enable_steady_tick(std::time::Duration::from_secs_f32(1.0 / 30.0));
 
     // First we will output errors for the chips we already know have failed
-    for (id, _, err) in &failed_chips {
+    for (id, _, err) in failed_chips {
         chip_detect_bar.inc(1);
         let bar = add_bar(&bars);
         bar.finish_with_message(format!(
@@ -156,7 +214,7 @@ pub fn detect_chips_options(options: ChipDetectOptions) -> Result<Vec<UninitChip
         Ok::<(), Infallible>(())
     };
 
-    let mut chips = match luwen_if::detect_chips(chips, &mut init_callback, options) {
+    let chips = match luwen_if::detect_chips(chips, &mut init_callback, options) {
         Err(InitError::CallbackError(err)) => {
             chip_detect_bar
                 .finish_with_message(format!("Ran into error from status callback;\n{}", err));
@@ -173,6 +231,45 @@ pub fn detect_chips_options(options: ChipDetectOptions) -> Result<Vec<UninitChip
     };
 
     chip_detect_bar.finish_with_message("Chip detection complete (found {pos})");
+
+    Ok(chips)
+}
+
+pub fn detect_chips_options(options: ChipDetectOptions) -> Result<Vec<UninitChip>, LuwenError> {
+    let mut chips = Vec::new();
+    let mut failed_chips = Vec::new();
+
+    let device_ids = PciDevice::scan();
+    for device_id in device_ids {
+        let ud = ExtendedPciDevice::open(device_id)?;
+
+        let arch = ud.borrow().device.arch;
+
+        let chip = Chip::open(arch, CallbackStorage::new(comms_callback, ud.clone()))?;
+
+        // First let's test basic pcie communication we may be in a hang state so it's
+        // important that we let the detect function know
+
+        // Hack(drosen): Basic init procedure should resolve this
+        let scratch_0 = if chip.get_arch().is_blackhole() {
+            "arc_ss.reset_unit.SCRATCH_0"
+        } else {
+            "ARC_RESET.SCRATCH[0]"
+        };
+        let result = chip.axi_sread32(scratch_0);
+        if let Err(err) = result {
+            // Basic comms have failed... we should output a nice error message on the console
+            failed_chips.push((device_id, chip, err));
+        } else {
+            chips.push(chip);
+        }
+    }
+
+    let mut chips = if std::io::stderr().is_terminal() {
+        detect_chips_options_tui(options, &failed_chips, chips)?
+    } else {
+        detect_chips_options_notui(options, &failed_chips, chips)?
+    };
 
     for (id, chip, err) in failed_chips.into_iter() {
         let mut status = InitStatus::new_unknown();
