@@ -115,7 +115,6 @@ impl Chip {
                 Arch::Grayskull => Box::new(Self::gs_open(arch, backend)?),
                 Arch::Wormhole => Box::new(Self::wh_open(arch, backend)?),
                 Arch::Blackhole => Box::new(Self::bh_open(arch, backend)?),
-                _ => panic!("Unsupported chip"),
             },
         })
     }

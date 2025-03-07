@@ -164,7 +164,6 @@ impl ExtendedPciDevice {
             luwen_core::Arch::Grayskull => (13, 12),
             luwen_core::Arch::Wormhole => (10, 12),
             luwen_core::Arch::Blackhole => (17, 12),
-            luwen_core::Arch::Unknown(id) => unreachable!("Found unrecognizable id {id:x}"),
         };
 
         Ok(ExtendedPciDeviceWrapper {
@@ -180,7 +179,6 @@ impl ExtendedPciDevice {
                 default_tlb: match device.arch {
                     luwen_core::Arch::Grayskull | luwen_core::Arch::Wormhole => 184,
                     luwen_core::Arch::Blackhole => 190,
-                    luwen_core::Arch::Unknown(id) => unreachable!("Found unrecognizable id {id:x}"),
                 },
 
                 device,
@@ -402,7 +400,6 @@ pub fn comms_callback_inner(
                     luwen_core::Arch::Grayskull => (0, 0),
                     luwen_core::Arch::Wormhole => (1, 0),
                     luwen_core::Arch::Blackhole => (0, 1),
-                    luwen_core::Arch::Unknown(_) => todo!(),
                 };
 
                 writer.setup_tlb(
