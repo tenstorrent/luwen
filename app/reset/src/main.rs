@@ -51,7 +51,7 @@ fn main() {
         link_reset(interface);
         if let Ok(device) = ttkmd_if::PciDevice::open(interface) {
             let tracker = match device.arch {
-                luwen_core::Arch::Grayskull => {continue},
+                luwen_core::Arch::Grayskull => continue,
                 luwen_core::Arch::Wormhole => {
                     Box::new(wormhole::ResetTracker::init(interface)) as Box<dyn Reset>
                 }
