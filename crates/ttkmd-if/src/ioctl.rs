@@ -180,6 +180,7 @@ nix::ioctl_readwrite_bad!(
 
 pub const RESET_DEVICE_RESTORE_STATE: u32 = 0;
 pub const RESET_DEVICE_RESET_PCIE_LINK: u32 = 1;
+pub const RESET_DEVICE_RESET_CONFIG_WRITE: u32 = 2;
 
 #[repr(C)]
 pub struct ResetDeviceIn {
