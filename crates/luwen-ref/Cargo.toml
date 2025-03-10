@@ -7,7 +7,7 @@ license = "Apache-2.0"
 
 [dependencies]
 ttkmd-if = {path = "../ttkmd-if", version = "0.2.0"}
-luwen-if = {path = "../luwen-if", version = "0.5.3"}
+luwen-if = {path = "../luwen-if", version = "0.5.4" }
 luwen-core = {path = "../luwen-core", version = "0.2.0"}
 
 thiserror = "1.0.40"

@@ -6,5 +6,5 @@ edition = "2021"
 [dependencies]
 clap = {version = "4.4.14", features = ["derive"]}
 
-luwen-if = {path = "../../crates/luwen-if", version = "0.5.2"}
+luwen-if = {path = "../../crates/luwen-if", version = "0.5.4" }
 luwen-ref = {path = "../../crates/luwen-ref", version = "0.4.0"}
