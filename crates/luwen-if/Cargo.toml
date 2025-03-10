@@ -1,6 +1,6 @@
 [package]
 name = "luwen-if"
-version = "0.5.4"
+version = "0.6.0"
 description = "Generic interface to Tenstorrent ai accelerators, abstracting the details of communication"
 edition = "2021"
 license = "Apache-2.0"

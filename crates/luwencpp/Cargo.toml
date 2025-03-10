@@ -1,6 +1,6 @@
 [package]
 name = "luwencpp"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "C++ bindings for luwen"
@@ -18,7 +18,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 luwen-core = {path = "../luwen-core", version = "0.2.0"}
-luwen-if = {path = "../luwen-if", version = "0.5.4" }
+luwen-if = {path = "../luwen-if", version = "0.6.0" }
 
 [build-dependencies]
 cbindgen = ">= 0.25.0"
