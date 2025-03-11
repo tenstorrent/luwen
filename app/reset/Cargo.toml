@@ -1,13 +1,13 @@
 [package]
 name = "reset"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 [dependencies]
-ttkmd-if = {path = "../../crates/ttkmd-if", version = "0.2.0"}
+ttkmd-if = {path = "../../crates/ttkmd-if", version = "0.2.1" }
 luwen-core = {path = "../../crates/luwen-core", version = "0.2.0"}
 luwen-if = {path = "../../crates/luwen-if", version = "0.6.0"}
-luwen-ref = {path = "../../crates/luwen-ref", version = "0.5.0"}
+luwen-ref = {path = "../../crates/luwen-ref", version = "0.5.1" }
 clap = { version = "4.4.6", features = ["derive"] }
 prometheus_exporter = "0.8.5"
 prometheus = { version = "0.13.3", features = ["process"] }
