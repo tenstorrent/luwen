@@ -216,7 +216,7 @@ impl Blackhole {
 
     pub fn hw_ready(&self) -> bool {
         if let Ok(boot_status_0) = self.axi_read32(self.scratch_ram_base.addr + (4 * 2)) {
-            (boot_status_0 >> 1) == 2
+            ((boot_status_0 >> 1) & 0x3) == 2
         } else {
             false
         }
