@@ -55,6 +55,7 @@ impl Default for ArcMsgOptions {
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct NeighbouringChip {
+    pub routing_enabled: bool,
     pub local_noc_addr: (u8, u8),
     pub remote_noc_addr: (u8, u8),
     pub eth_addr: crate::EthAddr,

@@ -77,6 +77,7 @@ pub fn generate_map(file: impl AsRef<str>) -> Result<(), LuwenError> {
                 local_noc_addr,
                 remote_noc_addr,
                 eth_addr,
+                ..
             } in neighbours
             {
                 let next = wh.open_remote(eth_addr)?;

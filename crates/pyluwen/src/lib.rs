@@ -1308,7 +1308,8 @@ impl PciBlackhole {
     pub fn decode_boot_fs_table(&self, tag_name: &str) -> PyResult<Py<PyDict>> {
         // Deserialize the boot fs table given the tag name and return it as a pydict with the correct types
         Python::with_gil(|py| {
-            let result = self.0
+            let result = self
+                .0
                 .decode_boot_fs_table(tag_name)
                 .map_err(|v| PyException::new_err(v.to_string()))?;
             let py_dict = PyDict::new(py);
@@ -1324,7 +1325,8 @@ impl PciBlackhole {
 
     pub fn get_spirom_table_spi_addr(&self, tag_name: &str) -> PyResult<u32> {
         // Return the spi address given the tagname
-        let result = self.0
+        let result = self
+            .0
             .get_boot_fs_tables_spi_read(tag_name)
             .map_err(|v| PyException::new_err(v.to_string()))?;
         Ok(result.unwrap().1.spi_addr)
@@ -1332,10 +1334,11 @@ impl PciBlackhole {
 
     pub fn get_spirom_table_image_size(&self, tag_name: &str) -> PyResult<u32> {
         // Return the spi image size when given the tagname
-        let result = self.0
+        let result = self
+            .0
             .get_boot_fs_tables_spi_read(tag_name)
             .map_err(|v| PyException::new_err(v.to_string()))?;
-        Ok(unsafe{result.unwrap().1.flags.f.image_size()})
+        Ok(unsafe { result.unwrap().1.flags.f.image_size() })
     }
 }
 
@@ -1596,3 +1599,4 @@ fn serde_json_value_to_pyobject(py: Python, value: &Value) -> PyResult<PyObject>
         }
     }
 }
+

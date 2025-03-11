@@ -366,6 +366,9 @@ pub fn detect_chips<E>(
                     }
 
                     for nchip in wh.get_neighbouring_chips()? {
+                        if !nchip.routing_enabled {
+                            continue;
+                        }
                         to_check.push(nchip);
                     }
                 }
