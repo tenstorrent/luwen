@@ -34,6 +34,8 @@ fn main() {
                     dbg!(bh.get_telemetry().unwrap());
                     dbg!(bh.get_telemetry().unwrap());
 
+                    dbg!(bh.get_telemetry().unwrap().board_serial_number_hex());
+
                     let subsystem = bh.get_if::<luwen_if::chip::NocInterface>()
                         .map(|v| &v.backing)
                         .map(|v| {

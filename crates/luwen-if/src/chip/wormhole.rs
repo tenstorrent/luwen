@@ -851,6 +851,7 @@ impl ChipImpl for Wormhole {
     fn get_neighbouring_chips(&self) -> Result<Vec<NeighbouringChip>, crate::error::PlatformError> {
         const ETH_UNKNOWN: u32 = 0;
         const ETH_UNCONNECTED: u32 = 1;
+        const ETH_DISABLED: u32 = 2;
 
         const SHELF_OFFSET: u64 = 9;
         const RACK_OFFSET: u64 = 10;
@@ -872,7 +873,10 @@ impl ChipImpl for Wormhole {
                 self.eth_addrs.eth_conn_info + (eth_id as u64 * 4),
             )?;
 
-            if port_status == ETH_UNCONNECTED || port_status == ETH_UNKNOWN {
+            if port_status == ETH_UNCONNECTED
+                || port_status == ETH_UNKNOWN
+                || port_status == ETH_DISABLED
+            {
                 continue;
             }
 
