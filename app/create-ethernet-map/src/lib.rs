@@ -77,7 +77,7 @@ pub fn generate_map(file: impl AsRef<str>) -> Result<(), LuwenError> {
                 local_noc_addr,
                 remote_noc_addr,
                 eth_addr,
-                ..
+                routing_enabled
             } in neighbours
             {
                 let next = wh.open_remote(eth_addr)?;
@@ -105,7 +105,7 @@ pub fn generate_map(file: impl AsRef<str>) -> Result<(), LuwenError> {
                 connection_info
                     .entry(next_ident)
                     .or_default()
-                    .push((local_id, remote_id));
+                    .push((local_id, remote_id, routing_enabled));
             }
             connection_map.insert(ident.clone(), connection_info);
 
@@ -178,7 +178,7 @@ pub fn generate_map(file: impl AsRef<str>) -> Result<(), LuwenError> {
     for chip in &ident_order {
         if let Some(connection_info) = connection_map.get(chip) {
             for (remote_chip, connection) in connection_info {
-                for (current_eth_id, next_eth_id) in connection {
+                for (current_eth_id, next_eth_id, routing_enabled) in connection {
                     let local = (chips[chip], current_eth_id);
                     let remote = (chips[remote_chip], next_eth_id);
 
@@ -186,12 +186,13 @@ pub fn generate_map(file: impl AsRef<str>) -> Result<(), LuwenError> {
                     let second = local.max(remote);
 
                     let connection_ident = (first, second);
+                    let larger_connection_ident = (first, second, routing_enabled);
                     if known_connections.contains(&connection_ident) {
                         continue;
                     }
                     known_connections.insert(connection_ident);
 
-                    connections.push(connection_ident);
+                    connections.push(larger_connection_ident);
                 }
             }
         }
@@ -221,8 +222,8 @@ pub fn generate_map(file: impl AsRef<str>) -> Result<(), LuwenError> {
     output.push_str("}\n\n");
 
     output.push_str("ethernet_connections: [\n");
-    for ((local_chip, local_port), (remote_chip, remote_port)) in connections {
-        output.push_str(&format!("   [{{chip: {local_chip}, chan: {local_port}}}, {{chip: {remote_chip}, chan: {remote_port}}}],\n"));
+    for ((local_chip, local_port), (remote_chip, remote_port), routing) in connections {
+        output.push_str(&format!("   [{{chip: {local_chip}, chan: {local_port}}}, {{chip: {remote_chip}, chan: {remote_port}}}, {{routing_enabled: {routing}}}],\n"));
     }
     output.push_str("]\n\n");
 
