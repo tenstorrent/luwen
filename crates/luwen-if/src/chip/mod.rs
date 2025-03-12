@@ -181,8 +181,16 @@ impl Telemetry {
             0xB => "GALAXY",
             0x14 => "n300",
             0x18 => "n150",
+            0x35 => "galaxy-wormhole",
             0x36 => "p100",
-            0x40 => "p150A",
+            0x40 => "p150a",
+            0x41 => "p150b",
+            0x42 => "p150c",
+            0x43 => "p100a",
+            0x44 => "p300b",
+            0x45 => "p300a",
+            0x46 => "p300c",
+            0x47 => "galaxy-blackhole",
             _ => return None,
         };
 
