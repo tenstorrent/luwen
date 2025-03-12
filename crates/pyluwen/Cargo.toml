@@ -1,6 +1,6 @@
 [package]
 name = "pyluwen"
-version = "0.7.0"
+version = "0.7.1"
 description = "Python bindings for luwen"
 edition = "2021"
 license = "Apache-2.0"
@@ -16,3 +16,6 @@ luwen-ref = {path = "../luwen-ref", version = "0.5.1" }
 serde_json = "1.0.117"
 
 pyo3 = { version = "0.19.2", features = ["extension-module", "multiple-pymethods"] }
+
+[package.metadata.workspaces]
+independent = true

@@ -1,6 +1,6 @@
 [package]
 name = "luwen-ref"
-version = "0.5.1"
+version = "0.5.2"
 description = "Reference pci communication implementation"
 edition = "2021"
 license = "Apache-2.0"
@@ -14,3 +14,6 @@ thiserror = "1.0.40"
 
 indicatif = "0.17.7"
 tracing = "0.1.40"
+
+[package.metadata.workspaces]
+independent = true
