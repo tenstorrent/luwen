@@ -324,6 +324,10 @@ pub fn detect_chips<E>(
 
         let mut seen_coords = HashSet::new();
         while let Some(nchip) = to_check.pop() {
+            if !nchip.routing_enabled {
+                continue;
+            }
+
             if !seen_coords.insert(nchip.eth_addr) {
                 continue;
             }

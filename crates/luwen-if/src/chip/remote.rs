@@ -87,6 +87,8 @@ pub struct EthAddresses {
     pub heartbeat: u64,
     pub erisc_app: u64,
     pub erisc_app_config: u64,
+    pub erisc_remote_board_type_offset: u64,
+    pub erisc_local_board_type_offset: u64,
 }
 
 impl EthAddresses {
@@ -103,6 +105,8 @@ impl EthAddresses {
         let heartbeat;
         let erisc_app;
         let erisc_app_config;
+        let erisc_remote_board_type_offset;
+        let erisc_local_board_type_offset;
 
         if masked_version >= 0x050000 {
             boot_params = 0x1000;
@@ -139,6 +143,14 @@ impl EthAddresses {
             erisc_app_config = 0x12000;
         }
 
+        if masked_version >= 0x061100 {
+            erisc_remote_board_type_offset = 77;
+            erisc_local_board_type_offset = 69;
+        } else {
+            erisc_remote_board_type_offset = 72;
+            erisc_local_board_type_offset = 64;
+        }
+
         EthAddresses {
             version,
             masked_version,
@@ -151,6 +163,8 @@ impl EthAddresses {
             heartbeat,
             erisc_app,
             erisc_app_config,
+            erisc_remote_board_type_offset,
+            erisc_local_board_type_offset,
         }
     }
 }
