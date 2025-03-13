@@ -883,16 +883,33 @@ impl ChipImpl for Wormhole {
             // for now we are just ignoreing those routes.
 
             // Get the neighbour's board type
-            let next_board_type = self.noc_read32(0, eth_x, eth_y, 0x1ec0 + (72 * 4))?;
+            let next_board_type = self.noc_read32(
+                0,
+                eth_x,
+                eth_y,
+                0x1ec0 + (self.eth_addrs.erisc_remote_board_type_offset * 4),
+            )?;
 
             // Get the our board type
-            let our_board_type = self.noc_read32(0, eth_x, eth_y, 0x1ec0 + (64 * 4))?;
+            let our_board_type = self.noc_read32(
+                0,
+                eth_x,
+                eth_y,
+                0x1ec0 + (self.eth_addrs.erisc_local_board_type_offset * 4),
+            )?;
+
+            // Check if it's possble to have routing disabled
+            let erisc_routing_disabled = self.noc_read32(
+                0,
+                eth_x,
+                eth_y,
+                self.eth_addrs.boot_params + (19 * 4),
+            )? == 1;
 
             // The board type value will be 0 if galaxy and non-zero if nb
             // It's currently not possible to go from GALAXY->NB
-            if our_board_type == 0 && next_board_type != 0 {
-                continue;
-            }
+            let routing_disabled =
+                (our_board_type == 0 && next_board_type != 0) || (erisc_routing_disabled && port_status == ETH_NO_ROUTING);
 
             // Decode the remote eth_addr for our erisc core
             // This can be used to build a map of the full mesh
@@ -918,7 +935,7 @@ impl ChipImpl for Wormhole {
             let remote_noc_y = (remote_id >> 10) & 0x3F;
 
             output.push(NeighbouringChip {
-                routing_enabled: port_status == ETH_NO_ROUTING,
+                routing_enabled: !routing_disabled,
                 local_noc_addr: (eth_x, eth_y),
                 remote_noc_addr: (remote_noc_x as u8, remote_noc_y as u8),
                 eth_addr: EthAddr {

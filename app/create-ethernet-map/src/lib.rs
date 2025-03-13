@@ -80,6 +80,10 @@ pub fn generate_map(file: impl AsRef<str>) -> Result<(), LuwenError> {
                 routing_enabled
             } in neighbours
             {
+                if !routing_enabled {
+                    continue;
+                }
+
                 let next = wh.open_remote(eth_addr)?;
 
                 let next_ident = ChipIdent {
