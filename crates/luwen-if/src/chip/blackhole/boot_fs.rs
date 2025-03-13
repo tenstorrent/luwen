@@ -1,3 +1,4 @@
+use bytemuck::{Pod, Zeroable};
 use std::fmt;
 use std::mem;
 
@@ -5,7 +6,7 @@ use std::mem;
 const IMAGE_TAG_SIZE: u32 = 8;
 
 #[bitfield_struct::bitfield(u32)] // specify the bitfield size to match the c struct
-#[derive(PartialEq)]
+#[derive(PartialEq, Pod, Zeroable)]
 pub struct FdFlags {
     #[bits(24)] // 24 bits for `image_size`
     pub image_size: u32,
@@ -17,27 +18,8 @@ pub struct FdFlags {
     pub fd_flags_rsvd: u8,
 }
 
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union FdFlagsUnion {
-    pub val: u32,
-    pub f: FdFlags,
-}
-
-impl PartialEq for FdFlagsUnion {
-    fn eq(&self, other: &Self) -> bool {
-        unsafe { self.val == other.val }
-    }
-}
-
-impl fmt::Debug for FdFlagsUnion {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        unsafe { write!(f, "FdFlagsUnion {{ val: {}, f: {:?} }}", self.val, self.f) }
-    }
-}
-
 #[bitfield_struct::bitfield(u32)] // specify the bitfield size to match the c struct
-#[derive(PartialEq)]
+#[derive(PartialEq, Pod, Zeroable)]
 pub struct SecurityFdFlags {
     #[bits(12)]
     pub signature_size: u16,
@@ -49,38 +31,13 @@ pub struct SecurityFdFlags {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
-pub union SecurityFdFlagsUnion {
-    pub val: u32,
-    pub f: std::mem::ManuallyDrop<SecurityFdFlags>,
-}
-
-impl PartialEq for SecurityFdFlagsUnion {
-    fn eq(&self, other: &Self) -> bool {
-        unsafe { self.val == other.val }
-    }
-}
-
-impl fmt::Debug for SecurityFdFlagsUnion {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        unsafe {
-            write!(
-                f,
-                "SecurityFdFlagsUnion {{ val: {}, f: {:?} }}",
-                self.val, self.f
-            )
-        }
-    }
-}
-
-#[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Pod, Zeroable)]
 pub struct TtBootFsFd {
     pub spi_addr: u32,
     pub copy_dest: u32,
-    pub flags: FdFlagsUnion,
+    pub flags: FdFlags,
     pub data_crc: u32,
-    pub security_flags: SecurityFdFlagsUnion,
+    pub security_flags: SecurityFdFlags,
     pub image_tag: [u8; IMAGE_TAG_SIZE as usize],
     pub fd_crc: u32,
 }
@@ -132,7 +89,7 @@ pub fn read_tag(reader: impl Fn(u32, usize) -> Vec<u8>, tag: &str) -> Option<(u3
     let mut curr_addr = 0;
     loop {
         let fd = read_fd(&reader, curr_addr).unwrap();
-        if unsafe { fd.flags.f.invalid() } {
+        if fd.flags.invalid() {
             return None;
         }
         if fd.image_tag_str() == tag {

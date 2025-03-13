@@ -36,7 +36,7 @@ mod tests {
         let (_, fd) = tag_read.unwrap();
         assert_eq!(fd.image_tag_str(), "boardcfg", "Tag name should match");
         assert!(
-            !unsafe { fd.flags.f.invalid() },
+            !fd.flags.invalid(),
             "Tag should not be marked as invalid"
         );
     }
@@ -53,7 +53,7 @@ mod tests {
         let (_, fd) = tag_read.unwrap();
         assert_eq!(fd.image_tag_str(), "flshinfo", "Tag name should match");
         assert!(
-            !unsafe { fd.flags.f.invalid() },
+            !fd.flags.invalid(),
             "Tag should not be marked as invalid"
         );
     }
@@ -70,7 +70,7 @@ mod tests {
         let (_, fd) = tag_read.unwrap();
         assert_eq!(fd.image_tag_str(), "cmfwcfg", "Tag name should match");
         assert!(
-            !unsafe { fd.flags.f.invalid() },
+            !fd.flags.invalid(),
             "Tag should not be marked as invalid"
         );
     }
@@ -90,7 +90,7 @@ mod tests {
         let (_, fd) = tag_read.unwrap();
         assert_eq!(fd.image_tag_str(), "origcfg", "Tag name should match");
         assert!(
-            !unsafe { fd.flags.f.invalid() },
+            !fd.flags.invalid(),
             "Tag should not be marked as invalid"
         );
     }
