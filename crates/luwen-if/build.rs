@@ -11,7 +11,7 @@ fn try_to_compiled_proto_file_by_name(
     protoc_build_config.out_dir(out_dir);
 
     // Add `#[derive(Serialize)]` to all generated messages for easy HashMap conversion
-    protoc_build_config.type_attribute(".", "#[derive(serde::Serialize)]");
+    protoc_build_config.type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]");
 
     if let Some(protoc_path) = protoc_path {
         protoc_build_config.protoc_executable(protoc_path);

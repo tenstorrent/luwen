@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: © 2024 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use bytemuck::bytes_of;
 use num_traits::cast::FromPrimitive;
 
 use std::sync::Arc;
@@ -31,7 +32,6 @@ pub mod spirom_tables;
 pub mod telemetry_tags;
 use crate::chip::blackhole::telemetry_tags::TelemetryTags;
 use prost::Message;
-use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -398,30 +398,6 @@ impl Blackhole {
         ))
     }
 
-    fn remove_padding_proto_bin<'a>(
-        &self,
-        bincode: &'a [u8],
-    ) -> Result<&'a [u8], Box<dyn std::error::Error>> {
-        // The proto bins have to be padded to be a multiple of 4 bytes to fit into the spirom requirements
-        // This means that we have to read the last byte of the bin and remove num + 1 num of bytes
-        // 0: remove 1 byte (0)
-        // 1: remove 2 bytes (0, 1)
-        // 2: remove 3 bytes (0, X, 2)
-        // 3: remove 4 bytes (0, X, X, 3)
-
-        let last_byte = bincode[bincode.len() - 1] as usize;
-        // truncate the last byte and the padding bytes
-        Ok(&bincode[..bincode.len() - last_byte - 1])
-    }
-
-    /// Generic function to convert any serializable type into a HashMap
-    fn to_hash_map<T: Serialize>(&self, value: T) -> HashMap<String, Value> {
-        // Serialize the value to JSON
-        let json_string = serde_json::to_string(&value).unwrap();
-        // Deserialize the JSON into a HashMap
-        serde_json::from_str(&json_string).unwrap()
-    }
-
     pub fn decode_boot_fs_table(
         &self,
         tag_name: &str,
@@ -429,33 +405,103 @@ impl Blackhole {
         // Return the decoded boot fs table as a HashMap
         // Get the spi address and image size of the tag and read the proto bin
         // Decode the proto bin and convert it to a HashMap
-        let table = self
+        let spi_addr = self
             .get_boot_fs_tables_spi_read(tag_name)?
-            .ok_or_else(|| format!("Non-existent tag name: {}", tag_name))?
-            .1;
-        let spi_addr = table.spi_addr;
-        let image_size = unsafe { table.flags.f.image_size() };
+            .unwrap()
+            .1
+            .spi_addr;
+        let image_size = self
+            .get_boot_fs_tables_spi_read(tag_name)?
+            .unwrap()
+            .1
+            .flags
+            .image_size();
+        let boot_fs = self.get_boot_fs_tables_spi_read(tag_name)?.unwrap().1;
+        let boot_fs_bytes = bytes_of(&boot_fs);
+        let boot_fs_bytes = &boot_fs_bytes[..boot_fs_bytes.len() - 4];
+        println!("Boot FS bytes: {:#?}", boot_fs_bytes);
+        let checksum = spirom_tables::calculate_checksum(boot_fs_bytes);
+        println!("Checksum: {:#X}", checksum);
+
         // declare as vec to allow non-const size
         let mut proto_bin = vec![0u8; image_size as usize];
         self.spi_read(spi_addr, &mut proto_bin)?;
         let final_decode_map: HashMap<String, Value>;
         // remove padding
-        proto_bin = self.remove_padding_proto_bin(&proto_bin)?.to_vec();
+        proto_bin = spirom_tables::remove_padding_proto_bin(&proto_bin)?.to_vec();
 
         if tag_name == "cmfwcfg" || tag_name == "origcfg" {
             final_decode_map =
-                self.to_hash_map(spirom_tables::fw_table::FwTable::decode(&*proto_bin)?);
+                spirom_tables::to_hash_map(spirom_tables::fw_table::FwTable::decode(&*proto_bin)?);
         } else if tag_name == "boardcfg" {
-            final_decode_map =
-                self.to_hash_map(spirom_tables::read_only::ReadOnly::decode(&*proto_bin)?);
+            final_decode_map = spirom_tables::to_hash_map(
+                spirom_tables::read_only::ReadOnly::decode(&*proto_bin)?,
+            );
         } else if tag_name == "flshinfo" {
-            final_decode_map = self.to_hash_map(spirom_tables::flash_info::FlashInfoTable::decode(
-                &*proto_bin,
-            )?);
+            final_decode_map = spirom_tables::to_hash_map(
+                spirom_tables::flash_info::FlashInfoTable::decode(&*proto_bin)?,
+            );
         } else {
             return Err(format!("Unsupported tag name: {}", tag_name).into());
         };
         Ok(final_decode_map)
+    }
+
+    // def write_fw_table(eeprom, message):
+    // """Write the message to SPI after padding and calculating checksum"""
+    //     data = check_encode_pad_message(message, False)
+    //     data_chk = calculate_checksum(data)
+    //     fd_in_spi = boot_fs.read_tag(lambda addr, size: eeprom.block_read(addr, size), "cmfwcfg")
+    //     assert fd_in_spi is not None
+
+    //     # In case the protobuf size changed since the initial flash
+    //     fd_in_spi[1].flags.f.image_size = len(data)
+
+    //     fd_in_spi[1].data_crc = data_chk
+    //     fd_in_spi[1].fd_crc = 0
+
+    //     fd_chk = calculate_checksum(bytes(fd_in_spi[1])[:-4])
+    //     fd_in_spi[1].fd_crc = fd_chk
+
+    //     eeprom.smart_write(fd_in_spi[0], bytes(fd_in_spi[1]))
+
+    //     eeprom.smart_write(fd_in_spi[1].spi_addr, data)
+    //     print(f"\033[93mNew value written to SPI!\033[0m")
+    //     return
+
+    pub fn encode_and_write_fw_table(
+        &self,
+        fw_table_message: spirom_tables::fw_table::FwTable,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // Convert the fw table message to a proto bin and write it to the spirom
+        let mut proto_bin = fw_table_message.encode_to_vec();
+        println!("proto_bin: {:#?}", proto_bin);
+        // Pad the proto bin to be a multiple of 4 bytes to fit into the spirom requirements
+        let padding = 4 - (proto_bin.len() % 4);
+        println!("padding: {:#?}", padding);
+        for i in 0..padding {
+            proto_bin.push(i as u8);
+        }
+
+        // // Write the proto bin to the spirom and update the checksums
+        // let mut tag_info = self.get_boot_fs_tables_spi_read("cmfwcfg")?.unwrap();
+        // println!("tag_info before: {:#?}", tag_info);
+
+        // let mut fd_in_spi = tag_info.1;
+        // fd_in_spi.flags.image_size = proto_bin.len() as u32;
+
+        // let data_chk = self.calculate_checksum(&proto_bin);
+        // fd_in_spi.data_crc = data_chk;
+        // fd_in_spi.fd_crc = 0;
+
+        // // let fd_chk = self.calculate_checksum();
+        // fd_in_spi.fd_crc = fd_chk;
+
+        // println!("fd_in_spi after: {:#?}", fd_in_spi);
+        // self.spi_write(tag_info.0, &fd_in_spi.to_bytes())?;
+        // self.spi_write(fd_in_spi.spi_addr, &proto_bin)?;
+
+        Ok(())
     }
 }
 
