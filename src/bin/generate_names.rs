@@ -226,7 +226,7 @@ fn parse_yaml_translation_file(
     for (name, top) in top_level.tops {
         println!("Parsing {name}");
         let defs: MemoryDefs =
-            serde_yaml::from_slice(&std::fs::read(&format!("{path}/{}", top.filename))?)?;
+            serde_yaml::from_slice(&std::fs::read(format!("{path}/{}", top.filename))?)?;
 
         let value = slices.entry(name.clone()).or_insert_with(|| MemorySlice {
             name,
