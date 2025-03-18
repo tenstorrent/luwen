@@ -79,11 +79,11 @@ impl<const N: usize> MessageQueue<N> {
         request: &[u32; N],
         timeout: std::time::Duration,
     ) -> Result<(), PlatformError> {
-        let request_queue_wptr = self.qread32(&chip, index, 0)?;
+        let request_queue_wptr = self.qread32(chip, index, 0)?;
 
         let start_time = std::time::Instant::now();
         loop {
-            let request_queue_rptr = self.qread32(&chip, index, 4)?;
+            let request_queue_rptr = self.qread32(chip, index, 4)?;
 
             // Check if the queue is full
             if request_queue_rptr.abs_diff(request_queue_wptr) % (2 * self.queue_size)
@@ -103,12 +103,12 @@ impl<const N: usize> MessageQueue<N> {
 
         let request_entry_offset =
             self.header_size + (request_queue_wptr % self.queue_size) * N as u32;
-        for i in 0..request.len() {
-            self.qwrite32(&chip, index, request_entry_offset + i as u32, request[i])?;
+        for (i, &item) in request.iter().enumerate() {
+            self.qwrite32(chip, index, request_entry_offset + i as u32, item)?;
         }
 
         let request_queue_wptr = (request_queue_wptr + 1) % (2 * self.queue_size);
-        self.qwrite32(&chip, index, 0, request_queue_wptr)?;
+        self.qwrite32(chip, index, 0, request_queue_wptr)?;
 
         self.trigger_int(chip)?;
 
