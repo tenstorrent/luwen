@@ -99,9 +99,7 @@ fn main() {
                 .unwrap();
             assert_eq!(write_buffer, readback_buffer);
 
-            let mut write_buffer = Vec::new();
-            write_buffer.push(0xad);
-            write_buffer.push(0xde);
+            let write_buffer = vec![0xad, 0xde];
             raw_device
                 .write_block(aligned_addr as u32 + 1, &write_buffer)
                 .unwrap();
@@ -125,9 +123,7 @@ fn main() {
                 .unwrap();
             assert_eq!(write_buffer, readback_buffer);
 
-            let mut write_buffer = Vec::new();
-            write_buffer.push(0xad);
-            write_buffer.push(0xde);
+            let write_buffer = vec![0xad, 0xde];
             raw_device
                 .write_block(aligned_addr as u32 + 3, &write_buffer)
                 .unwrap();
