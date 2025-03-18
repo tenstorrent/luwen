@@ -219,12 +219,10 @@ impl Spi {
         // Write sector lock info
         if simple_spi {
             chip.axi_write32(self.spi_dr, (1 << 6) | (sections as u32) << 2)?;
+        } else if sections < 5 {
+            chip.axi_write32(self.spi_dr, 0x3 << 5 | (sections as u32) << 2)?;
         } else {
-            if sections < 5 {
-                chip.axi_write32(self.spi_dr, 0x3 << 5 | (sections as u32) << 2)?;
-            } else {
-                chip.axi_write32(self.spi_dr, 0x1 << 5 | (sections as u32 - 5) << 2)?;
-            }
+            chip.axi_write32(self.spi_dr, 0x1 << 5 | (sections as u32 - 5) << 2)?;
         }
         chip.axi_write32(self.spi_ser, spi_ser_slave_enable(0))?;
 
