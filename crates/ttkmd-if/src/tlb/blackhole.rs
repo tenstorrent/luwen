@@ -79,7 +79,7 @@ impl From<Tlb> for (Tlb2M, Tlb2MStride) {
 impl From<(Tlb2M, Option<Tlb2MStride>)> for Tlb {
     fn from(value: (Tlb2M, Option<Tlb2MStride>)) -> Self {
         Tlb {
-            local_offset: value.0.local_offset() as u64,
+            local_offset: value.0.local_offset(),
             x_end: value.0.x_end(),
             y_end: value.0.y_end(),
             x_start: value.0.x_start(),
@@ -108,7 +108,7 @@ impl From<(Tlb2M, Option<Tlb2MStride>)> for Tlb {
 impl From<Tlb2M> for Tlb {
     fn from(value: Tlb2M) -> Self {
         Tlb {
-            local_offset: value.local_offset() as u64,
+            local_offset: value.local_offset(),
             x_end: value.x_end(),
             y_end: value.y_end(),
             x_start: value.x_start(),
