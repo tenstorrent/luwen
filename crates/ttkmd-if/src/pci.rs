@@ -493,9 +493,7 @@ impl PciDevice {
                 let read_count = (core::mem::size_of::<u32>() - byte_offset).min(bytes_left);
 
                 let read = read.to_le_bytes();
-                for i in 0..read_count {
-                    dest[offset + i] = read[i];
-                }
+                dest[offset..(read_count + offset)].copy_from_slice(&read[..read_count]);
 
                 offset += read_count
             } else {
