@@ -29,7 +29,7 @@ fn main() {
         );
     }
 
-    if telem_a.tdc < 3 && telem_a.tdc > 200 {
+    if telem_a.tdc < 3 || telem_a.tdc > 200 {
         panic!(
             "\x1b[0;31m[FAIL]\x1b[0m Board tdc reading is outside of the expected range {}",
             telem_a.tdc
