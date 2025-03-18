@@ -26,7 +26,7 @@ fn main() {
                 if let Some(gs) = v.as_gs() {
                     println!(
                         "{:x}",
-                        gs.axi_sread32(format!("ARC_RESET.SCRATCH[0]")).unwrap()
+                        gs.axi_sread32("ARC_RESET.SCRATCH[0]").unwrap()
                     );
                 }
 
@@ -48,7 +48,7 @@ fn main() {
 
                     println!(
                         "{:x}",
-                        bh.axi_sread32(format!("arc_ss.reset_unit.SCRATCH_RAM[0]"))
+                        bh.axi_sread32("arc_ss.reset_unit.SCRATCH_RAM[0]")
                             .unwrap()
                     );
 

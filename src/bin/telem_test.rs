@@ -26,7 +26,7 @@ fn main() {
                 if let Some(gs) = v.as_gs() {
                     println!(
                         "{:x}",
-                        gs.axi_sread32(format!("ARC_RESET.SCRATCH[0]")).unwrap()
+                        gs.axi_sread32("ARC_RESET.SCRATCH[0]").unwrap()
                     );
                 }
 
@@ -36,11 +36,10 @@ fn main() {
 
                     let subsystem = bh.get_if::<luwen_if::chip::NocInterface>()
                         .map(|v| &v.backing)
-                        .map(|v| {
+                        .and_then(|v| {
                             v.as_any()
                                 .downcast_ref::<luwen_if::CallbackStorage<luwen_ref::ExtendedPciDeviceWrapper>>()
                         })
-                        .flatten()
                         .map(|v| v.user_data.borrow().device.physical.subsystem_id)
                         .unwrap();
                     dbg!(subsystem);
