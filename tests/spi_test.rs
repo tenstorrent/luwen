@@ -20,6 +20,7 @@ use luwen_ref::detect_chips;
 ///
 /// The tests will automatically detect if compatible hardware is present;
 /// if hardware is not found, the test will be skipped.
+mod test_utils;
 
 mod tests {
     use super::*;

@@ -18,26 +18,11 @@ use luwen_if::{chip::HlCommsInterface, ChipImpl};
 ///
 /// The tests will automatically detect if compatible hardware is present;
 /// if hardware is not found, the test will be skipped.
+mod test_utils;
 
 mod tests {
     use super::*;
-
-    // Helper function to check if any hardware is available
-    fn hardware_available() -> bool {
-        match luwen_ref::detect_chips_fallible() {
-            Ok(chips) => {
-                if chips.is_empty() {
-                    println!("Test SKIPPED: No devices found");
-                    return false;
-                }
-                true
-            }
-            Err(e) => {
-                println!("Test SKIPPED: Error detecting chips: {}", e);
-                false
-            }
-        }
-    }
+    use test_utils::hardware_available;
 
     #[test]
     #[ignore = "Requires hardware"]
