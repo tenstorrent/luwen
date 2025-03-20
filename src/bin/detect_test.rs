@@ -24,10 +24,7 @@ fn main() {
                 };
 
                 if let Some(gs) = v.as_gs() {
-                    println!(
-                        "{:x}",
-                        gs.axi_sread32("ARC_RESET.SCRATCH[0]").unwrap()
-                    );
+                    println!("{:x}", gs.axi_sread32("ARC_RESET.SCRATCH[0]").unwrap());
                 }
 
                 if let Some(bh) = v.as_bh() {
@@ -48,8 +45,7 @@ fn main() {
 
                     println!(
                         "{:x}",
-                        bh.axi_sread32("arc_ss.reset_unit.SCRATCH_RAM[0]")
-                            .unwrap()
+                        bh.axi_sread32("arc_ss.reset_unit.SCRATCH_RAM[0]").unwrap()
                     );
 
                     /*
