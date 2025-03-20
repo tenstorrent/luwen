@@ -143,7 +143,7 @@ impl EthAddresses {
             erisc_app_config = 0x12000;
         }
 
-        if masked_version >= 0x061100 {
+        if masked_version >= 0x06C000 {
             erisc_remote_board_type_offset = 77;
             erisc_local_board_type_offset = 69;
         } else {
