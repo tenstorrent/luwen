@@ -169,7 +169,7 @@ fn mask_off(existing: &mut [u8], high_bit: u32) -> &mut [u8] {
     }
 
     let len = existing.len();
-    &mut existing[0..(top_byte as usize + 1).min(len)]
+    &mut existing[0..(top_byte + 1).min(len)]
 }
 
 /// Take a value and place it onto the existing value shifting by, `lower` and masking off at `upper`
@@ -186,10 +186,9 @@ fn write_modify(existing: &mut [u8], value: &[u8], lower: u32, upper: u32) {
 
     let mut carry = existing[write_ptr as usize] & ((1 << write_shift) - 1);
     while shift_count > 0 {
-        let to_write =
-            (value.get(read_ptr as usize).map(|v| *v).unwrap_or(0) << write_shift) | carry;
+        let to_write = (value.get(read_ptr as usize).copied().unwrap_or(0) << write_shift) | carry;
         if write_shift > 0 {
-            carry = (value.get(read_ptr as usize).map(|v| *v).unwrap_or(0) >> (8 - write_shift))
+            carry = (value.get(read_ptr as usize).copied().unwrap_or(0) >> (8 - write_shift))
                 & ((1 << write_shift) - 1);
         }
 
@@ -323,7 +322,7 @@ pub trait HlCommsInterface: HlComms {
 
         let addr = arc_if.axi_translate(addr.as_ref())?;
 
-        self.axi_write_field(&addr, &value)
+        self.axi_write_field(&addr, value)
     }
 
     fn axi_swrite32(&self, addr: impl AsRef<str>, value: u32) -> Result<(), PlatformError> {
