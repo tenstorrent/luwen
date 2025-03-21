@@ -2,19 +2,18 @@ use std::fmt;
 use std::mem;
 
 // define constants for boot fs
-const IMAGE_TAG_SIZE : u32 = 8;
-
+const IMAGE_TAG_SIZE: u32 = 8;
 
 #[bitfield_struct::bitfield(u32)] // specify the bitfield size to match the c struct
 #[derive(PartialEq)]
 pub struct FdFlags {
-    #[bits(24)]  // 24 bits for `image_size`
+    #[bits(24)] // 24 bits for `image_size`
     pub image_size: u32,
-    #[bits(1)]   // 1 bit for `invalid`
+    #[bits(1)] // 1 bit for `invalid`
     pub invalid: bool,
-    #[bits(1)]   // 1 bit for `executable`
+    #[bits(1)] // 1 bit for `executable`
     pub executable: bool,
-    #[bits(6)]   // 6 bits for `fd_flags_rsvd`
+    #[bits(6)] // 6 bits for `fd_flags_rsvd`
     pub fd_flags_rsvd: u8,
 }
 
@@ -33,9 +32,7 @@ impl PartialEq for FdFlagsUnion {
 
 impl fmt::Debug for FdFlagsUnion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        unsafe {
-            write!(f, "FdFlagsUnion {{ val: {}, f: {:?} }}", self.val, self.f)
-        }
+        unsafe { write!(f, "FdFlagsUnion {{ val: {}, f: {:?} }}", self.val, self.f) }
     }
 }
 
@@ -67,7 +64,11 @@ impl PartialEq for SecurityFdFlagsUnion {
 impl fmt::Debug for SecurityFdFlagsUnion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         unsafe {
-            write!(f, "SecurityFdFlagsUnion {{ val: {}, f: {:?} }}", self.val, self.f)
+            write!(
+                f,
+                "SecurityFdFlagsUnion {{ val: {}, f: {:?} }}",
+                self.val, self.f
+            )
         }
     }
 }
@@ -86,20 +87,24 @@ pub struct TtBootFsFd {
 
 impl TtBootFsFd {
     pub fn image_tag_str(&self) -> String {
-        let nul_pos = self.image_tag.iter().position(|&c| c == 0).unwrap_or(self.image_tag.len());
+        let nul_pos = self
+            .image_tag
+            .iter()
+            .position(|&c| c == 0)
+            .unwrap_or(self.image_tag.len());
         String::from_utf8_lossy(&self.image_tag[..nul_pos]).to_string()
     }
 }
 
 impl PartialEq for TtBootFsFd {
     fn eq(&self, other: &Self) -> bool {
-        self.spi_addr == other.spi_addr &&
-        self.copy_dest == other.copy_dest &&
-        self.flags == other.flags &&
-        self.data_crc == other.data_crc &&
-        self.security_flags == other.security_flags &&
-        self.image_tag == other.image_tag &&
-        self.fd_crc == other.fd_crc
+        self.spi_addr == other.spi_addr
+            && self.copy_dest == other.copy_dest
+            && self.flags == other.flags
+            && self.data_crc == other.data_crc
+            && self.security_flags == other.security_flags
+            && self.image_tag == other.image_tag
+            && self.fd_crc == other.fd_crc
     }
 }
 
@@ -113,7 +118,11 @@ impl fmt::Debug for TtBootFsFd {
 pub fn read_fd(reader: impl Fn(u32, usize) -> Vec<u8>, addr: u32) -> Option<TtBootFsFd> {
     let fd_bytes = reader(addr, mem::size_of::<TtBootFsFd>());
     if fd_bytes.len() == mem::size_of::<TtBootFsFd>() {
-        Some(unsafe { mem::transmute::<[u8; mem::size_of::<TtBootFsFd>()], TtBootFsFd>(fd_bytes.try_into().unwrap()) })
+        Some(unsafe {
+            mem::transmute::<[u8; mem::size_of::<TtBootFsFd>()], TtBootFsFd>(
+                fd_bytes.try_into().unwrap(),
+            )
+        })
     } else {
         None
     }

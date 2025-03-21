@@ -22,7 +22,10 @@ fn try_to_compiled_proto_file_by_name(
     Ok(())
 }
 
-fn compiled_proto_file_by_name(name: &str, out_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn compiled_proto_file_by_name(
+    name: &str,
+    out_dir: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     let first_try = try_to_compiled_proto_file_by_name(name, None, out_dir);
     match first_try {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {

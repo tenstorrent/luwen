@@ -899,17 +899,13 @@ impl ChipImpl for Wormhole {
             )?;
 
             // Check if it's possble to have routing disabled
-            let erisc_routing_disabled = self.noc_read32(
-                0,
-                eth_x,
-                eth_y,
-                self.eth_addrs.boot_params + (19 * 4),
-            )? == 1;
+            let erisc_routing_disabled =
+                self.noc_read32(0, eth_x, eth_y, self.eth_addrs.boot_params + (19 * 4))? == 1;
 
             // The board type value will be 0 if galaxy and non-zero if nb
             // It's currently not possible to go from GALAXY->NB
-            let routing_disabled =
-                (our_board_type == 0 && next_board_type != 0) || (erisc_routing_disabled && port_status == ETH_NO_ROUTING);
+            let routing_disabled = (our_board_type == 0 && next_board_type != 0)
+                || (erisc_routing_disabled && port_status == ETH_NO_ROUTING);
 
             // Decode the remote eth_addr for our erisc core
             // This can be used to build a map of the full mesh

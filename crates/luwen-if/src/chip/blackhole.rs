@@ -23,17 +23,17 @@ use super::{
     ArcMsgOptions, AxiData, ChipInitResult, CommsStatus, InitStatus, NeighbouringChip,
 };
 
-pub mod message;
 pub mod boot_fs;
+pub mod message;
 pub mod spirom_tables;
 
 #[macro_use]
 pub mod telemetry_tags;
 use crate::chip::blackhole::telemetry_tags::TelemetryTags;
 use prost::Message;
-use std::collections::HashMap;
 use serde::Serialize;
 use serde_json::Value;
+use std::collections::HashMap;
 
 // pub use telemetry_tags::telemetry_tags_to_u32;
 
@@ -383,16 +383,25 @@ impl Blackhole {
         })
     }
 
-    pub fn get_boot_fs_tables_spi_read(&self, tag_name: &str) -> Result <Option<(u32, boot_fs::TtBootFsFd)>, Box<dyn std::error::Error>> {
+    pub fn get_boot_fs_tables_spi_read(
+        &self,
+        tag_name: &str,
+    ) -> Result<Option<(u32, boot_fs::TtBootFsFd)>, Box<dyn std::error::Error>> {
         let reader = |addr: u32, size: usize| {
             let mut buf = vec![0; size];
             self.spi_read(addr, &mut buf).unwrap();
             return buf;
         };
-        return Ok(boot_fs::read_tag(&reader as &dyn Fn(u32, usize) -> Vec<u8>, &tag_name));
+        return Ok(boot_fs::read_tag(
+            &reader as &dyn Fn(u32, usize) -> Vec<u8>,
+            &tag_name,
+        ));
     }
 
-    fn remove_padding_proto_bin<'a>(&self, bincode: &'a [u8]) -> Result<&'a [u8], Box<dyn std::error::Error>> {
+    fn remove_padding_proto_bin<'a>(
+        &self,
+        bincode: &'a [u8],
+    ) -> Result<&'a [u8], Box<dyn std::error::Error>> {
         // The proto bins have to be padded to be a multiple of 4 bytes to fit into the spirom requirements
         // This means that we have to read the last byte of the bin and remove num + 1 num of bytes
         // 0: remove 1 byte (0)
@@ -413,29 +422,44 @@ impl Blackhole {
         serde_json::from_str(&json_string).unwrap()
     }
 
-    pub fn decode_boot_fs_table(&self, tag_name: &str) -> Result<HashMap<String, Value>, Box<dyn std::error::Error>> {
+    pub fn decode_boot_fs_table(
+        &self,
+        tag_name: &str,
+    ) -> Result<HashMap<String, Value>, Box<dyn std::error::Error>> {
         // Return the decoded boot fs table as a HashMap
         // Get the spi address and image size of the tag and read the proto bin
         // Decode the proto bin and convert it to a HashMap
-        let spi_addr = self.get_boot_fs_tables_spi_read(tag_name)?.unwrap().1.spi_addr;
-        let image_size = unsafe { self.get_boot_fs_tables_spi_read(tag_name)?.unwrap().1.flags.f.image_size() };
+        let spi_addr = self
+            .get_boot_fs_tables_spi_read(tag_name)?
+            .unwrap()
+            .1
+            .spi_addr;
+        let image_size = unsafe {
+            self.get_boot_fs_tables_spi_read(tag_name)?
+                .unwrap()
+                .1
+                .flags
+                .f
+                .image_size()
+        };
         // declare as vec to allow non-const size
         let mut proto_bin = vec![0u8; image_size as usize];
         self.spi_read(spi_addr, &mut proto_bin)?;
-        let final_decode_map : HashMap<String, Value>;
+        let final_decode_map: HashMap<String, Value>;
         // remove padding
         proto_bin = self.remove_padding_proto_bin(&proto_bin)?.to_vec();
 
         if tag_name == "cmfwcfg" || tag_name == "origcfg" {
-            final_decode_map = self.to_hash_map(spirom_tables::fw_table::FwTable::decode(&*proto_bin)?);
-        }
-        else if tag_name == "boardcfg" {
-            final_decode_map = self.to_hash_map(spirom_tables::read_only::ReadOnly::decode(&*proto_bin)?);
-        }
-        else if tag_name == "flshinfo" {
-            final_decode_map = self.to_hash_map(spirom_tables::flash_info::FlashInfoTable::decode(&*proto_bin)?);
-        }
-        else {
+            final_decode_map =
+                self.to_hash_map(spirom_tables::fw_table::FwTable::decode(&*proto_bin)?);
+        } else if tag_name == "boardcfg" {
+            final_decode_map =
+                self.to_hash_map(spirom_tables::read_only::ReadOnly::decode(&*proto_bin)?);
+        } else if tag_name == "flshinfo" {
+            final_decode_map = self.to_hash_map(spirom_tables::flash_info::FlashInfoTable::decode(
+                &*proto_bin,
+            )?);
+        } else {
             return Err(format!("Unsupported tag name: {}", tag_name).into());
         };
         Ok(final_decode_map)
@@ -585,7 +609,10 @@ impl ChipImpl for Blackhole {
         // Check if the address is within CSM memory. Otherwise, it must be invalid
         if telem_struct_addr < 0x10000000 || telem_struct_addr > 0x1007FFFF {
             return Err(PlatformError::Generic(
-                format!("Invalid Telemetry struct address: 0x{:08x}", telem_struct_addr),
+                format!(
+                    "Invalid Telemetry struct address: 0x{:08x}",
+                    telem_struct_addr
+                ),
                 BtWrapper::capture(),
             ));
         }

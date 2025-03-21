@@ -77,7 +77,7 @@ pub fn generate_map(file: impl AsRef<str>) -> Result<(), LuwenError> {
                 local_noc_addr,
                 remote_noc_addr,
                 eth_addr,
-                routing_enabled
+                routing_enabled,
             } in neighbours
             {
                 if !routing_enabled {
@@ -106,10 +106,11 @@ pub fn generate_map(file: impl AsRef<str>) -> Result<(), LuwenError> {
                     .position(|v| (v.x, v.y) == remote_noc_addr)
                     .unwrap();
 
-                connection_info
-                    .entry(next_ident)
-                    .or_default()
-                    .push((local_id, remote_id, routing_enabled));
+                connection_info.entry(next_ident).or_default().push((
+                    local_id,
+                    remote_id,
+                    routing_enabled,
+                ));
             }
             connection_map.insert(ident.clone(), connection_info);
 
@@ -268,10 +269,7 @@ pub fn generate_map(file: impl AsRef<str>) -> Result<(), LuwenError> {
     let file = file.as_ref();
 
     if let Err(_err) = std::fs::write(file, output) {
-        Err(LuwenError::Custom(format!(
-            "Failed to write to {}",
-            file
-        )))
+        Err(LuwenError::Custom(format!("Failed to write to {}", file)))
     } else {
         Ok(())
     }
