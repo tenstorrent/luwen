@@ -1,0 +1,145 @@
+name: Rust CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Allow manual triggering
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  check:
+    name: Check
+    strategy:
+        matrix:
+            os: [ubuntu-latest, ubuntu-22.04-arm]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ runner.arch }}-cargo-check-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run cargo check
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --workspace
+
+  test:
+    name: Test Suite
+    strategy:
+        matrix:
+            os: [ubuntu-20.04, ubuntu-22.04, ubuntu-24.04, ubuntu-22.04-arm]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Install required dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-${{ runner.arch }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run cargo test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --no-fail-fast
+
+# Don't upload artifacts yet (since there's no junit file produced)
+#      - name: Archive test results
+#        uses: actions/upload-artifact@v4
+#        if: always()
+#        with:
+#          name: test-results
+#          path: test-results
+#          retention-days: 7
+
+# Disabled since clippy doesn't run clean yet
+#  lints:
+#    name: Lints
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v3
+#
+#      - name: Install Rust toolchain
+#        uses: actions-rs/toolchain@v1
+#        with:
+#          profile: minimal
+#          toolchain: stable
+#          override: true
+#          components: clippy
+#
+#      - name: Install required dependencies
+#        run: |
+#          sudo apt-get update
+#          sudo apt-get install -y protobuf-compiler
+#
+#      - name: Cache Rust dependencies
+#        uses: actions/cache@v3
+#        with:
+#          path: |
+#            ~/.cargo/registry
+#            ~/.cargo/git
+#            target
+#          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
+#
+#      - name: Run cargo clippy
+#        uses: actions-rs/clippy-check@v1
+#        with:
+#          token: ${{ secrets.GITHUB_TOKEN }}
+#          args: --all-targets --all-features -- -D warnings
+
+  formatting:
+    name: Formatting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt
+
+      - name: Run cargo fmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check

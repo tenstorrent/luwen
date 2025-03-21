@@ -429,19 +429,12 @@ impl Blackhole {
         // Return the decoded boot fs table as a HashMap
         // Get the spi address and image size of the tag and read the proto bin
         // Decode the proto bin and convert it to a HashMap
-        let spi_addr = self
+        let table = self
             .get_boot_fs_tables_spi_read(tag_name)?
-            .unwrap()
-            .1
-            .spi_addr;
-        let image_size = unsafe {
-            self.get_boot_fs_tables_spi_read(tag_name)?
-                .unwrap()
-                .1
-                .flags
-                .f
-                .image_size()
-        };
+            .ok_or_else(|| format!("Non-existent tag name: {}", tag_name))?
+            .1;
+        let spi_addr = table.spi_addr;
+        let image_size = unsafe { table.flags.f.image_size() };
         // declare as vec to allow non-const size
         let mut proto_bin = vec![0u8; image_size as usize];
         self.spi_read(spi_addr, &mut proto_bin)?;
