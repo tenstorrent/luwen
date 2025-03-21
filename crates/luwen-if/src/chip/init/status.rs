@@ -82,19 +82,18 @@ pub enum DramChannelStatus {
     CaDebug,
 }
 
-impl ToString for DramChannelStatus {
-    fn to_string(&self) -> String {
+impl std::fmt::Display for DramChannelStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DramChannelStatus::TrainingNone => "in pre-training",
-            DramChannelStatus::TrainingFail => "failed to train",
-            DramChannelStatus::TrainingPass => "passed training",
-            DramChannelStatus::TrainingSkip => "skipped training",
-            DramChannelStatus::PhyOff => "phy is off",
-            DramChannelStatus::ReadEye => "read eye",
-            DramChannelStatus::BistEye => "bist eye",
-            DramChannelStatus::CaDebug => "ca debug",
+            DramChannelStatus::TrainingNone => f.write_str("in pre-training"),
+            DramChannelStatus::TrainingFail => f.write_str("failed to train"),
+            DramChannelStatus::TrainingPass => f.write_str("passed training"),
+            DramChannelStatus::TrainingSkip => f.write_str("skipped training"),
+            DramChannelStatus::PhyOff => f.write_str("phy is off"),
+            DramChannelStatus::ReadEye => f.write_str("read eye"),
+            DramChannelStatus::BistEye => f.write_str("bist eye"),
+            DramChannelStatus::CaDebug => f.write_str("ca debug"),
         }
-        .to_string()
     }
 }
 
