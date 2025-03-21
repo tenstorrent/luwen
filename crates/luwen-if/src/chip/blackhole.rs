@@ -282,7 +282,7 @@ impl Blackhole {
             })
         })?;
 
-        let response = queue.send_message(&self, 2, request, timeout)?;
+        let response = queue.send_message(self, 2, request, timeout)?;
         let status = (response[0] & 0xFF) as u8;
         let rc = (response[0] >> 16) as u16;
 
@@ -390,12 +390,12 @@ impl Blackhole {
         let reader = |addr: u32, size: usize| {
             let mut buf = vec![0; size];
             self.spi_read(addr, &mut buf).unwrap();
-            return buf;
+            buf
         };
-        return Ok(boot_fs::read_tag(
+        Ok(boot_fs::read_tag(
             &reader as &dyn Fn(u32, usize) -> Vec<u8>,
-            &tag_name,
-        ));
+            tag_name,
+        ))
     }
 
     fn remove_padding_proto_bin<'a>(
@@ -600,7 +600,7 @@ impl ChipImpl for Blackhole {
         self.axi_read_field(&self.telemetry_struct_addr, &mut scratch_reg_13_value)?;
         let telem_struct_addr = u32::from_le_bytes(scratch_reg_13_value);
         // Check if the address is within CSM memory. Otherwise, it must be invalid
-        if telem_struct_addr < 0x10000000 || telem_struct_addr > 0x1007FFFF {
+        if !(0x10000000..=0x1007FFFF).contains(&telem_struct_addr) {
             return Err(PlatformError::Generic(
                 format!(
                     "Invalid Telemetry struct address: 0x{:08x}",

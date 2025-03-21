@@ -8,9 +8,9 @@ Description:
 Details:
 - A Prometheus endpoint refers to a URL where Prometheus can scrape metrics.
 - A Prometheus exporter is a service that translates metrics from some source
-and exports them as an endpoint.
+  and exports them as an endpoint.
 - You can test this code by running `curl localhost:8080/metrics` while the
-service is running.  Note that you may need to change the port.
+  service is running.  Note that you may need to change the port.
 
 Limitations:
 - Not tested on Galaxy systems.
@@ -207,7 +207,7 @@ impl Metrics {
         let eth_fw_ver = telemetry.eth_fw_version();
         let board_type = telemetry.board_type();
         self.sw_info
-            .with_label_values(&[&board_id, &fw_date, &arc_fw_ver, &eth_fw_ver, &board_type])
+            .with_label_values(&[&board_id, &fw_date, &arc_fw_ver, &eth_fw_ver, board_type])
             .set(1.0);
 
         set_with_board_id!(&self.aiclk, &board_id, telemetry.ai_clk());
