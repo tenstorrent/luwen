@@ -332,7 +332,7 @@ impl ChipImpl for Grayskull {
                                     PlatformError::AxiError(error) => {
                                         *comms = CommsStatus::CommunicationError(error.to_string());
                                         return Ok(ChipInitResult::ErrorAbort(
-                                            format!("AXI Error: {}", error.to_string()),
+                                            format!("AXI Error: {}", error),
                                             backtrace::Backtrace::capture(),
                                         ));
                                     }
@@ -466,7 +466,7 @@ impl ChipImpl for Grayskull {
                                 }
                                 // This is an "expected error" but we probably can't recover from it, so we should abort the init.
                                 crate::ArcMsgError::AxiError(error) => {
-                                    return Ok(ChipInitResult::ErrorAbort(format!("Telemetry AXI error: {}; we expected to have communication, but lost it.", error.to_string()), backtrace::Backtrace::capture()));
+                                    return Ok(ChipInitResult::ErrorAbort(format!("Telemetry AXI error: {}; we expected to have communication, but lost it.", error), backtrace::Backtrace::capture()));
                                 }
                             }
 
@@ -475,7 +475,7 @@ impl ChipImpl for Grayskull {
                             }
 
                             // This is an "expected error" but we probably can't recover from it, so we should abort the init.
-                            PlatformError::AxiError(error) => return Ok(ChipInitResult::ErrorAbort(format!("Telemetry AXI error: {}; we expected to have communication, but lost it.", error.to_string()), backtrace::Backtrace::capture())),
+                            PlatformError::AxiError(error) => return Ok(ChipInitResult::ErrorAbort(format!("Telemetry AXI error: {}; we expected to have communication, but lost it.", error), backtrace::Backtrace::capture())),
 
 
 
@@ -743,14 +743,12 @@ impl ChipImpl for Grayskull {
             .axi_read32(&self.chip_if, telemetry_struct_offset + (38 * 4))?;
 
         let threshold: u32 = 0x01070000; // arc fw 1.7.0.0
-        let fw_bundle_version: u32;
-        if arc0_fw_version >= threshold {
-            fw_bundle_version = self
-                .arc_if
-                .axi_read32(&self.chip_if, telemetry_struct_offset + (39 * 4))?;
+        let fw_bundle_version: u32 = if arc0_fw_version >= threshold {
+            self.arc_if
+                .axi_read32(&self.chip_if, telemetry_struct_offset + (39 * 4))?
         } else {
-            fw_bundle_version = 0;
-        }
+            0
+        };
         // let board_id_high =
         //     self.arc_if
         //         .axi_read32(&self.chip_if, telemetry_struct_offset + (4 * 4))? as u64;

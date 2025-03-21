@@ -454,7 +454,7 @@ impl ChipImpl for Wormhole {
                                     PlatformError::AxiError(error) => {
                                         *comms = CommsStatus::CommunicationError(error.to_string());
                                         return Ok(ChipInitResult::ErrorAbort(
-                                            format!("ARC AXI error: {}", error.to_string()),
+                                            format!("ARC AXI error: {}", error),
                                             backtrace::Backtrace::capture(),
                                         ));
                                     }
@@ -567,7 +567,7 @@ impl ChipImpl for Wormhole {
                             // This means that ARC hung, we should stop initializing this chip in case
                             // we hit something like a noc hang.
                             PlatformError::ArcMsgError(error) => {
-                                return Ok(ChipInitResult::ErrorContinue(format!("Telemetry ARC message error: {}; we expected to have communication, but lost it.", error.to_string()), backtrace::Backtrace::capture()));
+                                return Ok(ChipInitResult::ErrorContinue(format!("Telemetry ARC message error: {}; we expected to have communication, but lost it.", error), backtrace::Backtrace::capture()));
                             }
 
                             PlatformError::MessageError(error) => {
@@ -1117,14 +1117,12 @@ impl ChipImpl for Wormhole {
             .axi_read32(&self.chip_if, telemetry_struct_offset + (46 * 4))?;
 
         let threshold: u32 = 0x02190000; // arc fw 2.25.0.0
-        let fw_bundle_version: u32;
-        if arc0_fw_version >= threshold {
-            fw_bundle_version = self
-                .arc_if
-                .axi_read32(&self.chip_if, telemetry_struct_offset + (49 * 4))?;
+        let fw_bundle_version: u32 = if arc0_fw_version >= threshold {
+            self.arc_if
+                .axi_read32(&self.chip_if, telemetry_struct_offset + (49 * 4))?
         } else {
-            fw_bundle_version = 0;
-        }
+            0
+        };
 
         Ok(super::Telemetry {
             board_id: ((board_id_high as u64) << 32) | (board_id_low as u64),
