@@ -61,11 +61,6 @@ jobs:
           toolchain: stable
           override: true
 
-      - name: Install required dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y protobuf-compiler
-
       - name: Cache Rust dependencies
         uses: actions/cache@v3
         with:
@@ -89,40 +84,34 @@ jobs:
 #          path: test-results
 #          retention-days: 7
 
-# Disabled since clippy doesn't run clean yet
-#  lints:
-#    name: Lints
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v3
-#
-#      - name: Install Rust toolchain
-#        uses: actions-rs/toolchain@v1
-#        with:
-#          profile: minimal
-#          toolchain: stable
-#          override: true
-#          components: clippy
-#
-#      - name: Install required dependencies
-#        run: |
-#          sudo apt-get update
-#          sudo apt-get install -y protobuf-compiler
-#
-#      - name: Cache Rust dependencies
-#        uses: actions/cache@v3
-#        with:
-#          path: |
-#            ~/.cargo/registry
-#            ~/.cargo/git
-#            target
-#          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
-#
-#      - name: Run cargo clippy
-#        uses: actions-rs/clippy-check@v1
-#        with:
-#          token: ${{ secrets.GITHUB_TOKEN }}
-#          args: --all-targets --all-features -- -D warnings
+  lints:
+    name: Lints
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: clippy
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ runner.arch }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run cargo clippy
+        uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --workspace --all-targets --all-features -- -D warnings
 
   formatting:
     name: Formatting
