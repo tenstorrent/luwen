@@ -131,7 +131,7 @@ pub struct Telemetry {
 impl Telemetry {
     /// Return firmware date in YYYY-MM-DD format.
     pub fn firmware_date(&self) -> String {
-        let year = (self.wh_fw_date >> 28 & 0xF) + 2020;
+        let year = ((self.wh_fw_date >> 28) & 0xF) + 2020;
         let month = (self.wh_fw_date >> 24) & 0xF;
         let day = (self.wh_fw_date >> 16) & 0xFF;
         let _hour = (self.wh_fw_date >> 8) & 0xFF;
@@ -316,7 +316,6 @@ pub trait ChipImpl: HlComms + Send + Sync + 'static {
 /// A wrapper around a chip that implements `ChipImpl`.
 /// This allows us to create and use chips without knowing their type,
 /// but we can still downcast to the concrete type if we need to.
-
 pub struct Chip {
     pub inner: Box<dyn ChipImpl>,
 }
