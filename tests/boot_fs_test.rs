@@ -19,7 +19,6 @@ use luwen_ref::detect_chips;
 ///
 /// The tests will automatically detect if compatible hardware is present;
 /// if hardware is not found, the test will be skipped.
-
 mod tests {
     use super::*;
 
@@ -83,7 +82,7 @@ mod tests {
         let bh = devices[0].as_bh().unwrap();
 
         let tag_read = bh.get_boot_fs_tables_spi_read("origcfg").unwrap();
-        if !tag_read.is_some() {
+        if tag_read.is_none() {
             println!("SKIPPED: No origcfg tag");
             return;
         }
