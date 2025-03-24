@@ -152,7 +152,8 @@ fn left_shift(existing: &mut [u8], shift: u32) {
     if bit_shift > 0 {
         let mut carry = 0;
         for i in (0..existing.len()).rev() {
-            let next_carry = (existing[i] & ((1 << bit_shift) - 1) << (8 - bit_shift)) >> bit_shift;
+            let next_carry =
+                (existing[i] & (((1 << bit_shift) - 1) << (8 - bit_shift))) >> bit_shift;
             existing[i] = (existing[i] << bit_shift) | carry;
             carry = next_carry;
         }

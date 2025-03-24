@@ -687,7 +687,7 @@ impl ChipImpl for Blackhole {
             }
         }
         telemetry_data.board_id =
-            (telemetry_data.board_id_high as u64) << 32 | telemetry_data.board_id_low as u64;
+            ((telemetry_data.board_id_high as u64) << 32) | telemetry_data.board_id_low as u64;
         Ok(telemetry_data)
     }
 
