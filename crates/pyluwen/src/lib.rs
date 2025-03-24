@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+// Allow function definitions inside PyMethod macros that appear outside of modules where they're used
+#![allow(non_local_definitions)]
+
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
