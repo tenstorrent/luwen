@@ -228,7 +228,7 @@ impl ChipDetectOptions {
 ///
 /// Search steps:
 /// 1. Add all given chips to output list removing duplicates this will ensure that if list indexes are used to
-/// assign a chip id pci chips will always be output instead of the remote equivalent.
+///    assign a chip id pci chips will always be output instead of the remote equivalent.
 /// 2. To a depth first search for each root chip, adding all new chips found to the output list.
 ///
 /// When continue on failure is true, we report errors, but continue searching for chips.

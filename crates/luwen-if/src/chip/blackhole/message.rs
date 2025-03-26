@@ -122,11 +122,11 @@ impl<const N: usize> MessageQueue<N> {
         result: &mut [u32; N],
         timeout: std::time::Duration,
     ) -> Result<(), PlatformError> {
-        let response_queue_rptr = self.qread32(&chip, index, 1)?;
+        let response_queue_rptr = self.qread32(chip, index, 1)?;
 
         let start_time = std::time::Instant::now();
         loop {
-            let response_queue_wptr = self.qread32(&chip, index, 5)?;
+            let response_queue_wptr = self.qread32(chip, index, 5)?;
 
             // Break if there is some data in the queue
             if response_queue_wptr != response_queue_rptr {
@@ -144,12 +144,12 @@ impl<const N: usize> MessageQueue<N> {
 
         let response_entry_offset = self.header_size
             + (self.queue_size + (response_queue_rptr % self.queue_size)) * N as u32;
-        for i in 0..result.len() {
-            result[i] = self.qread32(&chip, index, response_entry_offset + i as u32)?;
+        for (i, item) in result.iter_mut().enumerate() {
+            *item = self.qread32(chip, index, response_entry_offset + i as u32)?;
         }
 
         let response_queue_rptr = (response_queue_rptr + 1) % (2 * self.queue_size);
-        self.qwrite32(&chip, index, 1, response_queue_rptr)?;
+        self.qwrite32(chip, index, 1, response_queue_rptr)?;
 
         Ok(())
     }
@@ -171,7 +171,7 @@ impl<const N: usize> MessageQueue<N> {
         self.push_request(chip, index, &request, timeout)?;
         self.pop_response(chip, index, &mut request, timeout)?;
 
-        return Ok(request);
+        Ok(request)
     }
 }
 
@@ -193,10 +193,10 @@ impl<const N: usize> MessageQueue<N> {
         }
 
         Ok(QueueInfo {
-            req_rptr: self.qread32(&chip, index, 4)?,
-            req_wptr: self.qread32(&chip, index, 0)?,
-            resp_rptr: self.qread32(&chip, index, 1)?,
-            resp_wptr: self.qread32(&chip, index, 5)?,
+            req_rptr: self.qread32(chip, index, 4)?,
+            req_wptr: self.qread32(chip, index, 0)?,
+            resp_rptr: self.qread32(chip, index, 1)?,
+            resp_wptr: self.qread32(chip, index, 5)?,
         })
     }
 }

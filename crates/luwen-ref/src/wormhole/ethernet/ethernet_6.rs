@@ -209,7 +209,7 @@ pub fn block_read<D>(
     if fake_it {
         assert_eq!(data.len() % 4, 0);
 
-        let data = unsafe { std::mem::transmute::<_, &mut [u32]>(data) };
+        let data = unsafe { std::mem::transmute::<&mut [u8], &mut [u32]>(data) };
         for d in data {
             *d = eth_read32(
                 user_data,
@@ -388,7 +388,7 @@ pub fn block_write<D>(
     if fake_it {
         assert_eq!(data.len() % 4, 0);
 
-        let data = unsafe { std::mem::transmute::<_, &[u32]>(data) };
+        let data = unsafe { std::mem::transmute::<&[u8], &[u32]>(data) };
         for d in data {
             eth_write32(
                 user_data,

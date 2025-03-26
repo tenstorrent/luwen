@@ -32,7 +32,7 @@ mod tests {
 
         for chip in partial_chips {
             let upgraded_chip = chip.try_upgrade();
-            if let Some(ref upgraded_chip) = upgraded_chip {
+            if let Some(upgraded_chip) = upgraded_chip {
                 // Only test Wormhole chips
                 if let Some(wh) = upgraded_chip.as_wh() {
                     let status = chip.status();
@@ -79,7 +79,7 @@ mod tests {
 
         for chip in partial_chips {
             let upgraded_chip = chip.try_upgrade();
-            if let Some(ref upgraded_chip) = upgraded_chip {
+            if let Some(upgraded_chip) = upgraded_chip {
                 // Only test Grayskull chips
                 if let Some(gs) = upgraded_chip.as_gs() {
                     let status = chip.status();
@@ -121,7 +121,7 @@ mod tests {
 
         for chip in partial_chips {
             let upgraded_chip = chip.try_upgrade();
-            if let Some(ref upgraded_chip) = upgraded_chip {
+            if let Some(upgraded_chip) = upgraded_chip {
                 // Only test Blackhole chips
                 if let Some(bh) = upgraded_chip.as_bh() {
                     let status = chip.status();

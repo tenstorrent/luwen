@@ -37,7 +37,7 @@ pub fn detect_chips_options_notui(
                 eprintln!("Ok I was wrong we actually have {total_chips} chips");
             }
             luwen_if::chip::CallReason::NewChip => {
-                total_chips = total_chips + 1;
+                total_chips += 1;
                 eprintln!("New chip! We now have {total_chips} chips");
             }
             luwen_if::chip::CallReason::InitWait(status) => {

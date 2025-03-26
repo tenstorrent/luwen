@@ -48,7 +48,7 @@ where
         Ok(chips) => {
             let has_type = chips.iter().any(|chip| {
                 if let Some(upgraded) = chip.try_upgrade() {
-                    chip_type_check(&upgraded)
+                    chip_type_check(upgraded)
                 } else {
                     false
                 }

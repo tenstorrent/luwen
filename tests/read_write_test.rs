@@ -19,7 +19,6 @@ use ttkmd_if::PciDevice;
 ///
 /// The tests will automatically detect if compatible hardware is present;
 /// if hardware is not found, the test will be skipped.
-
 mod tests {
     use super::*;
 

@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+// Allow function definitions inside PyMethod macros that appear outside of modules where they're used
+#![allow(non_local_definitions)]
+
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
@@ -581,7 +584,12 @@ impl PciChip {
             Box::new(move |status| {
                 // Safety: This is extremly unsafe, the alternative would be to copy the status for
                 // every invocation.
-                let status = unsafe { std::mem::transmute(status) };
+                let status = unsafe {
+                    std::mem::transmute::<
+                        luwen_if::chip::ChipDetectState<'_>,
+                        luwen_if::chip::ChipDetectState<'_>,
+                    >(status)
+                };
                 if let Err(err) =
                     Python::with_gil(|py| callback.call1(py, (PyChipDetectState(status),)))
                 {
@@ -779,11 +787,10 @@ impl PciInterface<'_> {
     pub fn from_bh(bh: &PciBlackhole) -> Option<PciInterface> {
         bh.0.get_if::<NocInterface>()
             .map(|v| &v.backing)
-            .map(|v| {
+            .and_then(|v| {
                 v.as_any()
                     .downcast_ref::<CallbackStorage<ExtendedPciDeviceWrapper>>()
             })
-            .flatten()
             .map(|v| PciInterface {
                 pci_interface: &v.user_data,
             })
@@ -1471,7 +1478,12 @@ pub fn detect_chips_fallible(
             Box::new(move |status| {
                 // Safety: This is extremly unsafe, the alternative would be to copy the status for
                 // every invocation.
-                let status = unsafe { std::mem::transmute(status) };
+                let status = unsafe {
+                    std::mem::transmute::<
+                        luwen_if::chip::ChipDetectState<'_>,
+                        luwen_if::chip::ChipDetectState<'_>,
+                    >(status)
+                };
                 if let Err(err) =
                     Python::with_gil(|py| callback.call1(py, (PyChipDetectState(status),)))
                 {

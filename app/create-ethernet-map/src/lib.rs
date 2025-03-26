@@ -276,13 +276,19 @@ pub fn generate_map(file: impl AsRef<str>) -> Result<(), LuwenError> {
 }
 
 #[no_mangle]
-pub extern "C" fn create_ethernet_map(file: *const std::ffi::c_char) -> std::ffi::c_int {
+/// Creates an ethernet map and writes it to the specified file.
+///
+/// # Safety
+///
+/// This function expects a valid, null-terminated C string pointer for the `file` parameter.
+/// The caller must ensure that the pointer is valid and properly aligned.
+pub unsafe extern "C" fn create_ethernet_map(file: *const std::ffi::c_char) -> std::ffi::c_int {
     if file.is_null() {
         eprintln!("Error file pointer is NULL!");
         return -2;
     }
 
-    let file = unsafe { std::ffi::CStr::from_ptr(file) };
+    let file = std::ffi::CStr::from_ptr(file);
     if let Err(value) = generate_map(file.to_string_lossy()) {
         eprintln!("Error while generating ethernet map!\n{value}");
         -1

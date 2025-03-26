@@ -282,7 +282,7 @@ impl Blackhole {
             })
         })?;
 
-        let response = queue.send_message(&self, 2, request, timeout)?;
+        let response = queue.send_message(self, 2, request, timeout)?;
         let status = (response[0] & 0xFF) as u8;
         let rc = (response[0] >> 16) as u16;
 
@@ -390,12 +390,12 @@ impl Blackhole {
         let reader = |addr: u32, size: usize| {
             let mut buf = vec![0; size];
             self.spi_read(addr, &mut buf).unwrap();
-            return buf;
+            buf
         };
-        return Ok(boot_fs::read_tag(
+        Ok(boot_fs::read_tag(
             &reader as &dyn Fn(u32, usize) -> Vec<u8>,
-            &tag_name,
-        ));
+            tag_name,
+        ))
     }
 
     fn remove_padding_proto_bin<'a>(
@@ -600,7 +600,7 @@ impl ChipImpl for Blackhole {
         self.axi_read_field(&self.telemetry_struct_addr, &mut scratch_reg_13_value)?;
         let telem_struct_addr = u32::from_le_bytes(scratch_reg_13_value);
         // Check if the address is within CSM memory. Otherwise, it must be invalid
-        if telem_struct_addr < 0x10000000 || telem_struct_addr > 0x1007FFFF {
+        if !(0x10000000..=0x1007FFFF).contains(&telem_struct_addr) {
             return Err(PlatformError::Generic(
                 format!(
                     "Invalid Telemetry struct address: 0x{:08x}",
@@ -654,21 +654,21 @@ impl ChipImpl for Blackhole {
                     TelemetryTags::AsicId => telemetry_data.asic_id = data,
                     TelemetryTags::HarvestingState => telemetry_data.harvesting_state = data,
                     TelemetryTags::UpdateTelemSpeed => telemetry_data.update_telem_speed = data,
-                    TelemetryTags::VCORE => telemetry_data.vcore = data,
-                    TelemetryTags::TDP => telemetry_data.tdp = data,
-                    TelemetryTags::TDC => telemetry_data.tdc = data,
+                    TelemetryTags::Vcore => telemetry_data.vcore = data,
+                    TelemetryTags::Tdp => telemetry_data.tdp = data,
+                    TelemetryTags::Tdc => telemetry_data.tdc = data,
                     TelemetryTags::VddLimits => telemetry_data.vdd_limits = data,
                     TelemetryTags::ThmLimits => telemetry_data.thm_limits = data,
                     TelemetryTags::AsicTemperature => telemetry_data.asic_temperature = data,
                     TelemetryTags::VregTemperature => telemetry_data.vreg_temperature = data,
                     TelemetryTags::BoardTemperature => telemetry_data.board_temperature = data,
-                    TelemetryTags::AICLK => telemetry_data.aiclk = data,
-                    TelemetryTags::AXICLK => telemetry_data.axiclk = data,
-                    TelemetryTags::ARCCLK => telemetry_data.arcclk = data,
-                    TelemetryTags::L2CPUCLK0 => telemetry_data.l2cpuclk0 = data,
-                    TelemetryTags::L2CPUCLK1 => telemetry_data.l2cpuclk1 = data,
-                    TelemetryTags::L2CPUCLK2 => telemetry_data.l2cpuclk2 = data,
-                    TelemetryTags::L2CPUCLK3 => telemetry_data.l2cpuclk3 = data,
+                    TelemetryTags::AiClk => telemetry_data.aiclk = data,
+                    TelemetryTags::AxiClk => telemetry_data.axiclk = data,
+                    TelemetryTags::ArcClk => telemetry_data.arcclk = data,
+                    TelemetryTags::L2CPUClk0 => telemetry_data.l2cpuclk0 = data,
+                    TelemetryTags::L2CPUClk1 => telemetry_data.l2cpuclk1 = data,
+                    TelemetryTags::L2CPUClk2 => telemetry_data.l2cpuclk2 = data,
+                    TelemetryTags::L2CPUClk3 => telemetry_data.l2cpuclk3 = data,
                     TelemetryTags::EthLiveStatus => telemetry_data.eth_status0 = data,
                     TelemetryTags::DdrStatus => telemetry_data.ddr_status = data,
                     TelemetryTags::DdrSpeed => telemetry_data.ddr_speed = Some(data),
@@ -687,7 +687,7 @@ impl ChipImpl for Blackhole {
             }
         }
         telemetry_data.board_id =
-            (telemetry_data.board_id_high as u64) << 32 | telemetry_data.board_id_low as u64;
+            ((telemetry_data.board_id_high as u64) << 32) | telemetry_data.board_id_low as u64;
         Ok(telemetry_data)
     }
 

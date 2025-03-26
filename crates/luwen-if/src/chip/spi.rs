@@ -218,11 +218,11 @@ impl Spi {
 
         // Write sector lock info
         if simple_spi {
-            chip.axi_write32(self.spi_dr, (1 << 6) | (sections as u32) << 2)?;
+            chip.axi_write32(self.spi_dr, (1 << 6) | ((sections as u32) << 2))?;
         } else if sections < 5 {
-            chip.axi_write32(self.spi_dr, 0x3 << 5 | (sections as u32) << 2)?;
+            chip.axi_write32(self.spi_dr, (0x3 << 5) | ((sections as u32) << 2))?;
         } else {
-            chip.axi_write32(self.spi_dr, 0x1 << 5 | (sections as u32 - 5) << 2)?;
+            chip.axi_write32(self.spi_dr, (0x1 << 5) | ((sections as u32 - 5) << 2))?;
         }
         chip.axi_write32(self.spi_ser, spi_ser_slave_enable(0))?;
 
@@ -539,8 +539,7 @@ impl Spi {
             .any(|(a, b)| a != b)
         {
             let sector_start = addr / SECTOR_SIZE;
-            let num_sectors =
-                (addr + data.len() as u32 + SECTOR_SIZE - 1) / SECTOR_SIZE - sector_start;
+            let num_sectors = (addr + data.len() as u32).div_ceil(SECTOR_SIZE) - sector_start;
 
             existing.resize((num_sectors * SECTOR_SIZE) as usize, 0);
             self.read(chip, sector_start * SECTOR_SIZE, &mut existing)?;
@@ -622,8 +621,7 @@ impl ActiveSpi {
         }
 
         let start_addr = (addr / ARC_SPI_CHUNK_SIZE) * ARC_SPI_CHUNK_SIZE; // round down
-        let end_addr =
-            ((addr + size + ARC_SPI_CHUNK_SIZE - 1) / ARC_SPI_CHUNK_SIZE) * ARC_SPI_CHUNK_SIZE;
+        let end_addr = (addr + size).div_ceil(ARC_SPI_CHUNK_SIZE) * ARC_SPI_CHUNK_SIZE;
         let num_chunks = (end_addr - start_addr) / ARC_SPI_CHUNK_SIZE;
         let start_offset = addr - start_addr;
 
