@@ -13,6 +13,7 @@ mod spi;
 mod wormhole;
 
 pub use blackhole::{message::MessageError, Blackhole};
+pub use blackhole::spirom_tables; // Added for proto file write unit testing
 pub use communication::chip_comms::{
     axi_translate, ArcIf, AxiData, AxiError, ChipComms, MemorySlice, MemorySlices,
 };

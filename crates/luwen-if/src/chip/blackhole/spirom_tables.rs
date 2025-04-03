@@ -52,11 +52,8 @@ pub fn from_hash_map<T: DeserializeOwned>(map: HashMap<String, Value>) -> T {
 
 pub fn calculate_checksum(data: &[u8]) -> u32 {
     let mut calculate_checksum: u32 = 0;
-    println!("data.len(): {}", data.len());
     for i in (0..data.len()).step_by(4) {
-        println!("i: {}", i);
         let value = u32::from_le_bytes(data[i..i + 4].try_into().unwrap());
-        println!("value: 0x{:08x}", value);
         // Do a wrapping add to prevent overflow
         calculate_checksum = calculate_checksum.wrapping_add(value);
     }

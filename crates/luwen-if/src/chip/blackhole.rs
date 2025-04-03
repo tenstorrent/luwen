@@ -419,9 +419,7 @@ impl Blackhole {
         let boot_fs = self.get_boot_fs_tables_spi_read(tag_name)?.unwrap().1;
         let boot_fs_bytes = bytes_of(&boot_fs);
         let boot_fs_bytes = &boot_fs_bytes[..boot_fs_bytes.len() - 4];
-        println!("Boot FS bytes: {:#?}", boot_fs_bytes);
         let checksum = spirom_tables::calculate_checksum(boot_fs_bytes);
-        println!("Checksum: {:#X}", checksum);
 
         // declare as vec to allow non-const size
         let mut proto_bin = vec![0u8; image_size as usize];
@@ -447,59 +445,38 @@ impl Blackhole {
         Ok(final_decode_map)
     }
 
-    // def write_fw_table(eeprom, message):
-    // """Write the message to SPI after padding and calculating checksum"""
-    //     data = check_encode_pad_message(message, False)
-    //     data_chk = calculate_checksum(data)
-    //     fd_in_spi = boot_fs.read_tag(lambda addr, size: eeprom.block_read(addr, size), "cmfwcfg")
-    //     assert fd_in_spi is not None
-
-    //     # In case the protobuf size changed since the initial flash
-    //     fd_in_spi[1].flags.f.image_size = len(data)
-
-    //     fd_in_spi[1].data_crc = data_chk
-    //     fd_in_spi[1].fd_crc = 0
-
-    //     fd_chk = calculate_checksum(bytes(fd_in_spi[1])[:-4])
-    //     fd_in_spi[1].fd_crc = fd_chk
-
-    //     eeprom.smart_write(fd_in_spi[0], bytes(fd_in_spi[1]))
-
-    //     eeprom.smart_write(fd_in_spi[1].spi_addr, data)
-    //     print(f"\033[93mNew value written to SPI!\033[0m")
-    //     return
-
-    pub fn encode_and_write_fw_table(
+    pub fn encode_and_write_boot_fs_table<T: prost::Message>(
         &self,
-        fw_table_message: spirom_tables::fw_table::FwTable,
+        message: T,
+        tag_name: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        // Convert the fw table message to a proto bin and write it to the spirom
-        let mut proto_bin = fw_table_message.encode_to_vec();
-        println!("proto_bin: {:#?}", proto_bin);
+        // Encode the message to a proto bin
+        let mut proto_bin = message.encode_to_vec();
         // Pad the proto bin to be a multiple of 4 bytes to fit into the spirom requirements
         let padding = 4 - (proto_bin.len() % 4);
-        println!("padding: {:#?}", padding);
         for i in 0..padding {
             proto_bin.push(i as u8);
         }
 
-        // // Write the proto bin to the spirom and update the checksums
-        // let mut tag_info = self.get_boot_fs_tables_spi_read("cmfwcfg")?.unwrap();
-        // println!("tag_info before: {:#?}", tag_info);
+        // Write the proto bin to the spirom and update the checksums
+        let tag_info = self.get_boot_fs_tables_spi_read(tag_name)?.unwrap();
 
-        // let mut fd_in_spi = tag_info.1;
-        // fd_in_spi.flags.image_size = proto_bin.len() as u32;
+        let mut fd_in_spi = tag_info.1;
+        fd_in_spi.flags.set_image_size(proto_bin.len() as u32);
 
-        // let data_chk = self.calculate_checksum(&proto_bin);
-        // fd_in_spi.data_crc = data_chk;
-        // fd_in_spi.fd_crc = 0;
+        let data_chk = spirom_tables::calculate_checksum(&proto_bin);
+        fd_in_spi.data_crc = data_chk;
+        fd_in_spi.fd_crc = 0;
 
-        // // let fd_chk = self.calculate_checksum();
-        // fd_in_spi.fd_crc = fd_chk;
+        // do length -4 because of a bug in checksum calculation in bootrom
+        let fd_chk = {
+            let fd_bytes = bytes_of(&fd_in_spi);
+            spirom_tables::calculate_checksum(&fd_bytes[..fd_bytes.len() - 4])
+        };
+        fd_in_spi.fd_crc = fd_chk;
 
-        // println!("fd_in_spi after: {:#?}", fd_in_spi);
-        // self.spi_write(tag_info.0, &fd_in_spi.to_bytes())?;
-        // self.spi_write(fd_in_spi.spi_addr, &proto_bin)?;
+        self.spi_write(tag_info.0, bytes_of(&fd_in_spi))?;
+        self.spi_write(fd_in_spi.spi_addr, &proto_bin)?;
 
         Ok(())
     }
