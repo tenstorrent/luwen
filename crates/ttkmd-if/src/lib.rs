@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{
+    fs::File,
     os::{
         fd::{AsRawFd, RawFd},
-        unix::prelude::FileTypeExt,
+        unix::fs::FileTypeExt,
     },
     sync::Arc,
 };
@@ -502,12 +503,30 @@ impl PciDevice {
         let mut output = output
             .filter_map(|entry| {
                 let entry = entry.ok()?;
+                let path = entry.path();
 
                 if !entry.file_type().ok()?.is_char_device() {
-                    return None;
+                    /* return None; // <-- original code
+                     *
+                     * Workaround for the bug originally reported as
+                     * https://github.com/tenstorrent/tt-metal/issues/18506
+                     *
+                     * In a rootless podman container, read_dir claims the device is not a char
+                     * device, and opening the device fails. Checking the file object directly
+                     * behaves as expected.
+                     */
+                    tracing::debug!("{:?} is not a char device! (reported by read_dir)", entry.path());
+                    println!("rust read_dir reports {:?} is not a char device, checking the file directly",
+                             entry.path());
+                    let file = File::open(&path).ok()?;
+                    let metadata = file.metadata().ok()?;
+                    if !metadata.file_type().is_char_device() {
+                        tracing::debug!("{:?} is not a char device! (reported by file object)", 
+                                        entry.path());
+                        return None;
+                    }
                 }
 
-                let path = entry.path();
                 let file_name = path.file_name()?.to_str()?;
                 file_name.parse::<usize>().ok()
             })
