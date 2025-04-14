@@ -9,8 +9,8 @@ use std::str::FromStr;
 
 use luwen_core::Arch;
 use luwen_if::chip::{
-    wait_for_init, ArcMsg, ArcMsgOk, ArcMsgOptions, ChipImpl, HlComms, HlCommsInterface, InitError,
-    NocInterface,
+    ubb_wait_for_driver_load, wait_for_init, wh_ubb_ipmi_reset, ArcMsg, ArcMsgOk, ArcMsgOptions,
+    ChipImpl, HlComms, HlCommsInterface, InitError, NocInterface,
 };
 use luwen_if::{CallbackStorage, ChipDetectOptions, DeviceInfo, UninitChip};
 use luwen_ref::{DmaConfig, ExtendedPciDeviceWrapper};
@@ -1553,6 +1553,22 @@ pub fn pci_scan() -> Vec<usize> {
     luwen_ref::PciDevice::scan()
 }
 
+#[pyfunction]
+pub fn run_wh_ubb_ipmi_reset(
+    ubb_num: String,
+    dev_num: String,
+    op_mode: String,
+    reset_time: String,
+) -> PyResult<()> {
+    wh_ubb_ipmi_reset(&ubb_num, &dev_num, &op_mode, &reset_time)
+        .map_err(|v| PyException::new_err(v.to_string()))
+}
+
+#[pyfunction]
+pub fn run_ubb_wait_for_driver_load() {
+    ubb_wait_for_driver_load()
+}
+
 #[pymodule]
 fn pyluwen(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PciChip>()?;
@@ -1569,6 +1585,8 @@ fn pyluwen(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(detect_chips))?;
     m.add_wrapped(wrap_pyfunction!(detect_chips_fallible))?;
     m.add_wrapped(wrap_pyfunction!(pci_scan))?;
+    m.add_wrapped(wrap_pyfunction!(run_wh_ubb_ipmi_reset))?;
+    m.add_wrapped(wrap_pyfunction!(run_ubb_wait_for_driver_load))?;
 
     Ok(())
 }
