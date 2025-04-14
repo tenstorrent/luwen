@@ -416,10 +416,6 @@ impl Blackhole {
             .1
             .flags
             .image_size();
-        let boot_fs = self.get_boot_fs_tables_spi_read(tag_name)?.unwrap().1;
-        let boot_fs_bytes = bytes_of(&boot_fs);
-        let boot_fs_bytes = &boot_fs_bytes[..boot_fs_bytes.len() - 4];
-        let checksum = spirom_tables::calculate_checksum(boot_fs_bytes);
 
         // declare as vec to allow non-const size
         let mut proto_bin = vec![0u8; image_size as usize];
