@@ -287,7 +287,7 @@ fn parse_yaml_translation_file(
                             println!("WARNING: while parsing {field_name} found non zero field info[0] {mask}");
                         }
 
-                        let size = ((upper_bits + 1 + 7) / 8) as u64;
+                        let size = (upper_bits + 1).div_ceil(8) as u64;
 
                         slice.children.insert(
                             field_name.clone(),
@@ -312,7 +312,7 @@ fn parse_yaml_translation_file(
                             println!("WARNING: while parsing {field_name} found non zero field info[0] {mask}");
                         }
 
-                        let size = ((upper_bits + 1 + 7) / 8) as u64;
+                        let size = (upper_bits + 1).div_ceil(8) as u64;
 
                         slice.children.insert(
                             field_name.clone(),
@@ -540,7 +540,7 @@ fn parse_json_translation_file(
                 lower_bits,
                 description: _,
             } => {
-                let size = ((upper_bits + 1 + 7) / 8) as u64;
+                let size = (upper_bits + 1).div_ceil(8) as u64;
                 MemorySlice {
                     name: name.to_string(),
                     offset: 0,
