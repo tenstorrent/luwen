@@ -236,18 +236,18 @@ impl ChipDetectOptions {
 /// decide for themselves if they want to upgrade the chip to a full Chip.
 /// Error Cases:
 /// 1. ARC fw is hung, this usually means that there is a noc hang as well.
-///     a. Not catastrophic, we can recover from the hang by resetting the chip.
+///    a. Not catastrophic, we can recover from the hang by resetting the chip.
 /// 2. DRAM is not trained
-///     a. Not catastrophic, but we should not pass this over as a good chip as we may get a noc hang when accessing DRAM.
+///    a. Not catastrophic, but we should not pass this over as a good chip as we may get a noc hang when accessing DRAM.
 /// 3. ARC did not complete initialization
-///     a. Not catastrophic, but for gs we will have no thermal control.
+///    a. Not catastrophic, but for gs we will have no thermal control.
 /// 3. Ethernet fw is corrupted, we check this by looking for a known fw version.
-///     a. Not catastrophic, we need to report this, but can continue exploring other chips in the mesh.
+///    a. Not catastrophic, we need to report this, but can continue exploring other chips in the mesh.
 /// 4. Ethernet fw is hung, this usually means that the ethernet is in a bad state.
-///     a. Not catastrophic, we need to report this, but can continue exploring other chips in the mesh.
+///    a. Not catastrophic, we need to report this, but can continue exploring other chips in the mesh.
 /// 5. 0xffffffff error, this means that the underlying transport is hung.
-///     a. This is catastrophic, we cannot continue searching for chips, because some of the chips in the mesh may no longer be accesible
-///     b. We could recover from this by rerunning the search, but this is not implemented.
+///    a. This is catastrophic, we cannot continue searching for chips, because some of the chips in the mesh may no longer be accesible
+///    b. We could recover from this by rerunning the search, but this is not implemented.
 pub fn detect_chips<E>(
     mut root_chips: Vec<Chip>,
     init_callback: &mut impl FnMut(crate::chip::ChipDetectState) -> Result<(), E>,
