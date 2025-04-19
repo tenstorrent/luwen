@@ -402,7 +402,7 @@ impl fmt::Display for InitStatus {
                     completed_count += 1;
                 }
             }
-            if status.wait_status.len() > 0 {
+            if !status.wait_status.is_empty() {
                 init_status.push_str(
                     format!(
                         ", {} out of {} initialized",

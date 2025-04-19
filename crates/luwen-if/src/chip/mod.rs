@@ -10,6 +10,7 @@ mod hl_comms;
 mod init;
 mod remote;
 mod spi;
+pub mod wh_ubb;
 mod wormhole;
 
 pub use blackhole::{message::MessageError, Blackhole};
@@ -30,6 +31,7 @@ pub use wormhole::Wormhole;
 use crate::arc_msg::TypedArcMsg;
 pub use crate::arc_msg::{ArcMsg, ArcMsgOk};
 use crate::{arc_msg::ArcMsgAddr, error::PlatformError, DeviceInfo};
+pub use wh_ubb::{ubb_wait_for_driver_load, wh_ubb_ipmi_reset};
 
 /// Arc message interface
 #[derive(Debug)]
