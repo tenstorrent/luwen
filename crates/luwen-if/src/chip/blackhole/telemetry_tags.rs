@@ -36,4 +36,5 @@ pub enum TelemetryTags {
     FanSpeed = 31,
     TimerHeartbeat = 32,
     TelemEnumCount = 33,
+    AsicLocation = 51,
 }

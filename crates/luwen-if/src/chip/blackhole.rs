@@ -681,6 +681,7 @@ impl ChipImpl for Blackhole {
                     TelemetryTags::L2cpuFwVersion => telemetry_data.l2cpu_fw_version = data,
                     TelemetryTags::FanSpeed => telemetry_data.fan_speed = data,
                     TelemetryTags::TimerHeartbeat => telemetry_data.timer_heartbeat = data,
+                    TelemetryTags::AsicLocation => telemetry_data.asic_location = Some(data),
                     TelemetryTags::TelemEnumCount => telemetry_data.entry_count = data,
                     _ => (),
                 }

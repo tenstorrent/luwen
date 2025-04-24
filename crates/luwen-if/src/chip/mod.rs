@@ -128,6 +128,7 @@ pub struct Telemetry {
     pub tt_flash_version: u32,
     pub fw_bundle_version: u32,
     pub timer_heartbeat: u32,
+    pub asic_location: Option<u32>,
 }
 
 impl Telemetry {
