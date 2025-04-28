@@ -682,6 +682,11 @@ impl ChipImpl for Blackhole {
                     TelemetryTags::FanSpeed => telemetry_data.fan_speed = data,
                     TelemetryTags::TimerHeartbeat => telemetry_data.timer_heartbeat = data,
                     TelemetryTags::TelemEnumCount => telemetry_data.entry_count = data,
+                    TelemetryTags::EnabledTensixCol => telemetry_data.tensix_enabled_col = data,
+                    TelemetryTags::EnabledEth => telemetry_data.enabled_eth = data,
+                    TelemetryTags::EnabledGddr => telemetry_data.enabled_gddr = data,
+                    TelemetryTags::EnabledL2Cpu => telemetry_data.enabled_l2cpu = data,
+                    TelemetryTags::PcieUsage => telemetry_data.enabled_pcie = data,
                     _ => (),
                 }
             }

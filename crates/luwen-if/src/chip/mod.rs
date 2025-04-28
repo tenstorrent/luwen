@@ -128,6 +128,11 @@ pub struct Telemetry {
     pub tt_flash_version: u32,
     pub fw_bundle_version: u32,
     pub timer_heartbeat: u32,
+    pub tensix_enabled_col: u32,
+    pub enabled_eth: u32,
+    pub enabled_gddr: u32,
+    pub enabled_l2cpu: u32,
+    pub enabled_pcie: u32,
 }
 
 impl Telemetry {
