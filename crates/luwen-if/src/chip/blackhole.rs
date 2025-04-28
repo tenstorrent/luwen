@@ -223,10 +223,8 @@ impl Blackhole {
     }
 
     pub fn check_arc_msg_safe(&self) -> bool {
-        if !self.hw_ready() {
-            return false;
-        }
-
+        // Note that hw_ready can be false while we can safely send an arc_msg
+        // This confuses me a bit because this means you can send arc messages that will potentially poke an uninitialized hw
         if let Ok(boot_status_0) = self.axi_read32(self.scratch_ram_base.addr + (4 * 2)) {
             (boot_status_0 & 0x1) == 1
         } else {
