@@ -36,4 +36,9 @@ pub enum TelemetryTags {
     FanSpeed = 31,
     TimerHeartbeat = 32,
     TelemEnumCount = 33,
+    EnabledTensixCol = 34,
+    EnabledEth = 35,
+    EnabledGddr = 36,
+    EnabledL2Cpu = 37,
+    PcieUsage = 38,
 }
