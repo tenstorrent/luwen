@@ -35,6 +35,8 @@ pub enum ArcReadyError {
     WatchdogTriggered,
     #[error("ARC FW has not yet booted")]
     BootIncomplete,
+    #[error("ARC FW encountered an error during boot")]
+    BootError,
     #[error("ARC is asleep")]
     Asleep,
     #[error("there is an outstanding PCIE DMA request")]
