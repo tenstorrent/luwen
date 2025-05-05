@@ -5,13 +5,13 @@ const TENSTORRENT_IOCTL_MAGIC: usize = 0xFA;
 
 use nix::request_code_none;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 #[repr(C)]
 pub struct GetDeviceInfoIn {
     pub output_size_bytes: u32,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 #[repr(C)]
 pub struct GetDeviceInfoOut {
     pub output_size_bytes: u32,
@@ -24,7 +24,7 @@ pub struct GetDeviceInfoOut {
     pub pci_domain: u16,            // Since 1.23
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 #[repr(C)]
 pub struct GetDeviceInfo {
     pub input: GetDeviceInfoIn,
@@ -215,4 +215,100 @@ nix::ioctl_readwrite_bad!(
     reset_device,
     request_code_none!(TENSTORRENT_IOCTL_MAGIC, 6),
     ResetDevice
+);
+
+#[derive(Default)]
+#[repr(C)]
+pub struct AllocateTlbIn {
+    pub size: u64,
+    pub reserved: u64,
+}
+
+#[derive(Default)]
+#[repr(C)]
+pub struct AllocateTlbOut {
+    pub id: u32,
+    pub reserved0: u32,
+    pub mmap_offset_uc: u64,
+    pub mmap_offset_wc: u64,
+    pub reserved1: u64,
+}
+
+#[derive(Default)]
+#[repr(C)]
+pub struct AllocateTlb {
+    pub input: AllocateTlbIn,
+    pub output: AllocateTlbOut,
+}
+
+nix::ioctl_readwrite_bad!(
+    allocate_tlb,
+    request_code_none!(TENSTORRENT_IOCTL_MAGIC, 11),
+    AllocateTlb
+);
+
+#[derive(Default)]
+#[repr(C)]
+pub struct FreeTlbIn {
+    pub id: u32,
+}
+
+#[derive(Default)]
+#[repr(C)]
+pub struct FreeTlbOut {}
+
+#[derive(Default)]
+#[repr(C)]
+pub struct FreeTlb {
+    pub input: FreeTlbIn,
+    pub output: FreeTlbOut,
+}
+
+nix::ioctl_readwrite_bad!(
+    free_tlb,
+    request_code_none!(TENSTORRENT_IOCTL_MAGIC, 12),
+    FreeTlb
+);
+
+#[derive(Default)]
+#[repr(C)]
+pub struct NocTlbConfig {
+    pub addr: u64,
+    pub x_end: u16,
+    pub y_end: u16,
+    pub x_start: u16,
+    pub y_start: u16,
+    pub noc: u8,
+    pub mcast: u8,
+    pub ordering: u8,
+    pub linked: u8,
+    pub static_vc: u8,
+    pub reserved0: [u8; 3],
+    pub reserved1: [u8; 2],
+}
+
+#[derive(Default)]
+#[repr(C)]
+pub struct ConfigureTlbIn {
+    pub id: u32,
+    pub config: NocTlbConfig,
+}
+
+#[derive(Default)]
+#[repr(C)]
+pub struct ConfigureTlbOut {
+    pub reserved: u64,
+}
+
+#[derive(Default)]
+#[repr(C)]
+pub struct ConfigureTlb {
+    pub input: ConfigureTlbIn,
+    pub output: ConfigureTlbOut,
+}
+
+nix::ioctl_readwrite_bad!(
+    configure_tlb,
+    request_code_none!(TENSTORRENT_IOCTL_MAGIC, 13),
+    ConfigureTlb
 );

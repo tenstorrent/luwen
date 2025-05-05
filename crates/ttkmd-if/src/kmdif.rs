@@ -36,6 +36,7 @@ impl MappingId {
     }
 
     pub fn as_u32(&self) -> u32 {
+        // SAFTEY: Need to ensure that the enum has a primitive representation for this to be defined
         unsafe { *(self as *const Self as *const u32) }
     }
 }

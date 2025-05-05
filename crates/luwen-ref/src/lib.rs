@@ -7,8 +7,9 @@ use std::{
 };
 
 use error::LuwenError;
+use luwen_core::Arch;
 use luwen_if::{FnDriver, FnOptions};
-use ttkmd_if::PciError;
+use ttkmd_if::{PciError, PossibleTlbAllocation};
 
 mod detect;
 pub mod error;
@@ -46,126 +47,65 @@ pub struct ExtendedPciDevice {
     pub command_q_addr: u32,
     pub fake_block: bool,
 
-    pub default_tlb: u32,
+    pub default_tlb: PossibleTlbAllocation,
 
     pub ethernet_dma_buffer: HashMap<(u8, u8), DmaBuffer>,
 }
 
 impl ExtendedPciDevice {
-    pub fn setup_tlb(&mut self, index: u32, tlb: Tlb) -> Result<(u64, u64), PciError> {
-        ttkmd_if::tlb::setup_tlb(&mut self.device, index, tlb)
-    }
-
-    pub fn get_tlb(&self, index: u32) -> Result<Tlb, PciError> {
-        ttkmd_if::tlb::get_tlb(&self.device, index)
-    }
-
-    pub fn noc_write(&mut self, tlb_index: u32, addr: u64, data: &[u8]) -> Result<(), PciError> {
-        let mut written = 0;
-
-        let mut starting_tlb = self.get_tlb(tlb_index)?;
-
-        let len = data.len() as u64;
-
-        while written < len {
-            starting_tlb.local_offset = addr + written;
-            let (bar_addr, slice_len) = self.setup_tlb(tlb_index, starting_tlb.clone())?;
-
-            let to_write = std::cmp::min(slice_len, len.saturating_sub(written));
-            self.write_block(
-                bar_addr as u32,
-                &data[written as usize..(written as usize + to_write as usize)],
-            )?;
-
-            written += to_write;
-        }
-
-        Ok(())
-    }
-
-    pub fn noc_read(&mut self, tlb_index: u32, addr: u64, data: &mut [u8]) -> Result<(), PciError> {
-        let mut read = 0;
-
-        let mut starting_tlb = self.get_tlb(tlb_index)?;
-
-        let len = data.len() as u64;
-
-        while read < len {
-            starting_tlb.local_offset = addr + read;
-            let (bar_addr, slice_len) = self.setup_tlb(tlb_index, starting_tlb.clone())?;
-
-            let to_read = std::cmp::min(slice_len, len.saturating_sub(read));
-            self.read_block(
-                bar_addr as u32,
-                &mut data[read as usize..(read as usize + to_read as usize)],
-            )?;
-
-            read += to_read;
-        }
-
-        Ok(())
-    }
-
-    pub fn noc_write32(
-        &mut self,
-        tlb_index: u32,
-        noc_id: u8,
-        x: u8,
-        y: u8,
-        addr: u64,
-        data: u32,
-    ) -> Result<(), PciError> {
-        self.setup_tlb(
-            tlb_index,
-            Tlb {
-                x_end: x,
-                y_end: y,
-                noc_sel: noc_id,
-                ..Default::default()
-            },
-        )?;
-
-        self.noc_write(tlb_index, addr, &data.to_le_bytes())?;
-
-        Ok(())
-    }
-
-    pub fn noc_read32(
-        &mut self,
-        tlb_index: u32,
-        noc_id: u8,
-        x: u8,
-        y: u8,
-        addr: u64,
-    ) -> Result<u32, PciError> {
-        self.setup_tlb(
-            tlb_index,
-            Tlb {
-                x_end: x,
-                y_end: y,
-                noc_sel: noc_id,
-                ..Default::default()
-            },
-        )?;
-
-        let mut output = [0u8; 4];
-
-        self.noc_read(tlb_index, addr, &mut output)?;
-
-        Ok(u32::from_le_bytes(output))
-    }
-}
-
-impl ExtendedPciDevice {
-    pub fn open(pci_interface: usize) -> Result<ExtendedPciDeviceWrapper, ttkmd_if::PciOpenError> {
+    pub fn open(pci_interface: usize) -> Result<ExtendedPciDeviceWrapper, ttkmd_if::PciError> {
         let device = PciDevice::open(pci_interface)?;
 
         let (grid_size_x, grid_size_y) = match device.arch {
             luwen_core::Arch::Grayskull => (13, 12),
             luwen_core::Arch::Wormhole => (10, 12),
             luwen_core::Arch::Blackhole => (17, 12),
-            luwen_core::Arch::Unknown(id) => unreachable!("Found unrecognizable id {id:x}"),
+            luwen_core::Arch::Unknown(id) => unreachable!("found unrecognizable id {id:x}"),
         };
+
+        let default_tlb;
+
+        // Driver 1.33+ will have the allocation APIs enabled
+        // Grayskull does not support the allocation API
+        if device.arch != Arch::Grayskull
+            && ttkmd_if::get_version()
+                >= Some(DriverVersion {
+                    major: 1,
+                    minor: 33,
+                    ..Default::default()
+                })
+        {
+            // Try to allocate progressively smaller TLBs until we find one that looks like it'll work
+            let mut size = 1 << 20;
+
+            let mut tlb = None;
+            while size > 0 {
+                if let Ok(result) = device.allocate_tlb(size) {
+                    // have the tlb allocation
+                    tlb = Some(result);
+                    break;
+                }
+
+                size <<= 1;
+            }
+
+            if let Some(tlb) = tlb {
+                default_tlb = PossibleTlbAllocation::Allocation(tlb);
+            } else {
+                // Couldn't get a tlb... ideally at this point we would fallback to using a slower but useable read/write API
+                // for now though, we will just fail
+                return Err(PciError::TlbAllocationError(
+                    "Failed to find a free tlb".to_string(),
+                ));
+            }
+        } else {
+            // Otherwise fallback to default behaviour of just taking a constant one
+            default_tlb = PossibleTlbAllocation::Hardcoded(match device.arch {
+                luwen_core::Arch::Grayskull | luwen_core::Arch::Wormhole => 184,
+                luwen_core::Arch::Blackhole => 190,
+                luwen_core::Arch::Unknown(id) => unreachable!("Found unrecognizable id {id:x}"),
+            });
+        }
 
         Ok(ExtendedPciDeviceWrapper {
             inner: Arc::new(RwLock::new(ExtendedPciDevice {
@@ -177,11 +117,7 @@ impl ExtendedPciDevice {
                 command_q_addr: 0,
                 fake_block: false,
 
-                default_tlb: match device.arch {
-                    luwen_core::Arch::Grayskull | luwen_core::Arch::Wormhole => 184,
-                    luwen_core::Arch::Blackhole => 190,
-                    luwen_core::Arch::Unknown(id) => unreachable!("Found unrecognizable id {id:x}"),
-                },
+                default_tlb,
 
                 device,
 
@@ -197,57 +133,6 @@ impl ExtendedPciDevice {
     pub fn write_block(&mut self, addr: u32, data: &[u8]) -> Result<(), PciError> {
         self.device.write_block(addr, data)
     }
-}
-
-fn noc_write32(
-    device: &mut PciDevice,
-    tlb_index: u32,
-    noc_id: u8,
-    x: u8,
-    y: u8,
-    addr: u32,
-    data: u32,
-) -> Result<(), PciError> {
-    let (bar_addr, _slice_len) = ttkmd_if::tlb::setup_tlb(
-        device,
-        tlb_index,
-        Tlb {
-            local_offset: addr as u64,
-            x_end: x,
-            y_end: y,
-            noc_sel: noc_id,
-            mcast: false,
-            ..Default::default()
-        },
-    )?;
-
-    device.write_block(bar_addr as u32, data.to_le_bytes().as_slice())
-}
-
-fn noc_read32(
-    device: &mut PciDevice,
-    tlb_index: u32,
-    noc_id: u8,
-    x: u8,
-    y: u8,
-    addr: u32,
-) -> Result<u32, PciError> {
-    let (bar_addr, _slice_len) = ttkmd_if::tlb::setup_tlb(
-        device,
-        tlb_index,
-        Tlb {
-            local_offset: addr as u64,
-            x_end: x,
-            y_end: y,
-            noc_sel: noc_id,
-            mcast: false,
-            ..Default::default()
-        },
-    )?;
-
-    let mut data = [0u8; 4];
-    device.read_block(bar_addr as u32, &mut data)?;
-    Ok(u32::from_le_bytes(data))
 }
 
 pub fn comms_callback(
@@ -278,7 +163,7 @@ pub fn comms_callback_inner(
                             vendor: borrow.device.physical.vendor_id,
                             device_id: borrow.device.physical.device_id,
                             board_id: borrow.device.physical.subsystem_id,
-                            bar_size: borrow.device.physical.bar_size_bytes,
+                            bar_size: borrow.device.pci_bar.as_ref().map(|v| v.bar_size_bytes),
                         });
                     }
                 }
@@ -346,8 +231,8 @@ pub fn comms_callback_inner(
                 let mut reader = ud.borrow_mut();
                 let reader: &mut ExtendedPciDevice = &mut reader;
 
-                reader.setup_tlb(
-                    reader.default_tlb,
+                reader.device.noc_read(
+                    &reader.default_tlb,
                     Tlb {
                         local_offset: addr,
                         x_end: x as u8,
@@ -356,11 +241,8 @@ pub fn comms_callback_inner(
                         mcast: false,
                         ..Default::default()
                     },
+                    unsafe { std::slice::from_raw_parts_mut(data, len as usize) },
                 )?;
-
-                reader.noc_read(reader.default_tlb, addr, unsafe {
-                    std::slice::from_raw_parts_mut(data, len as usize)
-                })?;
             }
             luwen_if::FnNoc::Write {
                 noc_id,
@@ -373,8 +255,8 @@ pub fn comms_callback_inner(
                 let mut writer = ud.borrow_mut();
                 let writer: &mut ExtendedPciDevice = &mut writer;
 
-                writer.setup_tlb(
-                    writer.default_tlb,
+                writer.device.noc_write(
+                    &writer.default_tlb,
                     Tlb {
                         local_offset: addr,
                         x_end: x as u8,
@@ -383,11 +265,8 @@ pub fn comms_callback_inner(
                         mcast: false,
                         ..Default::default()
                     },
+                    unsafe { std::slice::from_raw_parts(data, len as usize) },
                 )?;
-
-                writer.noc_write(writer.default_tlb, addr, unsafe {
-                    std::slice::from_raw_parts(data, len as usize)
-                })?;
             }
             luwen_if::FnNoc::Broadcast {
                 noc_id,
@@ -405,8 +284,8 @@ pub fn comms_callback_inner(
                     luwen_core::Arch::Unknown(_) => todo!(),
                 };
 
-                writer.setup_tlb(
-                    writer.default_tlb,
+                writer.device.noc_write(
+                    &writer.default_tlb,
                     Tlb {
                         local_offset: addr,
                         x_start,
@@ -417,11 +296,8 @@ pub fn comms_callback_inner(
                         mcast: true,
                         ..Default::default()
                     },
+                    unsafe { std::slice::from_raw_parts(data, len as usize) },
                 )?;
-
-                writer.noc_write(writer.default_tlb, addr, unsafe {
-                    std::slice::from_raw_parts(data, len as usize)
-                })?;
             }
             luwen_if::FnNoc::Multicast {
                 noc_id,
@@ -445,8 +321,8 @@ pub fn comms_callback_inner(
 
                 let (start_x, start_y) = (start_x.max(min_start_x), start_y.max(min_start_y));
 
-                writer.setup_tlb(
-                    writer.default_tlb,
+                writer.device.noc_write(
+                    &writer.default_tlb,
                     Tlb {
                         local_offset: addr,
                         x_start: start_x,
@@ -457,11 +333,8 @@ pub fn comms_callback_inner(
                         mcast: true,
                         ..Default::default()
                     },
+                    unsafe { std::slice::from_raw_parts(data, len as usize) },
                 )?;
-
-                writer.noc_write(writer.default_tlb, addr, unsafe {
-                    std::slice::from_raw_parts(data, len as usize)
-                })?;
             }
         },
         FnOptions::Eth(op) => match op.rw {
@@ -479,22 +352,44 @@ pub fn comms_callback_inner(
                 let eth_x = borrow.eth_x;
                 let eth_y = borrow.eth_y;
 
-                let command_q_addr = noc_read32(
-                    &mut borrow.device,
-                    borrow.default_tlb,
-                    0,
-                    eth_x,
-                    eth_y,
-                    0x170,
+                let command_q_addr = borrow.device.noc_read32(
+                    &borrow.default_tlb,
+                    Tlb {
+                        local_offset: 0x170,
+                        noc_sel: 0,
+                        x_end: eth_x,
+                        y_end: eth_y,
+                        ..Default::default()
+                    },
                 )?;
                 let fake_block = borrow.fake_block;
 
-                let default_tlb = borrow.default_tlb;
-                let read32 =
-                    |borrow: &mut _, addr| noc_read32(borrow, default_tlb, 0, eth_x, eth_y, addr);
+                let default_tlb = &mut borrow.default_tlb;
+                let read32 = |borrow: &mut PciDevice, addr| {
+                    borrow.noc_read32(
+                        default_tlb,
+                        Tlb {
+                            local_offset: addr,
+                            noc_sel: 0,
+                            x_end: eth_x,
+                            y_end: eth_y,
+                            ..Default::default()
+                        },
+                    )
+                };
 
-                let write32 = |borrow: &mut _, addr, data| {
-                    noc_write32(borrow, default_tlb, 0, eth_x, eth_y, addr, data)
+                let write32 = |borrow: &mut PciDevice, addr, data| {
+                    borrow.noc_write32(
+                        default_tlb,
+                        Tlb {
+                            local_offset: addr,
+                            noc_sel: 0,
+                            x_end: eth_x,
+                            y_end: eth_y,
+                            ..Default::default()
+                        },
+                        data,
+                    )
                 };
 
                 let dma_buffer = {
@@ -566,16 +461,44 @@ pub fn comms_callback_inner(
                 let eth_x = borrow.eth_x;
                 let eth_y = borrow.eth_y;
 
-                let command_q_addr =
-                    borrow.noc_read32(borrow.default_tlb, 0, eth_x, eth_y, 0x170)?;
+                let command_q_addr = borrow.device.noc_read32(
+                    &borrow.default_tlb,
+                    Tlb {
+                        local_offset: 0x170,
+                        noc_sel: 0,
+                        x_end: eth_x,
+                        y_end: eth_y,
+                        ..Default::default()
+                    },
+                )?;
                 let fake_block = borrow.fake_block;
 
-                let default_tlb = borrow.default_tlb;
-                let read32 =
-                    |borrow: &mut _, addr| noc_read32(borrow, default_tlb, 0, eth_x, eth_y, addr);
+                let default_tlb = &borrow.default_tlb;
+                let read32 = |borrow: &mut PciDevice, addr| {
+                    borrow.noc_read32(
+                        default_tlb,
+                        Tlb {
+                            local_offset: addr,
+                            noc_sel: 0,
+                            x_end: eth_x,
+                            y_end: eth_y,
+                            ..Default::default()
+                        },
+                    )
+                };
 
-                let write32 = |borrow: &mut _, addr, data| {
-                    noc_write32(borrow, default_tlb, 0, eth_x, eth_y, addr, data)
+                let write32 = |borrow: &mut PciDevice, addr, data| {
+                    borrow.noc_write32(
+                        default_tlb,
+                        Tlb {
+                            local_offset: addr,
+                            noc_sel: 0,
+                            x_end: eth_x,
+                            y_end: eth_y,
+                            ..Default::default()
+                        },
+                        data,
+                    )
                 };
 
                 let dma_buffer = {
