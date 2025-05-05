@@ -72,7 +72,7 @@ pub struct DeviceInfo {
     pub vendor: u16,
     pub device_id: u16,
     pub board_id: u16,
-    pub bar_size: u64,
+    pub bar_size: Option<u64>,
 }
 
 impl DeviceInfo {

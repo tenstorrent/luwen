@@ -72,15 +72,21 @@ const SRC_ADDR_TAG_OFFSET: u32 = 7;
 
 fn wait_for_idle<D>(
     user_data: &mut D,
-    mut read32: impl FnMut(&mut D, u32) -> Result<u32, PciError>,
+    mut read32: impl FnMut(&mut D, u64) -> Result<u32, PciError>,
     command_q_addr: u32,
     timeout: std::time::Duration,
 ) -> Result<u32, LuwenError> {
-    let mut curr_wptr = read32(user_data, command_q_addr + REQ_Q_ADDR + 4 * WR_PTR_OFFSET)?;
+    let mut curr_wptr = read32(
+        user_data,
+        (command_q_addr + REQ_Q_ADDR + 4 * WR_PTR_OFFSET) as u64,
+    )?;
 
     let start = std::time::Instant::now();
     loop {
-        let curr_rptr = read32(user_data, command_q_addr + REQ_Q_ADDR + 4 * RD_PTR_OFFSET)?;
+        let curr_rptr = read32(
+            user_data,
+            (command_q_addr + REQ_Q_ADDR + 4 * RD_PTR_OFFSET) as u64,
+        )?;
 
         let is_command_q_full = (curr_wptr != curr_rptr)
             && ((curr_wptr & CMD_BUF_SIZE_MASK) == (curr_rptr & CMD_BUF_SIZE_MASK));
@@ -94,7 +100,10 @@ fn wait_for_idle<D>(
                 "Ethernet timeout while waiting for command queue to be idle".to_string(),
             ));
         }
-        curr_wptr = read32(user_data, command_q_addr + REQ_Q_ADDR + 4 * WR_PTR_OFFSET)?;
+        curr_wptr = read32(
+            user_data,
+            (command_q_addr + REQ_Q_ADDR + 4 * WR_PTR_OFFSET) as u64,
+        )?;
     }
 
     Ok(curr_wptr)
@@ -102,8 +111,8 @@ fn wait_for_idle<D>(
 
 pub fn eth_read32<D>(
     user_data: &mut D,
-    mut read32: impl FnMut(&mut D, u32) -> Result<u32, PciError>,
-    mut write32: impl FnMut(&mut D, u32, u32) -> Result<(), PciError>,
+    mut read32: impl FnMut(&mut D, u64) -> Result<u32, PciError>,
+    mut write32: impl FnMut(&mut D, u64, u32) -> Result<(), PciError>,
     command_q_addr: u32,
     coord: EthCommCoord,
     timeout: std::time::Duration,
@@ -112,6 +121,7 @@ pub fn eth_read32<D>(
 
     let cmd_addr =
         command_q_addr + REQ_Q_ADDR + 4 * CMD_OFFSET + (curr_wptr % CMD_BUF_SIZE) * Q_ENTRY_BYTES;
+    let cmd_addr = cmd_addr as u64;
 
     let sys_addr = get_sys_addr(&coord);
     let rack_addr = get_rack_addr(&coord);
@@ -127,16 +137,25 @@ pub fn eth_read32<D>(
     let next_wptr = (curr_wptr + 1) % (2 * CMD_BUF_SIZE);
     write32(
         user_data,
-        command_q_addr + REQ_Q_ADDR + 4 * WR_PTR_OFFSET,
+        (command_q_addr + REQ_Q_ADDR + 4 * WR_PTR_OFFSET) as u64,
         next_wptr,
     )?;
 
-    let curr_rptr = read32(user_data, command_q_addr + RESP_Q_ADDR + 4 * RD_PTR_OFFSET)?;
-    let mut curr_wptr = read32(user_data, command_q_addr + RESP_Q_ADDR + 4 * WR_PTR_OFFSET)?;
+    let curr_rptr = read32(
+        user_data,
+        (command_q_addr + RESP_Q_ADDR + 4 * RD_PTR_OFFSET) as u64,
+    )?;
+    let mut curr_wptr = read32(
+        user_data,
+        (command_q_addr + RESP_Q_ADDR + 4 * WR_PTR_OFFSET) as u64,
+    )?;
 
     let start_time = std::time::Instant::now();
     while curr_wptr == curr_rptr {
-        curr_wptr = read32(user_data, command_q_addr + RESP_Q_ADDR + 4 * WR_PTR_OFFSET)?;
+        curr_wptr = read32(
+            user_data,
+            (command_q_addr + RESP_Q_ADDR + 4 * WR_PTR_OFFSET) as u64,
+        )?;
         if start_time.elapsed() > timeout {
             return Err(LuwenError::Custom(
                 "Ethernet timeout while waiting for read queue to be cleared".to_string(),
@@ -146,6 +165,7 @@ pub fn eth_read32<D>(
 
     let cmd_addr =
         command_q_addr + RESP_Q_ADDR + 4 * CMD_OFFSET + (curr_rptr % CMD_BUF_SIZE) * Q_ENTRY_BYTES;
+    let cmd_addr = cmd_addr as u64;
 
     let mut flags = 0;
     let start_time = std::time::Instant::now();
@@ -181,7 +201,7 @@ pub fn eth_read32<D>(
     let next_rptr = (curr_rptr + 1) % (2 * CMD_BUF_SIZE);
     write32(
         user_data,
-        command_q_addr + RESP_Q_ADDR + 4 * RD_PTR_OFFSET,
+        (command_q_addr + RESP_Q_ADDR + 4 * RD_PTR_OFFSET) as u64,
         next_rptr,
     )?;
 
@@ -197,8 +217,8 @@ pub fn eth_read32<D>(
 #[allow(clippy::too_many_arguments)]
 pub fn block_read<D>(
     user_data: &mut D,
-    mut read32: impl FnMut(&mut D, u32) -> Result<u32, PciError>,
-    mut write32: impl FnMut(&mut D, u32, u32) -> Result<(), PciError>,
+    mut read32: impl FnMut(&mut D, u64) -> Result<u32, PciError>,
+    mut write32: impl FnMut(&mut D, u64, u32) -> Result<(), PciError>,
     dma_buffer: &mut ttkmd_if::DmaBuffer,
     command_q_addr: u32,
     timeout: std::time::Duration,
@@ -240,6 +260,7 @@ pub fn block_read<D>(
             + REQ_Q_ADDR
             + 4 * CMD_OFFSET
             + (curr_wptr % CMD_BUF_SIZE) * Q_ENTRY_BYTES;
+        let cmd_addr = cmd_addr as u64;
 
         let dma_offset = buffer_slice_len * (curr_wptr as u64 % number_of_slices);
 
@@ -260,16 +281,25 @@ pub fn block_read<D>(
         let next_wptr = (curr_wptr + 1) % (2 * CMD_BUF_SIZE);
         write32(
             user_data,
-            command_q_addr + REQ_Q_ADDR + 4 * WR_PTR_OFFSET,
+            (command_q_addr + REQ_Q_ADDR + 4 * WR_PTR_OFFSET) as u64,
             next_wptr,
         )?;
 
-        let curr_rptr = read32(user_data, command_q_addr + RESP_Q_ADDR + 4 * RD_PTR_OFFSET)?;
-        let mut curr_wptr = read32(user_data, command_q_addr + RESP_Q_ADDR + 4 * WR_PTR_OFFSET)?;
+        let curr_rptr = read32(
+            user_data,
+            (command_q_addr + RESP_Q_ADDR + 4 * RD_PTR_OFFSET) as u64,
+        )?;
+        let mut curr_wptr = read32(
+            user_data,
+            (command_q_addr + RESP_Q_ADDR + 4 * WR_PTR_OFFSET) as u64,
+        )?;
 
         let start_time = std::time::Instant::now();
         while curr_wptr == curr_rptr {
-            curr_wptr = read32(user_data, command_q_addr + RESP_Q_ADDR + 4 * WR_PTR_OFFSET)?;
+            curr_wptr = read32(
+                user_data,
+                (command_q_addr + RESP_Q_ADDR + 4 * WR_PTR_OFFSET) as u64,
+            )?;
             if start_time.elapsed() > timeout {
                 return Err(LuwenError::Custom(
                     "Ethernet timeout while waiting for read queue to be cleared".to_string(),
@@ -281,6 +311,7 @@ pub fn block_read<D>(
             + RESP_Q_ADDR
             + 4 * CMD_OFFSET
             + (curr_rptr % CMD_BUF_SIZE) * Q_ENTRY_BYTES;
+        let cmd_addr = cmd_addr as u64;
 
         let mut flags = 0;
         let start_time = std::time::Instant::now();
@@ -318,7 +349,7 @@ pub fn block_read<D>(
         let next_rptr = (curr_rptr + 1) % (2 * CMD_BUF_SIZE);
         write32(
             user_data,
-            command_q_addr + RESP_Q_ADDR + 4 * RD_PTR_OFFSET,
+            (command_q_addr + RESP_Q_ADDR + 4 * RD_PTR_OFFSET) as u64,
             next_rptr,
         )?;
 
@@ -337,8 +368,8 @@ pub fn block_read<D>(
 #[allow(clippy::too_many_arguments)]
 pub fn eth_write32<D>(
     user_data: &mut D,
-    mut read32: impl FnMut(&mut D, u32) -> Result<u32, PciError>,
-    mut write32: impl FnMut(&mut D, u32, u32) -> Result<(), PciError>,
+    mut read32: impl FnMut(&mut D, u64) -> Result<u32, PciError>,
+    mut write32: impl FnMut(&mut D, u64, u32) -> Result<(), PciError>,
     command_q_addr: u32,
     coord: EthCommCoord,
     timeout: std::time::Duration,
@@ -348,6 +379,7 @@ pub fn eth_write32<D>(
 
     let cmd_addr =
         command_q_addr + REQ_Q_ADDR + 4 * CMD_OFFSET + (curr_wptr % CMD_BUF_SIZE) * Q_ENTRY_BYTES;
+    let cmd_addr = cmd_addr as u64;
 
     let sys_addr = get_sys_addr(&coord);
     let rack_addr = get_rack_addr(&coord);
@@ -364,7 +396,7 @@ pub fn eth_write32<D>(
     let next_wptr = (curr_wptr + 1) % (2 * CMD_BUF_SIZE);
     write32(
         user_data,
-        command_q_addr + REQ_Q_ADDR + 4 * WR_PTR_OFFSET,
+        (command_q_addr + REQ_Q_ADDR + 4 * WR_PTR_OFFSET) as u64,
         next_wptr,
     )?;
 
@@ -376,8 +408,8 @@ pub fn eth_write32<D>(
 #[allow(clippy::too_many_arguments)]
 pub fn block_write<D>(
     user_data: &mut D,
-    mut read32: impl FnMut(&mut D, u32) -> Result<u32, PciError>,
-    mut write32: impl FnMut(&mut D, u32, u32) -> Result<(), PciError>,
+    mut read32: impl FnMut(&mut D, u64) -> Result<u32, PciError>,
+    mut write32: impl FnMut(&mut D, u64, u32) -> Result<(), PciError>,
     dma_buffer: &mut ttkmd_if::DmaBuffer,
     command_q_addr: u32,
     timeout: std::time::Duration,
@@ -420,6 +452,7 @@ pub fn block_write<D>(
             + REQ_Q_ADDR
             + 4 * CMD_OFFSET
             + (curr_wptr % CMD_BUF_SIZE) * Q_ENTRY_BYTES;
+        let cmd_addr = cmd_addr as u64;
 
         let dma_offset = buffer_slice_len * (curr_wptr as u64 % number_of_slices);
 
@@ -443,7 +476,7 @@ pub fn block_write<D>(
         let next_wptr = (curr_wptr + 1) % (2 * CMD_BUF_SIZE);
         write32(
             user_data,
-            command_q_addr + REQ_Q_ADDR + 4 * WR_PTR_OFFSET,
+            (command_q_addr + REQ_Q_ADDR + 4 * WR_PTR_OFFSET) as u64,
             next_wptr,
         )?;
 
@@ -456,20 +489,20 @@ pub fn block_write<D>(
 
 pub fn fixup_queues<D>(
     user_data: &mut D,
-    mut read32: impl FnMut(&mut D, u32) -> Result<u32, PciError>,
-    mut write32: impl FnMut(&mut D, u32, u32) -> Result<(), PciError>,
+    mut read32: impl FnMut(&mut D, u64) -> Result<u32, PciError>,
+    mut write32: impl FnMut(&mut D, u64, u32) -> Result<(), PciError>,
     command_q_addr: u32,
 ) -> Result<(), PciError> {
     let i = 2;
     let wr_ptr_addr = command_q_addr + REQ_Q_ADDR + 4 * (i * Q_SIZE_WORDS + WR_PTR_OFFSET);
     let rd_ptr_addr = command_q_addr + REQ_Q_ADDR + 4 * (i * Q_SIZE_WORDS + RD_PTR_OFFSET);
-    let wr_ptr = read32(user_data, wr_ptr_addr)?;
-    let rd_ptr = read32(user_data, rd_ptr_addr)?;
+    let wr_ptr = read32(user_data, wr_ptr_addr as u64)?;
+    let rd_ptr = read32(user_data, rd_ptr_addr as u64)?;
 
     if wr_ptr != rd_ptr {
         println!("RESPONSE_Q out of sync - wr_ptr: {wr_ptr}, rd_ptr: {rd_ptr}");
         println!("Setting rd_ptr = wr_ptr for the RESP CMD Q");
-        write32(user_data, rd_ptr_addr, wr_ptr)?;
+        write32(user_data, rd_ptr_addr as u64, wr_ptr)?;
     }
 
     Ok(())

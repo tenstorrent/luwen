@@ -34,9 +34,6 @@ pub enum PciOpenError {
         device_id: usize,
         source: std::io::Error,
     },
-
-    #[error(transparent)]
-    PciError(#[from] PciError),
 }
 
 #[derive(Error, Debug)]
@@ -67,6 +64,7 @@ pub enum PciError {
 
         source: CfgFailType,
     },
+
     #[error("Failed to write into device {id} config space[offset: {offset}, size: {size}]; Failed with {source}")]
     CfgWriteFailed {
         id: usize,
@@ -78,4 +76,16 @@ pub enum PciError {
 
     #[error("Tried to access tlb {id} which is out of range")]
     TlbOutOfRange { id: usize },
+
+    #[error("Failed to reserve tlb for NOC IO; {0}")]
+    TlbAllocationError(String),
+
+    #[error("Ioctl failed with {0}")]
+    IoctlError(Errno),
+
+    #[error("During PciDevice initialization the PCI bar could not be mapped")]
+    BarUnmapped,
+
+    #[error("{0}")]
+    DeviceOpenError(#[from] PciOpenError),
 }
