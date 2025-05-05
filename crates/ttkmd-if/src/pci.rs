@@ -3,7 +3,7 @@
 
 use std::os::fd::AsRawFd;
 
-use crate::{error::PciError, kmdif, PciDevice};
+use crate::{error::PciError, kmdif, BarMapping, PciDevice};
 
 const ERROR_VALUE: u32 = 0xffffffff;
 
@@ -26,6 +26,32 @@ pub(crate) fn read_bar0_base(config_space: &std::fs::File) -> u64 {
     }
 
     u64::from_ne_bytes(bar01) & BAR_ADDRESS_MASK
+}
+
+impl BarMapping {
+    unsafe fn register_address_mut<T>(&self, mut register_addr: u32) -> *mut T {
+        let reg_mapping: *mut u8;
+
+        if self.system_reg_mapping.is_some() && register_addr >= self.system_reg_start_offset {
+            let mapping = self.system_reg_mapping.as_ref().unwrap_unchecked();
+
+            register_addr -= self.system_reg_offset_adjust;
+            reg_mapping = mapping.as_ptr() as *mut u8;
+        } else if self.bar0_wc.is_some() && (register_addr as u64) < self.bar0_wc_size {
+            let mapping = self.bar0_wc.as_ref().unwrap_unchecked();
+
+            reg_mapping = mapping.as_ptr() as *mut u8;
+        } else {
+            register_addr -= self.bar0_uc_offset as u32;
+            reg_mapping = self.bar0_uc.as_ptr() as *mut u8;
+        }
+
+        reg_mapping.offset(register_addr as isize) as *mut T
+    }
+
+    unsafe fn register_address<T>(&self, register_addr: u32) -> *const T {
+        self.register_address_mut(register_addr) as *const T
+    }
 }
 
 impl PciDevice {
@@ -86,9 +112,14 @@ impl PciDevice {
         let data_read = data_read.unwrap_or(ERROR_VALUE);
 
         if self.read_checking_enabled && data_read == ERROR_VALUE {
-            let scratch_data = unsafe {
-                self.register_address::<u32>(self.read_checking_addr)
-                    .read_volatile()
+            let scratch_data = match &self.pci_bar {
+                Some(bar) => unsafe {
+                    bar.register_address::<u32>(self.read_checking_addr)
+                        .read_volatile()
+                },
+                None => {
+                    return Err(PciError::BarUnmapped);
+                }
             };
 
             if scratch_data == ERROR_VALUE {
@@ -99,40 +130,15 @@ impl PciDevice {
         Ok(())
     }
 
-    unsafe fn register_address_mut<T>(&self, mut register_addr: u32) -> *mut T {
-        let reg_mapping: *mut u8;
-
-        if self.system_reg_mapping.is_some() && register_addr >= self.system_reg_start_offset {
-            let mapping = self.system_reg_mapping.as_ref().unwrap_unchecked();
-
-            register_addr -= self.system_reg_offset_adjust;
-            reg_mapping = mapping.as_ptr() as *mut u8;
-        } else if self.bar0_wc.is_some() && (register_addr as u64) < self.bar0_wc_size {
-            let mapping = self.bar0_wc.as_ref().unwrap_unchecked();
-
-            reg_mapping = mapping.as_ptr() as *mut u8;
-        } else {
-            register_addr -= self.bar0_uc_offset as u32;
-            reg_mapping = self.bar0_uc.as_ptr() as *mut u8;
-        }
-
-        reg_mapping.offset(register_addr as isize) as *mut T
-    }
-
-    unsafe fn register_address<T>(&self, register_addr: u32) -> *const T {
-        self.register_address_mut(register_addr) as *const T
-    }
-
     #[inline]
-    pub fn read32(&self, addr: u32) -> Result<u32, PciError> {
-        let read_pointer = unsafe { self.register_address::<u32>(addr) } as usize;
-        let data = if read_pointer % core::mem::align_of::<u32>() != 0 {
+    pub fn read32_no_translation(&self, addr: usize) -> Result<u32, PciError> {
+        let data = if addr % core::mem::align_of::<u32>() != 0 {
             unsafe {
-                let aligned_read_pointer = read_pointer & !(core::mem::align_of::<u32>() - 1);
+                let aligned_read_pointer = addr & !(core::mem::align_of::<u32>() - 1);
                 let a = (aligned_read_pointer as *const u32).read_volatile();
                 let b = (aligned_read_pointer as *const u32).add(1).read_volatile();
 
-                let byte_offset = read_pointer % core::mem::align_of::<u32>();
+                let byte_offset = addr % core::mem::align_of::<u32>();
                 let shift = byte_offset * 8;
                 let inverse_shift = (core::mem::size_of::<u32>() * 8) - shift;
                 let inverse_mask = (1 << inverse_shift) - 1;
@@ -141,7 +147,7 @@ impl PciDevice {
                 ((a >> shift) & inverse_mask) | ((b << inverse_shift) & !inverse_mask)
             }
         } else {
-            unsafe { (read_pointer as *const u32).read_volatile() }
+            unsafe { (addr as *const u32).read_volatile() }
         };
         self.detect_ffffffff_read(Some(data))?;
 
@@ -149,15 +155,25 @@ impl PciDevice {
     }
 
     #[inline]
-    pub fn write32(&mut self, addr: u32, data: u32) -> Result<(), PciError> {
-        let write_pointer = unsafe { self.register_address_mut::<u32>(addr) } as usize;
-        if write_pointer % core::mem::align_of::<u32>() != 0 {
+    pub fn read32(&self, addr: u32) -> Result<u32, PciError> {
+        let read_pointer = match &self.pci_bar {
+            Some(bar) => unsafe { bar.register_address::<u32>(addr) as usize },
+            None => {
+                return Err(PciError::BarUnmapped);
+            }
+        };
+        self.read32_no_translation(read_pointer)
+    }
+
+    #[inline]
+    pub fn write32_no_translation(&mut self, addr: usize, data: u32) -> Result<(), PciError> {
+        if addr % core::mem::align_of::<u32>() != 0 {
             unsafe {
-                let aligned_write_pointer = write_pointer & !(core::mem::align_of::<u32>() - 1);
+                let aligned_write_pointer = addr & !(core::mem::align_of::<u32>() - 1);
                 let a = (aligned_write_pointer as *const u32).read_volatile();
                 let b = (aligned_write_pointer as *const u32).add(1).read_volatile();
 
-                let byte_offset = write_pointer % core::mem::align_of::<u32>();
+                let byte_offset = addr % core::mem::align_of::<u32>();
                 let shift = byte_offset * 8;
                 let inverse_shift = (core::mem::size_of::<u32>() * 8) - shift;
                 let inverse_mask = (1 << inverse_shift) - 1;
@@ -170,18 +186,36 @@ impl PciDevice {
                 (aligned_write_pointer as *mut u32).add(1).write_volatile(b);
             }
         } else {
-            unsafe { (write_pointer as *mut u32).write_volatile(data) }
+            unsafe { (addr as *mut u32).write_volatile(data) }
         };
         self.detect_ffffffff_read(None)?;
 
         Ok(())
     }
 
-    pub fn write_no_dma<T>(&mut self, addr: u32, data: &[T]) {
+    #[inline]
+    pub fn write32(&mut self, addr: u32, data: u32) -> Result<(), PciError> {
+        let write_pointer = match &self.pci_bar {
+            Some(bar) => unsafe { bar.register_address::<u32>(addr) as usize },
+            None => {
+                return Err(PciError::BarUnmapped);
+            }
+        };
+        self.write32_no_translation(write_pointer, data)
+    }
+
+    pub fn write_no_dma<T>(&mut self, addr: u32, data: &[T]) -> Result<(), PciError> {
         unsafe {
-            let ptr = self.register_address_mut::<T>(addr);
+            let ptr = match &self.pci_bar {
+                Some(bar) => bar.register_address_mut::<T>(addr),
+                None => {
+                    return Err(PciError::BarUnmapped);
+                }
+            };
             ptr.copy_from_nonoverlapping(data.as_ptr(), data.len());
         }
+
+        Ok(())
     }
 }
 
@@ -247,7 +281,7 @@ impl PciDevice {
                 &req as *const _ as *const u32,
                 std::mem::size_of::<kmdif::ArcPcieCtrlDmaRequest>() / 4,
             )
-        });
+        })?;
 
         // Trigger ARC interrupt 0 on core 0
         let mut arc_misc_cntl_value = 0;
@@ -311,7 +345,13 @@ impl PciDevice {
         }
 
         unsafe {
-            Self::memcpy_to_device(self.register_address_mut(addr), data);
+            let ptr = match &self.pci_bar {
+                Some(bar) => bar.register_address_mut(addr),
+                None => {
+                    return Err(PciError::BarUnmapped);
+                }
+            };
+            Self::memcpy_to_device(ptr, data);
         }
 
         Ok(())
@@ -354,7 +394,13 @@ impl PciDevice {
         }
 
         unsafe {
-            Self::memcpy_from_device(data, self.register_address(addr));
+            let ptr = match &self.pci_bar {
+                Some(bar) => bar.register_address_mut(addr),
+                None => {
+                    return Err(PciError::BarUnmapped);
+                }
+            };
+            Self::memcpy_from_device(data, ptr);
         }
 
         if data.len() >= std::mem::size_of::<u32>() {
@@ -464,7 +510,7 @@ impl PciDevice {
     /// # Safety
     /// This function requires that dest is a value returned by the self.register_address
     /// function.
-    unsafe fn memcpy_from_device(dest: &mut [u8], src: *const u8) {
+    pub unsafe fn memcpy_from_device(dest: &mut [u8], src: *const u8) {
         let align = core::mem::align_of::<u32>();
 
         let mut offset = 0;
