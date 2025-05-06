@@ -7,3 +7,4 @@ license = "Apache-2.0"
 
 [dependencies]
 thiserror = "1.0.40"
+serde = {version = "1.0.185", features = ["derive"]}

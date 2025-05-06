@@ -3,8 +3,9 @@
 
 use std::fmt;
 use std::str::FromStr;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Hash, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Hash, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Arch {
     Grayskull,
     Wormhole,
