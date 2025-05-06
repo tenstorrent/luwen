@@ -10,7 +10,12 @@ use luwen_if::{
 };
 use luwen_ref::error::LuwenError;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+use serde::{Deserialize, Serialize};
+use std::path::Path;
+use std::fs::File;
+use std::io::Write;
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChipIdent {
     pub arch: Arch,
     pub board_id: Option<u64>,
@@ -18,14 +23,43 @@ pub struct ChipIdent {
     pub coord: Option<EthAddr>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChipData {
     pub noc_translation_en: bool,
     pub harvest_mask: u32,
     pub boardtype: Option<String>,
 }
 
-pub fn generate_map(file: impl AsRef<str>) -> Result<(), LuwenError> {
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct EthernetLink {
+    pub chip: usize,
+    pub chan: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct EthernetConnection {
+    pub source: EthernetLink,
+    pub destination: EthernetLink,
+    pub routing_enabled: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EthernetMap {
+    pub arch: HashMap<usize, Arch>,
+    pub chips: HashMap<usize, EthAddr>,
+    pub ethernet_connections: Vec<EthernetConnection>,
+    pub chips_with_mmio: HashMap<usize, u32>,
+    pub harvesting: HashMap<usize, HarvestInfo>,
+    pub boardtype: HashMap<usize, Option<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct HarvestInfo {
+    pub noc_translation: bool,
+    pub harvest_mask: u32,
+}
+
+pub fn generate_map() -> Result<EthernetMap, LuwenError> {
     let mut chips = HashMap::new();
     let mut chip_data = HashMap::new();
     let mut mmio_chips = Vec::new();
@@ -179,9 +213,31 @@ pub fn generate_map(file: impl AsRef<str>) -> Result<(), LuwenError> {
     ident_order.sort_by_key(|v| v.1);
     let ident_order: Vec<_> = ident_order.into_iter().map(|v| v.0.clone()).collect();
 
+    let mut arch_map = HashMap::new();
+    let mut chips_map = HashMap::new();
+    let mut chips_with_mmio_map = HashMap::new();
+    let mut harvesting_map = HashMap::new();
+    let mut boardtype_map = HashMap::new();
+    
+
     let mut known_connections = HashSet::new();
     for chip in &ident_order {
         if let Some(connection_info) = connection_map.get(chip) {
+            let id = chips[chip];
+            arch_map.insert(id, chip.arch.clone());
+
+            if let Some(coord) = &chip.coord {
+                chips_map.insert(id, *coord);
+            }
+            
+            let data = &chip_data[chip];
+            harvesting_map.insert(id, HarvestInfo {
+                noc_translation: data.noc_translation_en,
+                harvest_mask: data.harvest_mask,
+            });
+            
+            boardtype_map.insert(id, data.boardtype.clone());
+
             for (remote_chip, connection) in connection_info {
                 for (current_eth_id, next_eth_id, routing_enabled) in connection {
                     let local = (chips[chip], current_eth_id);
@@ -191,13 +247,15 @@ pub fn generate_map(file: impl AsRef<str>) -> Result<(), LuwenError> {
                     let second = local.max(remote);
 
                     let connection_ident = (first, second);
-                    let larger_connection_ident = (first, second, routing_enabled);
                     if known_connections.contains(&connection_ident) {
                         continue;
                     }
                     known_connections.insert(connection_ident);
 
-                    connections.push(larger_connection_ident);
+                    connections.push(EthernetConnection{source: EthernetLink{chip: first.0, chan: *first.1}, 
+                        destination: EthernetLink{chip: second.0, chan: *second.1},
+                    routing_enabled: *routing_enabled
+                    });
                 }
             }
         }
@@ -205,74 +263,39 @@ pub fn generate_map(file: impl AsRef<str>) -> Result<(), LuwenError> {
 
     connections.sort();
 
-    let mut output = String::new();
-
-    output.push_str("arch: {\n");
-    for chip in &ident_order {
-        let id = chips[chip];
-        output.push_str(&format!("   {}: {:?},\n", id, chip.arch));
-    }
-    output.push_str("}\n\n");
-
-    output.push_str("chips: {\n");
-    for chip in &ident_order {
-        let id = chips[chip];
-        if let Some(coord) = &chip.coord {
-            output.push_str(&format!(
-                "   {}: [{},{},{},{}],\n",
-                id, coord.shelf_x, coord.shelf_y, coord.rack_x, coord.rack_y
-            ));
-        }
-    }
-    output.push_str("}\n\n");
-
-    output.push_str("ethernet_connections: [\n");
-    for ((local_chip, local_port), (remote_chip, remote_port), routing) in connections {
-        output.push_str(&format!("   [{{chip: {local_chip}, chan: {local_port}}}, {{chip: {remote_chip}, chan: {remote_port}}}, {{routing_enabled: {routing}}}],\n"));
-    }
-    output.push_str("]\n\n");
-
-    mmio_chips.sort_by_key(|v| v.1);
-
-    output.push_str("chips_with_mmio: [\n");
-    for (mmio, interface) in mmio_chips {
+    for (mmio, interface) in &mmio_chips {
         if let Some(interface) = interface {
-            output.push_str(&format!("   {}: {},\n", chips[&mmio], interface));
+            chips_with_mmio_map.insert(chips[mmio], *interface);
         }
     }
-    output.push_str("]\n\n");
+    
+    // Create the map
+    let ethernet_map = EthernetMap {
+        arch: arch_map,
+        chips: chips_map,
+        ethernet_connections: connections,
+        chips_with_mmio: chips_with_mmio_map,
+        harvesting: harvesting_map,
+        boardtype: boardtype_map,
+    };
+    
+    Ok(ethernet_map)
+}
 
-    output.push_str("# harvest_mask is the bit indicating which tensix row is harvested. So bit 0 = first tensix row; bit 1 = second tensix row etc...\n");
-    output.push_str("harvesting: {\n");
-    for chip in &ident_order {
-        let id = chips[chip];
-        let data = &chip_data[chip];
-        output.push_str(&format!(
-            "   {}: {{noc_translation: {}, harvest_mask: {}}},\n",
-            id, data.noc_translation_en, data.harvest_mask
-        ));
-    }
-    output.push_str("}\n\n");
+pub fn write_ethernet_map<W: Write>(
+    writer: W,
+    map: &EthernetMap,
+) -> Result<(), LuwenError> {
+    serde_yaml::to_writer(writer, map)
+        .map_err(|e| LuwenError::Custom(format!("Failed to write YAML: {e}")))
+}
 
-    output.push_str("# This value will be null if the boardtype is unknown, should never happen in practice but to be defensive it would be useful to throw an error on this case.\n");
-    output.push_str("boardtype: {\n");
-    for chip in &ident_order {
-        let id = chips[chip];
-        let data = &chip_data[chip];
-        output.push_str(&format!(
-            "   {id}: {},\n",
-            data.boardtype.as_deref().unwrap_or("null")
-        ));
-    }
-    output.push('}');
+pub fn read_ethernet_map<P: AsRef<Path>>(path: P) -> Result<EthernetMap, LuwenError> {
+    let file = File::open(path).map_err(|e|
+        LuwenError::Custom(format!("Failed to open file: {e}")))?;
 
-    let file = file.as_ref();
-
-    if let Err(_err) = std::fs::write(file, output) {
-        Err(LuwenError::Custom(format!("Failed to write to {}", file)))
-    } else {
-        Ok(())
-    }
+    serde_yaml::from_reader(file).map_err(|e|
+        LuwenError::Custom(format!("Failed to parse YAML: {e}")))
 }
 
 #[no_mangle]
@@ -289,10 +312,29 @@ pub unsafe extern "C" fn create_ethernet_map(file: *const std::ffi::c_char) -> s
     }
 
     let file = std::ffi::CStr::from_ptr(file);
-    if let Err(value) = generate_map(file.to_string_lossy()) {
-        eprintln!("Error while generating ethernet map!\n{value}");
-        -1
-    } else {
-        0
+    let filename = file.to_string_lossy();
+
+    match File::create(&*filename) {
+        Ok(file) => {
+            match generate_map(){
+                Ok(map) => {
+                    if let Err(value) = write_ethernet_map(file, &map) {
+                        eprintln!("Error while writing ethernet map!\n{value}");
+                        -1
+                    } else {
+                        0
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Failed to run create ethernet map: {e}");
+                    return -1;
+                }
+            }
+
+        }
+        Err(e) => {
+            eprintln!("Failed to create file: {e}");
+            return -2;
+        }
     }
 }
