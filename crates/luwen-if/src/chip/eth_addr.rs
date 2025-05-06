@@ -7,7 +7,9 @@ use crate::error::PlatformError;
 
 use super::{ChipComms, ChipInterface};
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EthAddr {
     pub shelf_x: u8,
     pub shelf_y: u8,
