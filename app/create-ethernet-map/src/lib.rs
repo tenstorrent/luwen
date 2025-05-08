@@ -53,11 +53,52 @@ pub struct EthernetMap {
     pub boardtype: HashMap<usize, Option<String>>,
 }
 
+impl PartialEq for EthernetMap {
+    fn eq(&self, other: &Self) -> bool {
+        for (key, val) in &self.arch {
+            match other.arch.get(key) {
+                Some(o_val) if val == o_val => continue,
+                _ => return false,
+            }
+        }
+        for (key, val) in &self.chips_with_mmio {
+            match other.chips_with_mmio.get(key) {
+                Some(o_val) if val == o_val => continue,
+                _ => return false,
+            }
+        }
+        for (key, val) in &self.harvesting {
+            match other.harvesting.get(key) {
+                Some(o_val) if val == o_val => continue,
+                _ => return false,
+            }
+        }
+        for (key, val) in &self.boardtype {
+            match other.boardtype.get(key) {
+                Some(o_val) if val == o_val => continue,
+                _ => return false,
+            }
+        }
+        true
+    }
+}
+
+impl Eq for EthernetMap {}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HarvestInfo {
     pub noc_translation: bool,
     pub harvest_mask: u32,
 }
+
+impl PartialEq for HarvestInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.noc_translation == other.noc_translation && self.harvest_mask.count_ones() == other.harvest_mask.count_ones()
+    }
+}
+
+impl Eq for HarvestInfo {}
+
 
 pub fn generate_map() -> Result<EthernetMap, LuwenError> {
     let mut chips = HashMap::new();
