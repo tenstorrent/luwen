@@ -74,7 +74,63 @@ jobs:
         with:
           command: test
           args: --no-fail-fast
+          
+  hardwre_test_wh:
+    name: Hardware Test Suite (WH)
+    runs-on: "tt-beta-ubuntu-2204-n150-large-stable"
 
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-${{ runner.arch }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run cargo test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --no-fail-fast --workspace --exclude pyluwen --features test_hardware 
+          
+  hardwre_test_bh:
+    name: Hardware Test Suite (BH)
+    runs-on: "tt-beta-ubuntu-2204-p150a-large-stable"
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-${{ runner.arch }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run cargo test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --no-fail-fast --workspace --exclude pyluwen --features test_hardware 
+  
 # Don't upload artifacts yet (since there's no junit file produced)
 #      - name: Archive test results
 #        uses: actions/upload-artifact@v4
