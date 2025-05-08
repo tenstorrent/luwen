@@ -237,6 +237,16 @@ pub struct Telemetry {
     tt_flash_version: u32,
     #[pyo3(get)]
     timer_heartbeat: u32,
+    #[pyo3(get)]
+    tensix_enabled_col: u32,
+    #[pyo3(get)]
+    enabled_eth: u32,
+    #[pyo3(get)]
+    enabled_gddr: u32,
+    #[pyo3(get)]
+    enabled_l2cpu: u32,
+    #[pyo3(get)]
+    enabled_pcie: u32,
 }
 impl From<luwen_if::chip::Telemetry> for Telemetry {
     fn from(value: luwen_if::chip::Telemetry) -> Self {
@@ -298,6 +308,11 @@ impl From<luwen_if::chip::Telemetry> for Telemetry {
             tt_flash_version: value.tt_flash_version,
             fw_bundle_version: value.fw_bundle_version,
             timer_heartbeat: value.timer_heartbeat,
+            tensix_enabled_col: value.tensix_enabled_col,
+            enabled_eth: value.enabled_eth,
+            enabled_gddr: value.enabled_gddr,
+            enabled_l2cpu: value.enabled_l2cpu,
+            enabled_pcie: value.enabled_pcie,
         }
     }
 }
