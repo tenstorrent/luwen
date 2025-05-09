@@ -101,6 +101,15 @@ pub trait ChipComms {
         addr: u64,
         data: &[u8],
     ) -> Result<(), Box<dyn std::error::Error>>;
+    fn noc_multicast(
+        &self,
+        chip_if: &dyn ChipInterface,
+        noc_id: u8,
+        start: (u8, u8),
+        end: (u8, u8),
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>>;
     fn noc_broadcast(
         &self,
         chip_if: &dyn ChipInterface,
@@ -133,6 +142,25 @@ pub trait ChipComms {
         value: u32,
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.noc_write(chip_if, noc_id, x, y, addr, value.to_le_bytes().as_slice())
+    }
+
+    fn noc_multicast32(
+        &self,
+        chip_if: &dyn ChipInterface,
+        noc_id: u8,
+        start: (u8, u8),
+        end: (u8, u8),
+        addr: u64,
+        value: u32,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.noc_multicast(
+            chip_if,
+            noc_id,
+            start,
+            end,
+            addr,
+            value.to_le_bytes().as_slice(),
+        )
     }
 
     fn noc_broadcast32(
@@ -317,6 +345,18 @@ impl ChipComms for ArcIf {
         chip_if.noc_write(noc_id, x, y, addr, data)
     }
 
+    fn noc_multicast(
+        &self,
+        chip_if: &dyn ChipInterface,
+        noc_id: u8,
+        start: (u8, u8),
+        end: (u8, u8),
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        chip_if.noc_multicast(noc_id, start, end, addr, data)
+    }
+
     fn noc_broadcast(
         &self,
         chip_if: &dyn ChipInterface,
@@ -382,6 +422,18 @@ impl ChipComms for NocIf {
         chip_if.noc_write(noc_id, x, y, addr, data)
     }
 
+    fn noc_multicast(
+        &self,
+        chip_if: &dyn ChipInterface,
+        noc_id: u8,
+        start: (u8, u8),
+        end: (u8, u8),
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        chip_if.noc_multicast(noc_id, start, end, addr, data)
+    }
+
     fn noc_broadcast(
         &self,
         chip_if: &dyn ChipInterface,
@@ -440,6 +492,19 @@ impl ChipComms for Arc<dyn ChipComms> {
         self.as_ref().noc_write(chip_if, noc_id, x, y, addr, data)
     }
 
+    fn noc_multicast(
+        &self,
+        chip_if: &dyn ChipInterface,
+        noc_id: u8,
+        start: (u8, u8),
+        end: (u8, u8),
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.as_ref()
+            .noc_multicast(chip_if, noc_id, start, end, addr, data)
+    }
+
     fn noc_broadcast(
         &self,
         chip_if: &dyn ChipInterface,
@@ -496,6 +561,19 @@ impl ChipComms for Arc<dyn ChipComms + Send + Sync> {
         data: &[u8],
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.as_ref().noc_write(chip_if, noc_id, x, y, addr, data)
+    }
+
+    fn noc_multicast(
+        &self,
+        chip_if: &dyn ChipInterface,
+        noc_id: u8,
+        start: (u8, u8),
+        end: (u8, u8),
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.as_ref()
+            .noc_multicast(chip_if, noc_id, start, end, addr, data)
     }
 
     fn noc_broadcast(

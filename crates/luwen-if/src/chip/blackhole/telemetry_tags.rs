@@ -41,4 +41,5 @@ pub enum TelemetryTags {
     EnabledGddr = 36,
     EnabledL2Cpu = 37,
     PcieUsage = 38,
+    NocTranslation = 40,
 }
