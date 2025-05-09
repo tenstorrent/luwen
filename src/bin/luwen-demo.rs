@@ -44,8 +44,8 @@ pub fn main() -> Result<(), LuwenError> {
                     write_threshold: 0,
                 });
 
-                let (offset, _size) = pci_interface.setup_tlb(
-                    168,
+                let (offset, _size) = pci_interface.device.setup_tlb(
+                    &ttkmd_if::PossibleTlbAllocation::Hardcoded(168),
                     Tlb {
                         local_offset: 0x0,
                         x_end: 1,
