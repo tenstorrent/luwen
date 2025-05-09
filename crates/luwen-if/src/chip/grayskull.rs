@@ -265,12 +265,9 @@ impl ChipImpl for Grayskull {
                                             // This is triggered when the s5 or pc registers readback
                                             // 0xffffffff. I am treating it like an AXI error and will
                                             // assume something has gone terribly wrong and abort.
-                                            crate::error::ArcReadyError::NoAccess => {
-                                                *arc_status = WaitStatus::Error(
-                                                    ArcInitError::WaitingForInit(reason),
-                                                );
-                                            }
-                                            crate::error::ArcReadyError::WatchdogTriggered
+                                            crate::error::ArcReadyError::NoAccess
+                                            | crate::error::ArcReadyError::BootError
+                                            | crate::error::ArcReadyError::WatchdogTriggered
                                             | crate::error::ArcReadyError::Asleep
                                             | crate::error::ArcReadyError::OldPostCode(_) => {
                                                 *arc_status = WaitStatus::Error(
