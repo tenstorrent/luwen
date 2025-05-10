@@ -423,6 +423,46 @@ pub fn comms_callback_inner(
                     std::slice::from_raw_parts(data, len as usize)
                 })?;
             }
+            luwen_if::FnNoc::Multicast {
+                noc_id,
+                start_x,
+                start_y,
+                end_x,
+                end_y,
+                addr,
+                data,
+                len,
+            } => {
+                let mut writer = ud.borrow_mut();
+                let writer: &mut ExtendedPciDevice = &mut writer;
+
+                let (min_start_x, min_start_y) = match writer.device.arch {
+                    luwen_core::Arch::Grayskull => (0, 0),
+                    luwen_core::Arch::Wormhole => (1, 0),
+                    luwen_core::Arch::Blackhole => (0, 1),
+                    luwen_core::Arch::Unknown(_) => todo!(),
+                };
+
+                let (start_x, start_y) = (start_x.min(min_start_x), start_y.min(min_start_y));
+
+                writer.setup_tlb(
+                    writer.default_tlb,
+                    Tlb {
+                        local_offset: addr,
+                        x_start: start_x,
+                        y_start: start_y,
+                        x_end: end_x,
+                        y_end: end_y,
+                        noc_sel: noc_id,
+                        mcast: true,
+                        ..Default::default()
+                    },
+                )?;
+
+                writer.noc_write(writer.default_tlb, addr, unsafe {
+                    std::slice::from_raw_parts(data, len as usize)
+                })?;
+            }
         },
         FnOptions::Eth(op) => match op.rw {
             luwen_if::FnNoc::Read {
@@ -601,6 +641,18 @@ pub fn comms_callback_inner(
                 len,
             } => {
                 todo!("Tried to do an ethernet broadcast which is not supported, noc_id: {}, addr: {:#x}, data: {:p}, len: {:x}", noc_id, addr, data, len);
+            }
+            luwen_if::FnNoc::Multicast {
+                noc_id,
+                start_x,
+                start_y,
+                end_x,
+                end_y,
+                addr,
+                data,
+                len,
+            } => {
+                todo!("Tried to do an ethernet multicast which is not supported, noc_id: {}, start: ({}, {}), end: ({}, {}), addr: {:#x}, data: {:p}, len: {:x}", noc_id, start_x, start_y, end_x, end_y, addr, data, len);
             }
         },
     }

@@ -22,6 +22,16 @@ pub enum FnNoc {
         data: *const u8,
         len: u64,
     },
+    Multicast {
+        noc_id: u8,
+        start_x: u8,
+        start_y: u8,
+        end_x: u8,
+        end_y: u8,
+        addr: u64,
+        data: *const u8,
+        len: u64,
+    },
     Broadcast {
         noc_id: u8,
         addr: u64,
@@ -232,6 +242,29 @@ impl<T: Clone + Send + 'static> ChipInterface for CallbackStorage<T> {
         )
     }
 
+    fn noc_multicast(
+        &self,
+        noc_id: u8,
+        start: (u8, u8),
+        end: (u8, u8),
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        (self.callback)(
+            &self.user_data,
+            FnOptions::Noc(FnNoc::Multicast {
+                noc_id,
+                start_x: start.0,
+                start_y: start.1,
+                end_x: end.0,
+                end_y: end.1,
+                addr,
+                data: data.as_ptr(),
+                len: data.len() as u64,
+            }),
+        )
+    }
+
     fn noc_broadcast(
         &self,
         noc_id: u8,
@@ -291,6 +324,33 @@ impl<T: Clone + Send + 'static> ChipInterface for CallbackStorage<T> {
                     noc_id,
                     x: x as u32,
                     y: y as u32,
+                    addr,
+                    data: data.as_ptr(),
+                    len: data.len() as u64,
+                },
+            }),
+        )
+    }
+
+    fn eth_noc_multicast(
+        &self,
+        eth_addr: EthAddr,
+        noc_id: u8,
+        start: (u8, u8),
+        end: (u8, u8),
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        (self.callback)(
+            &self.user_data,
+            FnOptions::Eth(FnRemote {
+                addr: eth_addr,
+                rw: FnNoc::Multicast {
+                    noc_id,
+                    start_x: start.0,
+                    start_y: start.1,
+                    end_x: end.0,
+                    end_y: end.1,
                     addr,
                     data: data.as_ptr(),
                     len: data.len() as u64,

@@ -238,6 +238,8 @@ pub struct Telemetry {
     #[pyo3(get)]
     timer_heartbeat: u32,
     #[pyo3(get)]
+    noc_translation_enabled: bool,
+    #[pyo3(get)]
     tensix_enabled_col: u32,
     #[pyo3(get)]
     enabled_eth: u32,
@@ -308,6 +310,7 @@ impl From<luwen_if::chip::Telemetry> for Telemetry {
             tt_flash_version: value.tt_flash_version,
             fw_bundle_version: value.fw_bundle_version,
             timer_heartbeat: value.timer_heartbeat,
+            noc_translation_enabled: value.noc_translation_enabled,
             tensix_enabled_col: value.tensix_enabled_col,
             enabled_eth: value.enabled_eth,
             enabled_gddr: value.enabled_gddr,
@@ -398,6 +401,46 @@ macro_rules! common_chip_comms_impls {
                     .map_err(|v| PyException::new_err(v.to_string()))
             }
 
+            pub fn noc_multicast(
+                &self,
+                noc_id: u8,
+                start: (u8, u8),
+                end: (u8, u8),
+                addr: u64,
+                data: pyo3::buffer::PyBuffer<u8>,
+            ) -> PyResult<()> {
+                Python::with_gil(|_py| {
+                    let ptr: *mut u8 = data.buf_ptr().cast();
+                    let len = data.len_bytes();
+
+                    let data = unsafe { std::slice::from_raw_parts(ptr, len) };
+
+                    let (start, end) = if self.0.get_arch() == Arch::Blackhole {
+                        let telemetry = self.get_telemetry()?;
+                        let translation_enabled = telemetry.noc_translation_enabled;
+
+                         if translation_enabled && noc_id != 0{
+                                (end, start)
+
+                        }  else {
+                            (start, end)
+                        }
+                    }  else {
+                        (start, end)
+                    };
+
+                    self.0
+                        .noc_multicast(noc_id, start, end, addr, data)
+                        .map_err(|v| PyException::new_err(v.to_string()))
+                })
+            }
+
+            pub fn noc_multicast32(&self, noc_id: u8, start: (u8, u8), end: (u8, u8), addr: u64, data: u32) -> PyResult<()> {
+                self.0
+                    .noc_multicast(noc_id, start, end, addr, &data.to_le_bytes())
+                    .map_err(|v| PyException::new_err(v.to_string()))
+            }
+
             pub fn noc_broadcast(
                 &self,
                 noc_id: u8,
@@ -409,9 +452,31 @@ macro_rules! common_chip_comms_impls {
                     let len = data.len_bytes();
 
                     let data = unsafe { std::slice::from_raw_parts(ptr, len) };
-                    self.0
-                        .noc_broadcast(noc_id, addr, data)
-                        .map_err(|v| PyException::new_err(v.to_string()))
+
+                    if self.0.get_arch() == Arch::Blackhole {
+                        let telemetry = self.get_telemetry()?;
+                        let translation_enabled = telemetry.noc_translation_enabled;
+
+                        if translation_enabled {
+                            let (start, end) = if noc_id == 0 {
+                                ((2, 3), (1, 2))
+                            }  else {
+                                ((1, 2), (2, 3))
+                            };
+
+                            self.0
+                            .noc_multicast(noc_id, start, end, addr, data)
+                            .map_err(|v| PyException::new_err(v.to_string()))
+                        }  else {
+                            self.0
+                                .noc_broadcast(noc_id, addr, data)
+                                .map_err(|v| PyException::new_err(v.to_string()))
+                        }
+                    } else {
+                        self.0
+                            .noc_broadcast(noc_id, addr, data)
+                            .map_err(|v| PyException::new_err(v.to_string()))
+                    }
                 })
             }
 

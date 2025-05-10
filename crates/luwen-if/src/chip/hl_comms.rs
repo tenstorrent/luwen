@@ -33,6 +33,18 @@ pub trait HlComms {
         arc_if.noc_write(chip_if, noc_id, x, y, addr, data)
     }
 
+    fn noc_multicast(
+        &self,
+        noc_id: u8,
+        start: (u8, u8),
+        end: (u8, u8),
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let (_, chip_if) = self.comms_obj();
+        chip_if.noc_multicast(noc_id, start, end, addr, data)
+    }
+
     fn noc_broadcast(
         &self,
         noc_id: u8,
