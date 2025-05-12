@@ -21,7 +21,10 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[cfg_attr(
+        not(all(feature = "test_hardware", feature = "test_wh_ubb")),
+        ignore = "Requires real wormhole hardware"
+    )]
     fn wh_ubb_reset_test() {
         wh_ubb::wh_ubb_ipmi_reset("0xF", "0xFF", "0x0", "0xF")
             .expect("Failed to execute wh_ubb_ipmi_reset");

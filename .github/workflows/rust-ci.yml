@@ -101,7 +101,13 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --no-fail-fast --workspace --exclude pyluwen --features test_hardware 
+          # All run in one thread; if it starts taking too long I could start requi 
+          # guarenteed thread safety 
+          args: |
+            --no-fail-fast --workspace --exclude pyluwen 
+            --features test_hardware --features test_wormhole 
+            --features test_n150 
+            -- --test-threads 1
           
   hardwre_test_bh:
     name: Hardware Test Suite (BH)
@@ -129,7 +135,13 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --no-fail-fast --workspace --exclude pyluwen --features test_hardware 
+          # All run in one thread; if it starts taking too long I could start requi 
+          # guarenteed thread safety 
+          args: |
+            --no-fail-fast --workspace --exclude pyluwen 
+            --features test_hardware --features test_blackhole 
+            --features test_p100a 
+            -- --test-threads 1
   
 # Don't upload artifacts yet (since there's no junit file produced)
 #      - name: Archive test results

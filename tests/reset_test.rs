@@ -108,8 +108,12 @@ mod tests {
         output
     }
 
+    // Ignoring BH because current FW cannot recover from a broken ARC
     #[test]
-    #[ignore = "Requires hardware"]
+    #[cfg_attr(
+        not(all(feature = "test_hardware", feature = "test_wormhole")),
+        ignore = "Requires real wormhole hardware"
+    )]
     fn wormhole_test_chip_reset() {
         println!("STARTING RESET TEST");
 

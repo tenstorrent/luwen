@@ -25,7 +25,10 @@ mod tests {
     use test_utils::hardware_available;
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[cfg_attr(
+        not(all(feature = "test_hardware", feature = "test_grayskull")),
+        ignore = "Requires hardware"
+    )]
     fn grayskull_detect_test() {
         assert!(hardware_available(), "Test requires hardware");
 
@@ -61,7 +64,10 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[cfg_attr(
+        not(all(feature = "test_hardware", feature = "test_wormhole")),
+        ignore = "Requires real wormhole hardware"
+    )]
     fn wormhole_detect_test() {
         assert!(hardware_available(), "Test requires hardware");
 
@@ -101,7 +107,10 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[cfg_attr(
+        not(all(feature = "test_hardware", feature = "test_blackhole")),
+        ignore = "Requires real blackhole hardware"
+    )]
     fn blackhole_detect_test() {
         assert!(hardware_available(), "Test requires hardware");
 

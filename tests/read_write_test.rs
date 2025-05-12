@@ -95,7 +95,10 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[cfg_attr(
+        not(all(feature = "test_hardware", feature = "test_wormhole")),
+        ignore = "Requires real wormhole hardware"
+    )]
     fn wormhole_test_aligned_register_access() {
         let mut fixture = TestFixture::setup().expect("Hardware should be available");
 
@@ -137,7 +140,10 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[cfg_attr(
+        not(all(feature = "test_hardware", feature = "test_wormhole")),
+        ignore = "Requires real wormhole hardware"
+    )]
     fn wormhole_test_unaligned_register_access() {
         let mut fixture = TestFixture::setup().expect("Hardware should be available");
 
@@ -191,7 +197,10 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[cfg_attr(
+        not(all(feature = "test_hardware", feature = "test_wormhole")),
+        ignore = "Requires real wormhole hardware"
+    )]
     fn wormhole_test_sequential_pattern_reads() {
         let mut fixture = TestFixture::setup().expect("Hardware should be available");
 
@@ -238,7 +247,10 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[cfg_attr(
+        not(all(feature = "test_hardware", feature = "test_wormhole")),
+        ignore = "Requires real wormhole hardware"
+    )]
     fn wormhole_test_aligned_block_operations() {
         let mut fixture = TestFixture::setup().expect("Hardware should be available");
 
@@ -266,7 +278,10 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[cfg_attr(
+        not(all(feature = "test_hardware", feature = "test_wormhole")),
+        ignore = "Requires real wormhole hardware"
+    )]
     fn wormhole_test_unaligned_block_operations() {
         let mut fixture = TestFixture::setup().expect("Hardware should be available");
 
@@ -328,7 +343,10 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[cfg_attr(
+        not(all(feature = "test_hardware", feature = "test_wormhole")),
+        ignore = "Requires real wormhole hardware"
+    )]
     fn wormhole_test_sequential_pattern_block_operations() {
         let mut fixture = TestFixture::setup().expect("Hardware should be available");
 
@@ -390,7 +408,10 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[cfg_attr(
+        not(all(feature = "test_hardware", feature = "test_wormhole")),
+        ignore = "Requires real wormhole hardware"
+    )]
     #[allow(clippy::cast_possible_truncation)]
     fn wormhole_test_large_block_transfers() {
         let mut fixture = TestFixture::setup().expect("Hardware should be available");

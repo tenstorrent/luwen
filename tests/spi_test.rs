@@ -26,7 +26,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[ignore = "Requires hardware with the ability to recover a broken SPI"]
     fn wormhole_test_spi_operations() {
         let devices = detect_chips().unwrap();
 
@@ -98,7 +98,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[ignore = "Requires hardware with the ability to recover a broken SPI"]
     // Named jtag_grayskull since recovery from some failures might need jtag
     // to reflash.
     fn jtag_grayskull_test_spi_operations() {
