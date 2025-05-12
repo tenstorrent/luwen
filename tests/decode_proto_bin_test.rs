@@ -24,7 +24,7 @@ mod tests {
     use test_utils::has_chip_type;
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[ignore = "Requires hardware with the ability to recover a broken SPI"]
     fn blackhole_test_decode_boardcfg() {
         assert!(
             has_chip_type(|chip| chip.as_bh().is_some()),
@@ -49,7 +49,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[ignore = "Requires hardware with the ability to recover a broken SPI"]
     fn blackhole_test_decode_flshinfo() {
         assert!(
             has_chip_type(|chip| chip.as_bh().is_some()),
@@ -74,7 +74,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[ignore = "Requires hardware with the ability to recover a broken SPI"]
     fn blackhole_test_decode_cmfwcfg() {
         assert!(
             has_chip_type(|chip| chip.as_bh().is_some()),
@@ -99,7 +99,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[ignore = "Requires hardware with the ability to recover a broken SPI"]
     fn blackhole_test_decode_origcfg() {
         assert!(
             has_chip_type(|chip| chip.as_bh().is_some()),
@@ -120,7 +120,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[ignore = "Requires hardware with the ability to recover a broken SPI"]
     fn blackhole_test_decode_nonexistent_table() {
         assert!(
             has_chip_type(|chip| chip.as_bh().is_some()),

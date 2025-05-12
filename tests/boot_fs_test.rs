@@ -23,7 +23,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[ignore = "Requires hardware with the ability to recover a broken SPI"]
     fn blackhole_test_boardcfg_tag() {
         // FIXME: This test assumes there are only BH chips in a system, which
         // is fragile. Also, should it iterate across all chips?
@@ -42,7 +42,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[ignore = "Requires hardware with the ability to recover a broken SPI"]
     fn blackhole_test_flshinfo_tag() {
         let devices = detect_chips().unwrap();
         let bh = devices[0].as_bh().unwrap();
@@ -59,7 +59,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[ignore = "Requires hardware with the ability to recover a broken SPI"]
     fn blackhole_test_cmfwcfg_tag() {
         let devices = detect_chips().unwrap();
         let bh = devices[0].as_bh().unwrap();
@@ -76,7 +76,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[ignore = "Requires hardware with the ability to recover a broken SPI"]
     fn blackhole_test_origcfg_tag() {
         let devices = detect_chips().unwrap();
         let bh = devices[0].as_bh().unwrap();

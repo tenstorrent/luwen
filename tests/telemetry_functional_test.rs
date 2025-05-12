@@ -20,11 +20,21 @@ use luwen_if::ChipImpl;
 mod test_utils;
 
 mod tests {
+    use std::sync::Mutex;
+
     use super::*;
 
+    // A HACK to solve problems with resource contention on the ARC in WH
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
+
     #[test]
-    #[ignore = "Requires hardware"]
+    #[cfg_attr(
+        not(all(feature = "test_hardware", feature = "test_hardware")),
+        ignore = "Requires real hardware"
+    )]
     fn test_telemetry_heartbeat() {
+        let _lock = TEST_LOCK.lock();
+
         let chip = luwen_ref::open(0).unwrap();
         println!("Detected chip; gathering telemetry");
 
@@ -40,6 +50,8 @@ mod tests {
         let telem_b = chip.get_telemetry().unwrap();
         println!("New heartbeat value: {}", telem_b.timer_heartbeat);
 
+        drop(_lock);
+
         // Verify the heartbeat changed, indicating ARC is running
         assert_ne!(
             telem_a.timer_heartbeat, telem_b.timer_heartbeat,
@@ -48,10 +60,17 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[cfg_attr(
+        not(all(feature = "test_hardware", feature = "test_hardware")),
+        ignore = "Requires real hardware"
+    )]
     fn test_voltage_readings() {
+        let _lock = TEST_LOCK.lock();
+
         let chip = luwen_ref::open(0).unwrap();
         let telemetry = chip.get_telemetry().unwrap();
+
+        drop(_lock);
 
         // Check vcore is within expected range (700-850 mV)
         println!("Vcore reading: {} mV", telemetry.vcore);
@@ -63,10 +82,17 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[cfg_attr(
+        not(all(feature = "test_hardware", feature = "test_hardware")),
+        ignore = "Requires real hardware"
+    )]
     fn test_temperature_readings() {
+        let _lock = TEST_LOCK.lock();
+
         let chip = luwen_ref::open(0).unwrap();
         let telemetry = chip.get_telemetry().unwrap();
+
+        drop(_lock);
 
         // Check TDC is within expected range (3-200)
         println!("TDC reading: {}", telemetry.tdc);
@@ -88,14 +114,20 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[cfg_attr(
+        not(all(feature = "test_hardware", feature = "test_hardware")),
+        ignore = "Requires real hardware"
+    )]
     fn test_telemetry_consistency() {
+        let _lock = TEST_LOCK.lock();
         let chip = luwen_ref::open(0).unwrap();
 
         // Take multiple telemetry readings in quick succession
         let telem1 = chip.get_telemetry().unwrap();
         let telem2 = chip.get_telemetry().unwrap();
         let telem3 = chip.get_telemetry().unwrap();
+
+        drop(_lock);
 
         // Check that board ID and asic ID remain consistent
         assert_eq!(

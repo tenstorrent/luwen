@@ -25,7 +25,10 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[cfg_attr(
+        not(all(feature = "test_hardware", feature = "test_wormhole")),
+        ignore = "Requires real wormhole hardware"
+    )]
     fn wormhole_test_chip_telemetry() {
         let partial_chips = luwen_ref::detect_chips_fallible().unwrap();
         assert!(!partial_chips.is_empty(), "Should find at least one chip");
@@ -72,7 +75,10 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[cfg_attr(
+        not(all(feature = "test_hardware", feature = "test_grayskull")),
+        ignore = "Requires real grayskull hardware"
+    )]
     fn grayskull_test_chip_telemetry() {
         let partial_chips = luwen_ref::detect_chips_fallible().unwrap();
         assert!(!partial_chips.is_empty(), "Should find at least one chip");
@@ -114,7 +120,10 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[cfg_attr(
+        not(all(feature = "test_hardware", feature = "test_blackhole")),
+        ignore = "Requires real blackhole hardware"
+    )]
     fn blackhole_test_chip_telemetry() {
         let partial_chips = luwen_ref::detect_chips_fallible().unwrap();
         assert!(!partial_chips.is_empty(), "Should find at least one chip");
