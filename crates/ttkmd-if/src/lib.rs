@@ -489,6 +489,178 @@ impl PciDevice {
         self.allocate_dma_buffer_range(size, size)
     }
 
+    pub fn resource_lock(&self, index: u8) -> Result<bool, PciError> {
+        let mut data = ioctl::LockCtl {
+            input: ioctl::LockCtlIn {
+                flags: ioctl::LOCK_CTL_ACQUIRE,
+                index,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let result = unsafe { ioctl::lock_ctl(self.device_fd.as_raw_fd(), (&mut data) as *mut _) };
+
+        match result {
+            Ok(value) => {
+                if value == 1 {
+                    Ok(true)
+                } else if value == 0 {
+                    Ok(false)
+                } else {
+                    Err(PciError::IoctlError(nix::errno::Errno::EINVAL))
+                }
+            }
+            Err(errno) => Err(PciError::IoctlError(errno)),
+        }
+    }
+
+    pub fn resource_unlock(&self, index: u8) -> Result<bool, PciError> {
+        let mut data = ioctl::LockCtl {
+            input: ioctl::LockCtlIn {
+                flags: ioctl::LOCK_CTL_RELEASE,
+                index,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let result = unsafe { ioctl::lock_ctl(self.device_fd.as_raw_fd(), (&mut data) as *mut _) };
+
+        match result {
+            Ok(value) => {
+                if value == 1 {
+                    Ok(true)
+                } else if value == 0 {
+                    Ok(false)
+                } else {
+                    Err(PciError::IoctlError(nix::errno::Errno::EINVAL))
+                }
+            }
+            Err(errno) => Err(PciError::IoctlError(errno)),
+        }
+    }
+
+    pub fn resource_test(&self, index: u8) -> Result<bool, PciError> {
+        let mut data = ioctl::LockCtl {
+            input: ioctl::LockCtlIn {
+                flags: ioctl::LOCK_CTL_TEST,
+                index,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let result = unsafe { ioctl::lock_ctl(self.device_fd.as_raw_fd(), (&mut data) as *mut _) };
+
+        match result {
+            Ok(value) => {
+                if value != 0 {
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
+            }
+            Err(errno) => Err(PciError::IoctlError(errno)),
+        }
+    }
+
+    pub fn allocate_tlb(&self, size: u64) -> Result<TlbAllocation, PciError> {
+        let mut data = ioctl::AllocateTlb {
+            input: ioctl::AllocateTlbIn {
+                size,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let result =
+            unsafe { ioctl::allocate_tlb(self.device_fd.as_raw_fd(), (&mut data) as *mut _) };
+
+        let uc_mapping = unsafe {
+            memmap2::MmapOptions::default()
+                .len(size as usize)
+                .offset(data.output.mmap_offset_uc)
+                .map_mut(self.device_fd.as_raw_fd())
+        }
+        .map_err(|_err| PciError::TlbAllocationError("Failed to map uc buffer".to_string()))?;
+
+        let wc_mapping = unsafe {
+            memmap2::MmapOptions::default()
+                .len(size as usize)
+                .offset(data.output.mmap_offset_wc)
+                .map_mut(self.device_fd.as_raw_fd())
+        }
+        .map_err(|_err| PciError::TlbAllocationError("Failed to map wc buffer".to_string()))?;
+
+        match result {
+            Ok(rc) => match rc {
+                0 => Ok(TlbAllocation {
+                    id: data.output.id,
+                    uc_mapping,
+                    wc_mapping,
+                    size,
+                }),
+                errno => Err(PciError::IoctlError(nix::errno::Errno::from_i32(errno))),
+            },
+            Err(errno) => Err(PciError::IoctlError(errno)),
+        }
+    }
+
+    pub fn free_tlb(&self, alloc: &TlbAllocation) -> Result<bool, PciError> {
+        let result = unsafe {
+            ioctl::free_tlb(
+                self.device_fd.as_raw_fd(),
+                (&mut ioctl::FreeTlb {
+                    input: ioctl::FreeTlbIn { id: alloc.id },
+                    output: ioctl::FreeTlbOut {},
+                }) as *mut _,
+            )
+        };
+
+        match result {
+            Ok(rc) => match rc {
+                0 => Ok(true),
+                _ => Ok(false),
+            },
+            Err(errno) => match errno {
+                nix::errno::Errno::EINVAL => Ok(false),
+                errno => Err(PciError::IoctlError(errno)),
+            },
+        }
+    }
+
+    pub fn configure_tlb(
+        &self,
+        alloc: &TlbAllocation,
+        config: ioctl::NocTlbConfig,
+    ) -> Result<bool, PciError> {
+        let result = unsafe {
+            ioctl::configure_tlb(
+                self.device_fd.as_raw_fd(),
+                (&mut ioctl::ConfigureTlb {
+                    input: ioctl::ConfigureTlbIn {
+                        id: alloc.id,
+                        config,
+                    },
+                    output: ioctl::ConfigureTlbOut {
+                        ..Default::default()
+                    },
+                }) as *mut _,
+            )
+        };
+
+        match result {
+            Ok(rc) => match rc {
+                0 => Ok(true),
+                _ => Ok(false),
+            },
+            Err(errno) => match errno {
+                nix::errno::Errno::EINVAL => Ok(false),
+                errno => Err(PciError::IoctlError(errno)),
+            },
+        }
+    }
+
     pub fn scan() -> Vec<usize> {
         let output = std::fs::read_dir("/dev/tenstorrent");
         let output = match output {

@@ -216,3 +216,43 @@ nix::ioctl_readwrite_bad!(
     request_code_none!(TENSTORRENT_IOCTL_MAGIC, 6),
     ResetDevice
 );
+
+pub const LOCK_CTL_ACQUIRE: u32 = 0;
+pub const LOCK_CTL_RELEASE: u32 = 1;
+pub const LOCK_CTL_TEST: u32 = 2;
+
+#[repr(C)]
+pub struct LockCtlIn {
+    pub output_size_bytes: u32,
+    pub flags: u32,
+    pub index: u8,
+}
+
+impl Default for LockCtlIn {
+    fn default() -> Self {
+        Self {
+            output_size_bytes: std::mem::size_of::<Self>() as u32,
+            flags: 0,
+            index: 0,
+        }
+    }
+}
+
+#[derive(Default)]
+#[repr(C)]
+pub struct LockCtlOut {
+    pub result: u8,
+}
+
+#[derive(Default)]
+#[repr(C)]
+pub struct LockCtl {
+    pub input: LockCtlIn,
+    pub output: LockCtlOut,
+}
+
+nix::ioctl_readwrite_bad!(
+    lock_ctl,
+    request_code_none!(TENSTORRENT_IOCTL_MAGIC, 8),
+    LockCtl
+);
