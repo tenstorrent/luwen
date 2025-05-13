@@ -9,7 +9,6 @@ pub enum Arch {
     Grayskull,
     Wormhole,
     Blackhole,
-    Unknown(u16),
 }
 
 impl Default for Arch {
@@ -51,7 +50,6 @@ impl fmt::Display for Arch {
             Arch::Grayskull => write!(f, "Grayskull"),
             Arch::Wormhole => write!(f, "Wormhole"),
             Arch::Blackhole => write!(f, "Blackhole"),
-            Arch::Unknown(u) => write!(f, "Unknown({})", u),
         }
     }
 }

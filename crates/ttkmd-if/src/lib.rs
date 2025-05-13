@@ -22,13 +22,15 @@ use ioctl::{
 use luwen_core::Arch;
 pub use tlb::{DeviceTlbInfo, Tlb};
 
-impl From<&GetDeviceInfoOut> for Arch {
-    fn from(value: &GetDeviceInfoOut) -> Self {
+impl TryFrom<&GetDeviceInfoOut> for Arch {
+    type Error = u16;
+
+    fn try_from(value: &GetDeviceInfoOut) -> Result<Self, Self::Error> {
         match value.device_id {
-            0xfaca => Arch::Grayskull,
-            0x401e => Arch::Wormhole,
-            0xb140 => Arch::Blackhole,
-            id => Arch::Unknown(id),
+            0xfaca => Ok(Arch::Grayskull),
+            0x401e => Ok(Arch::Wormhole),
+            0xb140 => Ok(Arch::Blackhole),
+            id => Err(id),
         }
     }
 }
@@ -400,7 +402,12 @@ impl PciDevice {
             });
         }
 
-        let arch = Arch::from(&device_info.output);
+        let arch = Arch::try_from(&device_info.output).map_err(|asic_id| {
+            PciOpenError::UnrecognizedDeviceId {
+                pci_id: device_id,
+                device_id: asic_id,
+            }
+        })?;
 
         let max_dma_buf_size_log2 = device_info.output.max_dma_buf_size_log2;
 

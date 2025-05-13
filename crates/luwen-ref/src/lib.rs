@@ -60,7 +60,6 @@ impl ExtendedPciDevice {
             luwen_core::Arch::Grayskull => (13, 12),
             luwen_core::Arch::Wormhole => (10, 12),
             luwen_core::Arch::Blackhole => (17, 12),
-            luwen_core::Arch::Unknown(id) => unreachable!("found unrecognizable id {id:x}"),
         };
 
         let default_tlb;
@@ -274,7 +273,6 @@ pub fn comms_callback_inner(
                     luwen_core::Arch::Grayskull => (0, 0),
                     luwen_core::Arch::Wormhole => (1, 0),
                     luwen_core::Arch::Blackhole => (0, 1),
-                    luwen_core::Arch::Unknown(_) => todo!(),
                 };
 
                 writer.device.noc_write(
@@ -309,7 +307,6 @@ pub fn comms_callback_inner(
                     luwen_core::Arch::Grayskull => (0, 0),
                     luwen_core::Arch::Wormhole => (1, 0),
                     luwen_core::Arch::Blackhole => (0, 1),
-                    luwen_core::Arch::Unknown(_) => todo!(),
                 };
 
                 let (start_x, start_y) = (start_x.max(min_start_x), start_y.max(min_start_y));
