@@ -1,6 +1,6 @@
 [package]
 name = "ttkmd-if"
-version = "0.2.1"
+version = "0.2.2"
 description = "Lowest level pci interface to the tenstorrent driver (ttkmd)"
 edition = "2021"
 license = "Apache-2.0"

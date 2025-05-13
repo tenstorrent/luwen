@@ -1,6 +1,6 @@
 [package]
 name = "luwen-ref"
-version = "0.5.2"
+version = "0.5.3"
 description = "Reference pci communication implementation"
 edition = "2021"
 license = "Apache-2.0"
