@@ -20,6 +20,9 @@ use ttkmd_if::PciDevice;
 /// The tests will automatically detect if compatible hardware is present;
 /// if hardware is not found, the test will be skipped.
 mod tests {
+    use luwen_if::chip::HlComms;
+    use luwen_ref::detect_chips_fallible;
+
     use super::*;
 
     // Common test fixture setup
@@ -462,5 +465,96 @@ mod tests {
             write_buffer, readback_buffer,
             "Large block transfer with offset +1 failed"
         );
+    }
+
+    #[test]
+    #[ignore = "Requires hardware"]
+    #[allow(clippy::cast_possible_truncation)]
+    fn blackhole_test_large_block_transfers_broadcast() {
+        let bh = detect_chips_fallible().expect("need to be able to talk to the chips");
+        let bh = bh
+            .iter()
+            .filter_map(|chip| chip.try_upgrade())
+            .filter_map(|chip| chip.as_bh())
+            .next()
+            .expect("one working BH chip");
+
+        let mut write_buffer = vec![0; 1024];
+        for (index, r) in write_buffer.iter_mut().enumerate() {
+            // The modulo ensures we never exceed u8 range
+            let value = index % 256;
+            // Safe cast: we've ensured the value is < 256, which fits in u8
+            *r = value as u8;
+        }
+
+        let telem = bh
+            .get_telemetry()
+            .expect("need to be able to fetch telemetry");
+
+        let mut all_tensix = Vec::new();
+        for y in 2..=11 {
+            for x in 1..=7 {
+                all_tensix.push((x, y));
+            }
+
+            for x in 10..=16 {
+                all_tensix.push((x, y));
+            }
+        }
+
+        let working_cores = if telem.noc_translation_enabled {
+            bh.noc_multicast(0, (2, 3), (1, 2), 0, &write_buffer)
+                .expect("multicast to succeed");
+
+            let mut working_tensix = Vec::with_capacity(all_tensix.len());
+
+            let working_cols = telem.tensix_enabled_col.count_ones();
+            for core in all_tensix {
+                let x = core.0 as u32;
+                if (x <= 7 && x < working_cols) || (x >= 10 && (x - 2) < working_cols) {
+                    working_tensix.push(core);
+                }
+            }
+
+            working_tensix
+        } else {
+            bh.noc_broadcast(0, 0, &write_buffer)
+                .expect("broadcast to succeed");
+
+            let mut working_col_bitmask = telem.tensix_enabled_col;
+
+            let mut working_cols = Vec::new();
+            let mut col = 0;
+            let tensix_cols = [1, 2, 3, 4, 5, 6, 7, 10, 11, 12, 13, 14, 15, 16];
+            while working_col_bitmask != 0 {
+                if working_col_bitmask & 0x1 != 0 {
+                    working_cols.push(tensix_cols[col]);
+                }
+                working_col_bitmask >>= 1;
+                col += 1;
+            }
+
+            let mut working_tensix = Vec::with_capacity(all_tensix.len());
+            for core in all_tensix {
+                if working_cols.contains(&core.0) {
+                    working_tensix.push(core);
+                }
+            }
+
+            working_tensix
+        };
+
+        for core in working_cores {
+            println!("Checking core {core:?}");
+
+            let mut readback_buffer = vec![0u8; write_buffer.len()];
+            bh.noc_read(0, core.0, core.1, 0, &mut readback_buffer)
+                .expect("readback to succeed");
+
+            assert_eq!(
+                write_buffer, readback_buffer,
+                "Write to core {core:?} failed"
+            );
+        }
     }
 }

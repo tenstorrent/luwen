@@ -443,7 +443,7 @@ pub fn comms_callback_inner(
                     luwen_core::Arch::Unknown(_) => todo!(),
                 };
 
-                let (start_x, start_y) = (start_x.min(min_start_x), start_y.min(min_start_y));
+                let (start_x, start_y) = (start_x.max(min_start_x), start_y.max(min_start_y));
 
                 writer.setup_tlb(
                     writer.default_tlb,

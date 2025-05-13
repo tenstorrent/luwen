@@ -441,6 +441,33 @@ macro_rules! common_chip_comms_impls {
                     .map_err(|v| PyException::new_err(v.to_string()))
             }
 
+            fn broadcast_impl(&self, noc_id: u8, addr: u64, data: &[u8]) -> PyResult<()> {
+                if self.0.get_arch() == Arch::Blackhole {
+                    let telemetry = self.get_telemetry()?;
+                    let translation_enabled = telemetry.noc_translation_enabled;
+
+                    if translation_enabled {
+                        let (start, end) = if noc_id == 0 {
+                            ((2, 3), (1, 2))
+                        }  else {
+                            ((1, 2), (2, 3))
+                        };
+
+                        self.0
+                            .noc_multicast(noc_id, start, end, addr, data)
+                            .map_err(|v| PyException::new_err(v.to_string()))
+                    }  else {
+                        self.0
+                            .noc_broadcast(noc_id, addr, data)
+                            .map_err(|v| PyException::new_err(v.to_string()))
+                    }
+                } else {
+                    self.0
+                        .noc_broadcast(noc_id, addr, data)
+                        .map_err(|v| PyException::new_err(v.to_string()))
+                }
+            }
+
             pub fn noc_broadcast(
                 &self,
                 noc_id: u8,
@@ -452,38 +479,12 @@ macro_rules! common_chip_comms_impls {
                     let len = data.len_bytes();
 
                     let data = unsafe { std::slice::from_raw_parts(ptr, len) };
-
-                    if self.0.get_arch() == Arch::Blackhole {
-                        let telemetry = self.get_telemetry()?;
-                        let translation_enabled = telemetry.noc_translation_enabled;
-
-                        if translation_enabled {
-                            let (start, end) = if noc_id == 0 {
-                                ((2, 3), (1, 2))
-                            }  else {
-                                ((1, 2), (2, 3))
-                            };
-
-                            self.0
-                            .noc_multicast(noc_id, start, end, addr, data)
-                            .map_err(|v| PyException::new_err(v.to_string()))
-                        }  else {
-                            self.0
-                                .noc_broadcast(noc_id, addr, data)
-                                .map_err(|v| PyException::new_err(v.to_string()))
-                        }
-                    } else {
-                        self.0
-                            .noc_broadcast(noc_id, addr, data)
-                            .map_err(|v| PyException::new_err(v.to_string()))
-                    }
+                    self.broadcast_impl(noc_id, addr, data)
                 })
             }
 
             pub fn noc_broadcast32(&self, noc_id: u8, addr: u64, data: u32) -> PyResult<()> {
-                self.0
-                    .noc_broadcast(noc_id, addr, &data.to_le_bytes())
-                    .map_err(|v| PyException::new_err(v.to_string()))
+                self.broadcast_impl(noc_id, addr, &data.to_le_bytes())
             }
 
             pub fn axi_translate(&self, addr: &str) -> PyResult<AxiData> {

@@ -7,7 +7,7 @@ mod blackhole;
 mod grayskull;
 mod wormhole;
 
-#[derive(Clone, Default)]
+#[derive(Debug, Clone, Default)]
 #[repr(u8)]
 pub enum Ordering {
     RELAXED = 0,
@@ -41,7 +41,7 @@ impl From<Ordering> for u8 {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct TlbStride {
     pub stride_x: u8,
     pub stride_y: u8,
@@ -51,7 +51,7 @@ pub struct TlbStride {
     pub num_destinations: u8,
 }
 
-#[derive(Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Tlb {
     pub local_offset: u64,
     pub x_end: u8,
