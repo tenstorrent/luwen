@@ -58,7 +58,6 @@ fn main() {
                 luwen_core::Arch::Blackhole => {
                     Box::new(blackhole::ResetTracker::init(interface)) as Box<dyn Reset>
                 }
-                luwen_core::Arch::Unknown(_) => todo!(),
             };
             trackers.push((tracker, false));
         }
