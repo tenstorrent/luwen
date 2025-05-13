@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    tlb::{MemoryType, TlbInfo},
+    tlb::{MemoryType, SpecificTlbInfo, TlbInfo},
     DeviceTlbInfo, PciDevice, PciError, Tlb,
 };
 
@@ -255,6 +255,58 @@ pub fn setup_tlb(
     Ok((mmio_addr + addr_offset, size - addr_offset))
 }
 
+pub fn get_specific_tlb_info(device: &PciDevice, tlb_index: u32) -> SpecificTlbInfo {
+    const TLB_CONFIG_BASE: u64 = 0x1FC00000;
+
+    const TLB_COUNT_1M: u64 = 156;
+    const TLB_COUNT_2M: u64 = 10;
+    const _TLB_COUNT_16M: u64 = 20;
+
+    const _TLB_INDEX_1M: u64 = 0;
+    const _TLB_INDEX_2M: u64 = TLB_COUNT_1M;
+    const _TLB_INDEX_16M: u64 = TLB_COUNT_1M + TLB_COUNT_2M;
+
+    const TLB_BASE_1M: u64 = 0;
+    const TLB_BASE_2M: u64 = TLB_COUNT_1M * (1 << 20);
+    const TLB_BASE_16M: u64 = TLB_BASE_2M + TLB_COUNT_2M * (1 << 21);
+
+    let tlb_config_addr = TLB_CONFIG_BASE + (tlb_index as u64 * 8);
+
+    let (tlb_data_addr, size) = match tlb_index {
+        0..=155 => {
+            let size = 1 << 20;
+
+            (TLB_BASE_1M + size * tlb_index as u64, size)
+        }
+        156..=165 => {
+            let size = 1 << 21;
+
+            (TLB_BASE_2M + size * (tlb_index - 156) as u64, size)
+        }
+        166..=185 => {
+            let size = 1 << 24;
+
+            (TLB_BASE_16M + size * (tlb_index - 166) as u64, size)
+        }
+        _ => {
+            panic!("TLB index out of range");
+        }
+    };
+
+    let memory_type = if device.bar0_wc_size > tlb_data_addr {
+        MemoryType::Wc
+    } else {
+        MemoryType::Uc
+    };
+
+    SpecificTlbInfo {
+        config_base: tlb_config_addr,
+        data_base: tlb_data_addr,
+        size,
+        memory_type,
+    }
+}
+
 pub fn get_tlb(device: &PciDevice, tlb_index: u32) -> Result<Tlb, PciError> {
     const TLB_CONFIG_BASE: u32 = 0x1FC00000;
     let tlb_config_addr = TLB_CONFIG_BASE + (tlb_index * 8);
@@ -279,25 +331,44 @@ pub fn tlb_info(device: &PciDevice) -> DeviceTlbInfo {
     const TLB_COUNT_2M: u64 = 10;
     const TLB_COUNT_16M: u64 = 20;
 
+    let mut tlb_config = vec![
+        TlbInfo {
+            count: TLB_COUNT_1M,
+            size: 1 << 20,
+            memory_type: MemoryType::Uc,
+        },
+        TlbInfo {
+            count: TLB_COUNT_2M,
+            size: 1 << 21,
+            memory_type: MemoryType::Uc,
+        },
+        TlbInfo {
+            count: TLB_COUNT_16M,
+            size: 1 << 24,
+            memory_type: MemoryType::Uc,
+        },
+    ];
+
+    let mut count = 0;
+    for index in 0..tlb_config.len() {
+        if count + tlb_config[index].size * tlb_config[index].count < device.bar0_wc_size {
+            tlb_config[index].memory_type = MemoryType::Wc;
+        } else if count + tlb_config[index].size < device.bar0_wc_size {
+            let new_info = TlbInfo {
+                count: (device.bar0_wc_size - count) / tlb_config[index].size,
+                size: tlb_config[index].size,
+                memory_type: MemoryType::Wc,
+            };
+            tlb_config.insert(index, new_info);
+
+            tlb_config[index + 1].count -= (device.bar0_wc_size - count) / tlb_config[index].size;
+        }
+        count += tlb_config[index].size * tlb_config[index].count;
+    }
+
     DeviceTlbInfo {
         device_id: device.id as u32,
         total_count: 186,
-        tlb_config: vec![
-            TlbInfo {
-                count: TLB_COUNT_1M,
-                size: 1 << 20,
-                memory_type: MemoryType::Uc,
-            },
-            TlbInfo {
-                count: TLB_COUNT_2M,
-                size: 1 << 21,
-                memory_type: MemoryType::Uc,
-            },
-            TlbInfo {
-                count: TLB_COUNT_16M,
-                size: 1 << 24,
-                memory_type: MemoryType::Uc,
-            },
-        ],
+        tlb_config,
     }
 }

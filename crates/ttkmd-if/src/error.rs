@@ -18,6 +18,9 @@ pub enum PciOpenError {
     #[error("Failed to open device /dev/tenstorrent/{id}: {source}")]
     DeviceOpenFailed { id: usize, source: std::io::Error },
 
+    #[error("Failed to recognize id for device /dev/tenstorrent/{pci_id}: {device_id:x}")]
+    UnrecognizedDeviceId { pci_id: usize, device_id: u16 },
+
     #[error("ioctl {name} failed for device {id} with: {source}")]
     IoctlError {
         name: String,

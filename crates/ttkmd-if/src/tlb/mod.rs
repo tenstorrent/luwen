@@ -7,7 +7,7 @@ mod blackhole;
 mod grayskull;
 mod wormhole;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Debug, Default, Hash, PartialEq)]
 #[repr(u8)]
 pub enum Ordering {
     RELAXED = 0,
@@ -41,7 +41,7 @@ impl From<Ordering> for u8 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Hash, PartialEq)]
 pub struct TlbStride {
     pub stride_x: u8,
     pub stride_y: u8,
@@ -69,11 +69,13 @@ pub struct Tlb {
     pub stride: Option<TlbStride>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum MemoryType {
     Uc,
     Wc,
 }
 
+#[derive(Debug)]
 pub struct TlbInfo {
     pub count: u64,
     pub size: u64,
@@ -86,12 +88,27 @@ pub struct DeviceTlbInfo {
     pub tlb_config: Vec<TlbInfo>,
 }
 
+#[derive(Debug)]
+pub struct SpecificTlbInfo {
+    pub config_base: u64,
+    pub data_base: u64,
+    pub size: u64,
+    pub memory_type: MemoryType,
+}
+
+pub fn get_per_tlb_info(device: &PciDevice, index: u32) -> SpecificTlbInfo {
+    match device.arch {
+        crate::Arch::Grayskull => grayskull::get_specific_tlb_info(device, index),
+        crate::Arch::Wormhole => wormhole::get_specific_tlb_info(device, index),
+        crate::Arch::Blackhole => blackhole::get_specific_tlb_info(device, index),
+    }
+}
+
 pub fn get_tlb(device: &PciDevice, index: u32) -> Result<Tlb, PciError> {
     match device.arch {
         crate::Arch::Grayskull => grayskull::get_tlb(device, index),
         crate::Arch::Wormhole => wormhole::get_tlb(device, index),
         crate::Arch::Blackhole => blackhole::get_tlb(device, index),
-        crate::Arch::Unknown(_) => todo!(),
     }
 }
 
@@ -100,7 +117,6 @@ pub fn setup_tlb(device: &mut PciDevice, index: u32, tlb: Tlb) -> Result<(u64, u
         crate::Arch::Grayskull => grayskull::setup_tlb(device, index, tlb),
         crate::Arch::Wormhole => wormhole::setup_tlb(device, index, tlb),
         crate::Arch::Blackhole => blackhole::setup_tlb(device, index, tlb),
-        crate::Arch::Unknown(_) => todo!(),
     }
 }
 
@@ -109,6 +125,5 @@ pub fn get_tlb_info(device: &PciDevice) -> DeviceTlbInfo {
         crate::Arch::Grayskull => grayskull::tlb_info(device),
         crate::Arch::Wormhole => wormhole::tlb_info(device),
         crate::Arch::Blackhole => blackhole::tlb_info(device),
-        crate::Arch::Unknown(_) => todo!(),
     }
 }
