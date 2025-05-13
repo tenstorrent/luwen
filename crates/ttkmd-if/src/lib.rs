@@ -120,6 +120,7 @@ pub struct PciDevice {
     next_dma_buf: usize,
 
     device_fd: std::fs::File,
+    pub driver_version: u32,
 
     config_space: std::fs::File,
 
@@ -382,11 +383,18 @@ impl PciDevice {
         };
 
         let mut device_info = GetDeviceInfo::default();
-        device_info.input.output_size_bytes = std::mem::size_of::<ioctl::GetDeviceInfoOut>() as u32;
-
         if let Err(errorno) = unsafe { ioctl::get_device_info(fd.as_raw_fd(), &mut device_info) } {
             return Err(PciOpenError::IoctlError {
                 name: "get_device_info".to_string(),
+                id: device_id,
+                source: errorno,
+            });
+        }
+
+        let mut driver_info = ioctl::GetDriverInfo::default();
+        if let Err(errorno) = unsafe { ioctl::get_driver_info(fd.as_raw_fd(), &mut driver_info) } {
+            return Err(PciOpenError::IoctlError {
+                name: "get_driver_info".to_string(),
                 id: device_id,
                 source: errorno,
             });
@@ -440,6 +448,7 @@ impl PciDevice {
             next_dma_buf: 0,
 
             device_fd: fd,
+            driver_version: driver_info.output.driver_version,
 
             config_space,
 

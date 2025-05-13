@@ -65,16 +65,9 @@ impl ExtendedPciDevice {
 
         let default_tlb;
 
-        // Driver 1.33+ will have the allocation APIs enabled
+        // Driver 1.35+ will have the allocation APIs enabled
         // Grayskull does not support the allocation API
-        if device.arch != Arch::Grayskull
-            && ttkmd_if::get_version()
-                >= Some(DriverVersion {
-                    major: 1,
-                    minor: 33,
-                    ..Default::default()
-                })
-        {
+        if device.arch != Arch::Grayskull && device.driver_version >= 2 {
             // Try to allocate progressively smaller TLBs until we find one that looks like it'll work
             let mut size = 1 << 20;
 
