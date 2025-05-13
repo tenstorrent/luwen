@@ -828,7 +828,7 @@ impl PciDevice {
     }
 }
 
-#[derive(Default, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct DriverVersion {
     pub major: u32,
     pub minor: u32,
@@ -857,45 +857,111 @@ impl PartialOrd for DriverVersion {
     }
 }
 
+fn driver_version_parse(version: &str) -> DriverVersion {
+    let mut driver_version = DriverVersion::default();
+    let version = version.trim();
+
+    let version = if let Some((a, b)) = version.split_once('-') {
+        driver_version.quirk = Some(b.to_string());
+
+        a
+    } else {
+        version
+    };
+
+    let mut it = version.splitn(3, '.');
+    if let Some(v) = it.next() {
+        if let Ok(v) = v.parse() {
+            driver_version.major = v;
+        }
+    }
+    if let Some(v) = it.next() {
+        if let Ok(v) = v.parse() {
+            driver_version.minor = v;
+        }
+    }
+    if let Some(v) = it.next() {
+        if let Ok(v) = v.parse() {
+            driver_version.patch = v;
+        }
+    }
+
+    driver_version
+}
+
 pub fn get_version() -> Option<DriverVersion> {
     std::fs::read_to_string("/sys/module/tenstorrent/version")
         .ok()
-        .map(|version| {
-            let mut driver_version = DriverVersion::default();
-            let version = version.trim();
-
-            let version = if let Some((a, b)) = version.split_once('-') {
-                driver_version.quirk = Some(b.to_string());
-
-                a
-            } else {
-                version
-            };
-
-            let mut it = version.splitn(3, '.');
-            if let Some(v) = it.next() {
-                if let Ok(v) = v.parse() {
-                    driver_version.major = v;
-                }
-            }
-            if let Some(v) = it.next() {
-                if let Ok(v) = v.parse() {
-                    driver_version.minor = v;
-                }
-            }
-            if let Some(v) = it.next() {
-                if let Ok(v) = v.parse() {
-                    driver_version.patch = v;
-                }
-            }
-
-            driver_version
-        })
+        .map(|version| driver_version_parse(&version))
 }
-
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn test_get_version() {
+        assert_eq!(
+            DriverVersion::default(),
+            DriverVersion {
+                major: 0,
+                minor: 0,
+                patch: 0,
+                quirk: None
+            },
+            "default driver version did not match expected values"
+        );
+        assert_eq!(
+            driver_version_parse("1"),
+            DriverVersion {
+                major: 1,
+                ..Default::default()
+            }
+        );
+        assert_eq!(
+            driver_version_parse("1.33"),
+            DriverVersion {
+                major: 1,
+                minor: 33,
+                ..Default::default()
+            }
+        );
+        assert_eq!(
+            driver_version_parse("1.33.5"),
+            DriverVersion {
+                major: 1,
+                minor: 33,
+                patch: 5,
+                ..Default::default()
+            }
+        );
+        assert_eq!(
+            driver_version_parse("1.33.5-quirk"),
+            DriverVersion {
+                major: 1,
+                minor: 33,
+                patch: 5,
+                quirk: Some("quirk".to_string())
+            }
+        );
+        assert_eq!(
+            driver_version_parse("1.33-quirk"),
+            DriverVersion {
+                major: 1,
+                minor: 33,
+                quirk: Some("quirk".to_string()),
+                ..Default::default()
+            }
+        );
+        assert_eq!(
+            driver_version_parse("1-quirk"),
+            DriverVersion {
+                major: 1,
+                quirk: Some("quirk".to_string()),
+                ..Default::default()
+            }
+        );
+        assert_eq!(driver_version_parse("bad"), DriverVersion::default());
+    }
 
     fn verify_noc(device: &mut PciDevice, tlb: PossibleTlbAllocation) {
         let node_info = match device.arch {
