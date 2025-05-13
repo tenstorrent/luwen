@@ -15,4 +15,4 @@ luwen-if = {path = "../luwen-if", version = "0.6.0" }
 luwen-ref = {path = "../luwen-ref", version = "0.5.1" }
 serde_json = "1.0.117"
 
-pyo3 = { version = "0.19.2", features = ["extension-module", "multiple-pymethods"] }
+pyo3 = { version = "0.19.2", features = ["abi3-py38", "extension-module", "multiple-pymethods"] }
