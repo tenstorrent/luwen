@@ -5,10 +5,18 @@ const TENSTORRENT_IOCTL_MAGIC: usize = 0xFA;
 
 use nix::request_code_none;
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 #[repr(C)]
 pub struct GetDeviceInfoIn {
     pub output_size_bytes: u32,
+}
+
+impl Default for GetDeviceInfoIn {
+    fn default() -> Self {
+        Self {
+            output_size_bytes: std::mem::size_of::<GetDeviceInfoOut>() as u32,
+        }
+    }
 }
 
 #[derive(Default, Debug)]
@@ -152,10 +160,17 @@ nix::ioctl_readwrite_bad!(
     FreeDmaBuffer
 );
 
-#[derive(Default)]
 #[repr(C)]
 pub struct GetDriverInfoIn {
     pub output_size_bytes: u32,
+}
+
+impl Default for GetDriverInfoIn {
+    fn default() -> Self {
+        Self {
+            output_size_bytes: std::mem::size_of::<GetDriverInfoOut>() as u32,
+        }
+    }
 }
 
 #[derive(Default)]
