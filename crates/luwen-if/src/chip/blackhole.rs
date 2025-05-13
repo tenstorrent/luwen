@@ -687,6 +687,9 @@ impl ChipImpl for Blackhole {
                     TelemetryTags::EnabledGddr => telemetry_data.enabled_gddr = data,
                     TelemetryTags::EnabledL2Cpu => telemetry_data.enabled_l2cpu = data,
                     TelemetryTags::PcieUsage => telemetry_data.enabled_pcie = data,
+                    TelemetryTags::NocTranslation => {
+                        telemetry_data.noc_translation_enabled = data != 0
+                    }
                     _ => (),
                 }
             }

@@ -43,6 +43,14 @@ pub trait ChipInterface: 'static {
         addr: u64,
         data: &[u8],
     ) -> Result<(), Box<dyn std::error::Error>>;
+    fn noc_multicast(
+        &self,
+        noc_id: u8,
+        start: (u8, u8),
+        end: (u8, u8),
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>>;
 
     /// Read and write to a noc endpoint via ethernet on a local or remote chip.
     fn eth_noc_read(
@@ -60,6 +68,15 @@ pub trait ChipInterface: 'static {
         noc_id: u8,
         x: u8,
         y: u8,
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>>;
+    fn eth_noc_multicast(
+        &self,
+        eth_addr: EthAddr,
+        noc_id: u8,
+        start: (u8, u8),
+        end: (u8, u8),
         addr: u64,
         data: &[u8],
     ) -> Result<(), Box<dyn std::error::Error>>;
@@ -109,6 +126,17 @@ impl ChipInterface for Arc<dyn ChipInterface + Send + Sync> {
         self.as_ref().noc_write(noc_id, x, y, addr, data)
     }
 
+    fn noc_multicast(
+        &self,
+        noc_id: u8,
+        start: (u8, u8),
+        end: (u8, u8),
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.as_ref().noc_multicast(noc_id, start, end, addr, data)
+    }
+
     fn noc_broadcast(
         &self,
         noc_id: u8,
@@ -142,6 +170,19 @@ impl ChipInterface for Arc<dyn ChipInterface + Send + Sync> {
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.as_ref()
             .eth_noc_write(eth_addr, noc_id, x, y, addr, data)
+    }
+
+    fn eth_noc_multicast(
+        &self,
+        eth_addr: EthAddr,
+        noc_id: u8,
+        start: (u8, u8),
+        end: (u8, u8),
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.as_ref()
+            .eth_noc_multicast(eth_addr, noc_id, start, end, addr, data)
     }
 
     fn eth_noc_broadcast(
@@ -205,6 +246,17 @@ impl ChipInterface for NocInterface {
         self.backing.noc_write(noc_id, x, y, addr, data)
     }
 
+    fn noc_multicast(
+        &self,
+        noc_id: u8,
+        start: (u8, u8),
+        end: (u8, u8),
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.backing.noc_multicast(noc_id, start, end, addr, data)
+    }
+
     fn noc_broadcast(
         &self,
         noc_id: u8,
@@ -238,6 +290,19 @@ impl ChipInterface for NocInterface {
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.backing
             .eth_noc_write(eth_addr, noc_id, x, y, addr, data)
+    }
+
+    fn eth_noc_multicast(
+        &self,
+        eth_addr: EthAddr,
+        noc_id: u8,
+        start: (u8, u8),
+        end: (u8, u8),
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.backing
+            .eth_noc_multicast(eth_addr, noc_id, start, end, addr, data)
     }
 
     fn eth_noc_broadcast(

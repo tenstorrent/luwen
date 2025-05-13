@@ -62,6 +62,18 @@ impl ChipComms for RemoteArcIf {
         chip_if.eth_noc_write(self.addr, noc_id, x, y, addr, data)
     }
 
+    fn noc_multicast(
+        &self,
+        chip_if: &dyn ChipInterface,
+        noc_id: u8,
+        start: (u8, u8),
+        end: (u8, u8),
+        addr: u64,
+        data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        chip_if.eth_noc_multicast(self.addr, noc_id, start, end, addr, data)
+    }
+
     fn noc_broadcast(
         &self,
         chip_if: &dyn ChipInterface,

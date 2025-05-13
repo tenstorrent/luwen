@@ -95,6 +95,17 @@ pub struct LuwenGlue {
         len: u64,
         user_data: *mut std::ffi::c_void,
     ),
+    noc_multicast: extern "C" fn(
+        noc_id: u8,
+        start_x: u8,
+        start_y: u8,
+        end_x: u8,
+        end_y: u8,
+        addr: u64,
+        data: *const u8,
+        len: u64,
+        user_data: *mut std::ffi::c_void,
+    ),
     noc_broadcast: extern "C" fn(
         noc_id: u8,
         addr: u64,
@@ -120,6 +131,18 @@ pub struct LuwenGlue {
         noc_id: u8,
         x: u32,
         y: u32,
+        addr: u64,
+        data: *const u8,
+        len: u64,
+        user_data: *mut std::ffi::c_void,
+    ),
+    eth_multicast: extern "C" fn(
+        eth_addr: EthAddr,
+        noc_id: u8,
+        start_x: u8,
+        start_y: u8,
+        end_x: u8,
+        end_y: u8,
         addr: u64,
         data: *const u8,
         len: u64,
@@ -197,6 +220,29 @@ pub fn callback_glue(
                 (glue_data.noc_broadcast)(noc_id, addr, data, len, glue_data.user_data);
                 Ok(())
             }
+            luwen_if::FnNoc::Multicast {
+                noc_id,
+                start_x,
+                start_y,
+                end_x,
+                end_y,
+                addr,
+                data,
+                len,
+            } => {
+                (glue_data.noc_multicast)(
+                    noc_id,
+                    start_x,
+                    start_y,
+                    end_x,
+                    end_y,
+                    addr,
+                    data,
+                    len,
+                    glue_data.user_data,
+                );
+                Ok(())
+            }
         },
         FnOptions::Eth(op) => match op.rw {
             luwen_if::FnNoc::Read {
@@ -263,6 +309,35 @@ pub fn callback_glue(
                         rack_y: op.addr.rack_y,
                     },
                     noc_id,
+                    addr,
+                    data,
+                    len,
+                    glue_data.user_data,
+                );
+                Ok(())
+            }
+            luwen_if::FnNoc::Multicast {
+                noc_id,
+                start_x,
+                start_y,
+                end_x,
+                end_y,
+                addr,
+                data,
+                len,
+            } => {
+                (glue_data.eth_multicast)(
+                    EthAddr {
+                        shelf_x: op.addr.shelf_x,
+                        shelf_y: op.addr.shelf_y,
+                        rack_x: op.addr.rack_x,
+                        rack_y: op.addr.rack_y,
+                    },
+                    noc_id,
+                    start_x,
+                    start_y,
+                    end_x,
+                    end_y,
                     addr,
                     data,
                     len,
