@@ -149,7 +149,7 @@ impl PciDevice {
     }
 
     #[inline]
-    pub fn write32(&mut self, addr: u32, data: u32) -> Result<(), PciError> {
+    pub fn write32(&self, addr: u32, data: u32) -> Result<(), PciError> {
         let write_pointer = unsafe { self.register_address_mut::<u32>(addr) } as usize;
         if write_pointer % core::mem::align_of::<u32>() != 0 {
             unsafe {
@@ -177,7 +177,7 @@ impl PciDevice {
         Ok(())
     }
 
-    pub fn write_no_dma<T>(&mut self, addr: u32, data: &[T]) {
+    pub fn write_no_dma<T>(&self, addr: u32, data: &[T]) {
         unsafe {
             let ptr = self.register_address_mut::<T>(addr);
             ptr.copy_from_nonoverlapping(data.as_ptr(), data.len());
@@ -353,6 +353,26 @@ impl PciDevice {
             }
         }
 
+        unsafe {
+            Self::memcpy_from_device(data, self.register_address(addr));
+        }
+
+        if data.len() >= std::mem::size_of::<u32>() {
+            self.detect_ffffffff_read(Some(unsafe { (data.as_ptr() as *const u32).read() }))?;
+        }
+
+        Ok(())
+    }
+
+    pub fn write_block_no_dma(&self, addr: u32, data: &[u8]) -> Result<(), PciError> {
+        unsafe {
+            Self::memcpy_to_device(self.register_address_mut(addr), data);
+        }
+
+        Ok(())
+    }
+
+    pub fn read_block_no_dma(&self, addr: u32, data: &mut [u8]) -> Result<(), PciError> {
         unsafe {
             Self::memcpy_from_device(data, self.register_address(addr));
         }
