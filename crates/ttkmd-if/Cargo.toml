@@ -14,3 +14,7 @@ bitfield-struct = "0.6.0"
 
 thiserror = "1.0.40"
 tracing = "0.1.40"
+
+[features]
+test_hardware = []
+test_grayskull = []

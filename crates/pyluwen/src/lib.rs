@@ -18,6 +18,7 @@ use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use serde_json::Value;
+use ttkmd_if::PossibleTlbAllocation;
 
 #[pyclass]
 pub struct PciChip(luwen_if::chip::Chip);
@@ -705,7 +706,19 @@ impl PciChip {
 
     pub fn bar_size(&self) -> PyResult<u64> {
         let info = self.device_info()?;
-        Ok(info.bar_size)
+        if let Some(bar_size) = info.bar_size {
+            Ok(bar_size)
+        } else {
+            let device_id = if let Ok(device_id) = self.device_id() {
+                device_id.to_string()
+            } else {
+                "?".to_string()
+            };
+
+            Err(PyException::new_err(format!(
+                "Could not get bar_size from PciDevice[{device_id}]",
+            )))
+        }
     }
 
     pub fn get_pci_bdf(&self) -> PyResult<String> {
@@ -762,7 +775,7 @@ impl PciGrayskull {
         let value = PciInterface::from_gs(self);
 
         if let Some(value) = value {
-            value.pci_interface.borrow_mut().default_tlb = index;
+            value.pci_interface.borrow_mut().default_tlb = PossibleTlbAllocation::Hardcoded(index);
             Ok(())
         } else {
             Err(PyException::new_err(
@@ -893,8 +906,9 @@ impl PciInterface<'_> {
     ) -> (u64, u64) {
         self.pci_interface
             .borrow_mut()
+            .device
             .setup_tlb(
-                index,
+                &PossibleTlbAllocation::Hardcoded(index),
                 ttkmd_if::Tlb {
                     local_offset: addr,
                     x_end,
@@ -911,18 +925,42 @@ impl PciInterface<'_> {
             .unwrap()
     }
 
-    pub fn noc_read(&self, tlb_index: u32, addr: u64, data: &mut [u8]) {
+    pub fn noc_read(&self, tlb_index: u32, addr: u64, data: &mut [u8]) -> Result<(), String> {
+        let index = PossibleTlbAllocation::Hardcoded(tlb_index);
+        let mut tlb = self
+            .pci_interface
+            .borrow()
+            .device
+            .get_tlb(&index)
+            .map_err(|v| v.to_string())?;
+        tlb.local_offset = addr;
+
         self.pci_interface
             .borrow_mut()
-            .noc_read(tlb_index, addr, data)
+            .device
+            .noc_read(&index, tlb, data)
             .unwrap();
+
+        Ok(())
     }
 
-    pub fn noc_write(&self, tlb_index: u32, addr: u64, data: &[u8]) {
+    pub fn noc_write(&self, tlb_index: u32, addr: u64, data: &[u8]) -> Result<(), String> {
+        let index = PossibleTlbAllocation::Hardcoded(tlb_index);
+        let mut tlb = self
+            .pci_interface
+            .borrow()
+            .device
+            .get_tlb(&index)
+            .map_err(|v| v.to_string())?;
+        tlb.local_offset = addr;
+
         self.pci_interface
             .borrow_mut()
-            .noc_write(tlb_index, addr, data)
+            .device
+            .noc_write(&index, tlb, data)
             .unwrap();
+
+        Ok(())
     }
 
     pub fn allocate_dma_buffer(&self, size: u32) -> Result<DmaBuffer, String> {
@@ -1062,7 +1100,7 @@ impl PciWormhole {
         let value = PciInterface::from_wh(self);
 
         if let Some(value) = value {
-            value.pci_interface.borrow_mut().default_tlb = index;
+            value.pci_interface.borrow_mut().default_tlb = PossibleTlbAllocation::Hardcoded(index);
             Ok(())
         } else {
             Err(PyException::new_err(
@@ -1267,7 +1305,7 @@ impl PciBlackhole {
         let value = PciInterface::from_bh(self);
 
         if let Some(value) = value {
-            value.pci_interface.borrow_mut().default_tlb = index;
+            value.pci_interface.borrow_mut().default_tlb = PossibleTlbAllocation::Hardcoded(index);
             Ok(())
         } else {
             Err(PyException::new_err(
