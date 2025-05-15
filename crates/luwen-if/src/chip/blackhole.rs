@@ -739,7 +739,9 @@ impl ChipImpl for Blackhole {
                     // TelemetryTags::CM_FW_VERSION => telemetry_data.cm_fw_version = data,
                     TelemetryTags::L2cpuFwVersion => telemetry_data.l2cpu_fw_version = data,
                     TelemetryTags::FanSpeed => telemetry_data.fan_speed = data,
-                    TelemetryTags::TimerHeartbeat => telemetry_data.timer_heartbeat = data,
+                    TelemetryTags::TimerHeartbeat => {
+                        telemetry_data.timer_heartbeat = data;
+                    }
                     TelemetryTags::TelemEnumCount => telemetry_data.entry_count = data,
                     TelemetryTags::EnabledTensixCol => telemetry_data.tensix_enabled_col = data,
                     TelemetryTags::EnabledEth => telemetry_data.enabled_eth = data,
@@ -755,6 +757,7 @@ impl ChipImpl for Blackhole {
         }
         telemetry_data.board_id =
             ((telemetry_data.board_id_high as u64) << 32) | telemetry_data.board_id_low as u64;
+        telemetry_data.arch = self.get_arch();
         Ok(telemetry_data)
     }
 

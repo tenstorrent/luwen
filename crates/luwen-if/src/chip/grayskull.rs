@@ -754,6 +754,7 @@ impl ChipImpl for Grayskull {
         //         .axi_read32(&self.chip_if, telemetry_struct_offset + (5 * 4))? as u64;
 
         Ok(super::Telemetry {
+            arch: self.get_arch(),
             board_id: ((board_id_high as u64) << 32) | (board_id_low as u64),
             enum_version,
             device_id,

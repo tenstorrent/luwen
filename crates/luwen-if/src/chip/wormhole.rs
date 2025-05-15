@@ -1122,6 +1122,7 @@ impl ChipImpl for Wormhole {
         };
 
         Ok(super::Telemetry {
+            arch: self.get_arch(),
             board_id: ((board_id_high as u64) << 32) | (board_id_low as u64),
             enum_version,
             device_id,
@@ -1171,6 +1172,7 @@ impl ChipImpl for Wormhole {
             eth_debug_status1,
             tt_flash_version,
             fw_bundle_version,
+            timer_heartbeat: arc0_health,
             ..Default::default()
         })
     }
