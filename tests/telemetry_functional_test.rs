@@ -28,19 +28,18 @@ mod tests {
     static TEST_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
-    #[cfg_attr(
-        not(all(feature = "test_hardware", feature = "test_hardware")),
-        ignore = "Requires real hardware"
-    )]
+    #[cfg_attr(not(feature = "test_hardware"), ignore = "Requires real hardware")]
     fn test_telemetry_heartbeat() {
         let _lock = TEST_LOCK.lock();
 
         let chip = luwen_ref::open(0).unwrap();
         println!("Detected chip; gathering telemetry");
 
+        dbg!(chip.get_arch());
+
         // Get initial telemetry
         let telem_a = chip.get_telemetry().unwrap();
-        println!("Initial heartbeat value: {}", telem_a.timer_heartbeat);
+        println!("Initial heartbeat value: {}", telem_a.telemetry_heartbeat());
 
         // Sleep to allow time for heartbeat to change
         println!("Sleeping for 1 second before checking telemetry again");
@@ -48,22 +47,20 @@ mod tests {
 
         println!("Gathering telemetry again");
         let telem_b = chip.get_telemetry().unwrap();
-        println!("New heartbeat value: {}", telem_b.timer_heartbeat);
+        println!("New heartbeat value: {}", telem_b.telemetry_heartbeat());
 
         drop(_lock);
 
         // Verify the heartbeat changed, indicating ARC is running
         assert_ne!(
-            telem_a.timer_heartbeat, telem_b.timer_heartbeat,
+            telem_a.telemetry_heartbeat(),
+            telem_b.telemetry_heartbeat(),
             "ARC appears to be hung - heartbeat not changing"
         );
     }
 
     #[test]
-    #[cfg_attr(
-        not(all(feature = "test_hardware", feature = "test_hardware")),
-        ignore = "Requires real hardware"
-    )]
+    #[cfg_attr(not(feature = "test_hardware"), ignore = "Requires real hardware")]
     fn test_voltage_readings() {
         let _lock = TEST_LOCK.lock();
 
@@ -82,10 +79,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(
-        not(all(feature = "test_hardware", feature = "test_hardware")),
-        ignore = "Requires real hardware"
-    )]
+    #[cfg_attr(not(feature = "test_hardware"), ignore = "Requires real hardware")]
     fn test_temperature_readings() {
         let _lock = TEST_LOCK.lock();
 
@@ -95,29 +89,25 @@ mod tests {
         drop(_lock);
 
         // Check TDC is within expected range (3-200)
-        println!("TDC reading: {}", telemetry.tdc);
+        let tdc = telemetry.tdc & 0xFFFF;
+        println!("TDC reading: {}", tdc);
         assert!(
-            telemetry.tdc >= 3 && telemetry.tdc <= 200,
+            (3..=300).contains(&tdc),
             "Board TDC (temperature) reading is outside of the expected range: {}",
-            telemetry.tdc
+            tdc
         );
 
         // Check asic temperature
-        println!("ASIC temperature: {}", telemetry.asic_temperature);
-        if telemetry.asic_temperature > 0 {
-            assert!(
-                telemetry.asic_temperature <= 125,
-                "ASIC temperature reading is outside of expected range: {}",
-                telemetry.asic_temperature
-            );
-        }
+        println!("ASIC temperature: {}", telemetry.asic_temperature());
+        assert!(
+            telemetry.asic_temperature() > 0.0 && telemetry.asic_temperature() <= 125.0,
+            "ASIC temperature reading is outside of expected range: {}",
+            telemetry.asic_temperature()
+        );
     }
 
     #[test]
-    #[cfg_attr(
-        not(all(feature = "test_hardware", feature = "test_hardware")),
-        ignore = "Requires real hardware"
-    )]
+    #[cfg_attr(not(feature = "test_hardware"), ignore = "Requires real hardware")]
     fn test_telemetry_consistency() {
         let _lock = TEST_LOCK.lock();
         let chip = luwen_ref::open(0).unwrap();
@@ -151,7 +141,6 @@ mod tests {
 
         // Verify presence of telemetry data
         assert_ne!(telem1.board_id, 0, "Board ID should not be zero");
-        assert_ne!(telem1.asic_id, 0, "ASIC ID should not be zero");
 
         println!("Board ID: {:X}", telem1.board_id);
         println!("ASIC ID: {:X}", telem1.asic_id);

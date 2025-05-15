@@ -12,6 +12,12 @@ pub enum Arch {
     Unknown(u16),
 }
 
+impl Default for Arch {
+    fn default() -> Self {
+        Arch::Unknown(0)
+    }
+}
+
 impl Arch {
     pub fn is_wormhole(&self) -> bool {
         matches!(self, Arch::Wormhole)

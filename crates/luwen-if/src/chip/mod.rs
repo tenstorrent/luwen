@@ -65,6 +65,7 @@ pub struct NeighbouringChip {
 
 #[derive(Default, Debug)]
 pub struct Telemetry {
+    pub arch: Arch,
     pub board_id: u64,
     pub enum_version: u32,
     pub entry_count: u32,
@@ -232,7 +233,16 @@ impl Telemetry {
 
     /// Return the ASIC temperature in degrees celsius.
     pub fn asic_temperature(&self) -> f64 {
-        ((self.asic_temperature & 0xffff) >> 4) as f64
+        if self.arch.is_blackhole() {
+            let frac: f64 = (self.asic_temperature & 0xFFFF).into();
+            let frac = frac / 65536.0;
+
+            let int: f64 = (self.asic_temperature >> 16).into();
+
+            int + frac
+        } else {
+            ((self.asic_temperature & 0xffff) >> 4) as f64
+        }
     }
 
     /// Return the voltage regulator temperature in degrees celsius.
@@ -263,6 +273,14 @@ impl Telemetry {
     /// Return the current consumption in amperes.
     pub fn current(&self) -> f64 {
         (self.tdc & 0xffff) as f64
+    }
+
+    pub fn telemetry_heartbeat(&self) -> u32 {
+        if self.arch.is_blackhole() {
+            self.timer_heartbeat
+        } else {
+            self.arc0_health
+        }
     }
 }
 
