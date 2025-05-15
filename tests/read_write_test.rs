@@ -489,7 +489,10 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires hardware"]
+    #[cfg_attr(
+        not(all(feature = "test_hardware", feature = "test_blackhole")),
+        ignore = "Requires real blackhole hardware"
+    )]
     #[allow(clippy::cast_possible_truncation)]
     fn blackhole_test_large_block_transfers_broadcast() {
         let bh = detect_chips_fallible().expect("need to be able to talk to the chips");
