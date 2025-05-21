@@ -1,7 +1,7 @@
-use serde_json::Value;
-use serde::Serialize;
-use std::collections::HashMap;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
+use serde_json::Value;
+use std::collections::HashMap;
 
 pub mod flash_info {
     include!(concat!(env!("OUT_DIR"), "/flash_info.rs"));

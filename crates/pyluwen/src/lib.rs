@@ -1774,7 +1774,7 @@ fn serde_json_value_to_pyobject(py: Python, value: &Value) -> PyResult<PyObject>
 }
 
 /// Helper function to convert PyObject to serde_json::Value
-fn pyobject_to_serde_json_value(py: Python, obj: &PyAny) -> PyResult<Value> {
+fn pyobject_to_serde_json_value(_py: Python, obj: &PyAny) -> PyResult<Value> {
     if obj.is_none() {
         Ok(Value::Null)
     } else if let Ok(b) = obj.extract::<bool>() {
@@ -1789,17 +1789,17 @@ fn pyobject_to_serde_json_value(py: Python, obj: &PyAny) -> PyResult<Value> {
         )?))
     } else if let Ok(s) = obj.extract::<String>() {
         Ok(Value::String(s))
-    } else if let Ok(list) = obj.cast_as::<PyList>() {
+    } else if let Ok(list) = obj.downcast::<PyList>() {
         let mut array = Vec::new();
         for item in list {
-            array.push(pyobject_to_serde_json_value(py, item)?);
+            array.push(pyobject_to_serde_json_value(_py, item)?);
         }
         Ok(Value::Array(array))
-    } else if let Ok(dict) = obj.cast_as::<PyDict>() {
+    } else if let Ok(dict) = obj.downcast::<PyDict>() {
         let mut map = serde_json::Map::new();
         for (key, value) in dict {
             let key: String = key.extract()?;
-            map.insert(key, pyobject_to_serde_json_value(py, value)?);
+            map.insert(key, pyobject_to_serde_json_value(_py, value)?);
         }
         Ok(Value::Object(map))
     } else {
