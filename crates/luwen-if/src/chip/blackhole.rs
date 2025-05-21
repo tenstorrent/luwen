@@ -423,21 +423,11 @@ impl Blackhole {
         // Return the decoded boot fs table as a HashMap
         // Get the spi address and image size of the tag and read the proto bin
         // Decode the proto bin and convert it to a HashMap
-        let spi_addr = self
+        let tag_info = self
             .get_boot_fs_tables_spi_read(tag_name)?
-            .unwrap()
-            .1
-            .spi_addr;
-        let image_size = self
-            .get_boot_fs_tables_spi_read(tag_name)?
-            .unwrap()
-            .1
-            .flags
-            .image_size();
-        let boot_fs = self.get_boot_fs_tables_spi_read(tag_name)?.unwrap().1;
-        let boot_fs_bytes = bytes_of(&boot_fs);
-        let boot_fs_bytes = &boot_fs_bytes[..boot_fs_bytes.len() - 4];
-        let checksum = spirom_tables::calculate_checksum(boot_fs_bytes);
+            .ok_or_else(|| format!("Tag '{}' not found in boot FS tables", tag_name))?;
+        let spi_addr = tag_info.1.spi_addr;
+        let image_size = tag_info.1.flags.image_size();
 
         // declare as vec to allow non-const size
         let mut proto_bin = vec![0u8; image_size as usize];
@@ -463,13 +453,24 @@ impl Blackhole {
         Ok(final_decode_map)
     }
 
-    pub fn encode_and_write_boot_fs_table<T: prost::Message>(
+    pub fn encode_and_write_boot_fs_table(
         &self,
-        message: T,
+        hashmap: HashMap<String, Value>,
         tag_name: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        // Encode the message to a proto bin
-        let mut proto_bin = message.encode_to_vec();
+        // Convert the HashMap to a proto message and encode it to a proto bin
+        let mut proto_bin = if tag_name == "cmfwcfg" {
+            spirom_tables::from_hash_map::<spirom_tables::fw_table::FwTable>(hashmap)
+                .encode_to_vec()
+        } else if tag_name == "boardcfg" {
+            spirom_tables::from_hash_map::<spirom_tables::read_only::ReadOnly>(hashmap)
+                .encode_to_vec()
+        } else if tag_name == "flshinfo" {
+            spirom_tables::from_hash_map::<spirom_tables::flash_info::FlashInfoTable>(hashmap)
+                .encode_to_vec()
+        } else {
+            return Err(format!("Unsupported tag name: {}", tag_name).into());
+        };
         // Pad the proto bin to be a multiple of 4 bytes to fit into the spirom requirements
         let padding = 4 - (proto_bin.len() % 4);
         for i in 0..padding {
@@ -477,7 +478,9 @@ impl Blackhole {
         }
 
         // Write the proto bin to the spirom and update the checksums
-        let tag_info = self.get_boot_fs_tables_spi_read(tag_name)?.unwrap();
+        let tag_info = self
+            .get_boot_fs_tables_spi_read(tag_name)?
+            .ok_or_else(|| format!("Tag '{}' not found in boot FS tables", tag_name))?;
 
         let mut fd_in_spi = tag_info.1;
         fd_in_spi.flags.set_image_size(proto_bin.len() as u32);

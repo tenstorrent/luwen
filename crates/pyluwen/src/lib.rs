@@ -18,6 +18,7 @@ use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use serde_json::Value;
+use std::collections::HashMap;
 use ttkmd_if::PossibleTlbAllocation;
 
 #[pyclass]
@@ -1449,6 +1450,29 @@ impl PciBlackhole {
         })
     }
 
+    pub fn encode_and_write_boot_fs_table(
+        &self,
+        py: Python,
+        message: Py<PyDict>,
+        tag_name: &str,
+    ) -> PyResult<()> {
+        // Convert the pydict to a HashMap<String, Value>
+        let py_dict = message.as_ref(py);
+        let mut result: HashMap<String, Value> = HashMap::new();
+
+        for (key, value) in py_dict.iter() {
+            let key: String = key.extract()?;
+            let value: Value = pyobject_to_serde_json_value(py, value)?;
+            result.insert(key, value);
+        }
+
+        // Encode the boot fs table given the tag name and write it to the spi
+        self.0
+            .encode_and_write_boot_fs_table(result, tag_name)
+            .map_err(|v| PyException::new_err(v.to_string()))?;
+        Ok(())
+    }
+
     pub fn get_spirom_table_spi_addr(&self, tag_name: &str) -> PyResult<u32> {
         // Return the spi address given the tagname
         let result = self
@@ -1464,7 +1488,7 @@ impl PciBlackhole {
             .0
             .get_boot_fs_tables_spi_read(tag_name)
             .map_err(|v| PyException::new_err(v.to_string()))?;
-        Ok(unsafe { result.unwrap().1.flags.f.image_size() })
+        Ok(result.unwrap().1.flags.image_size())
     }
 }
 
@@ -1746,5 +1770,39 @@ fn serde_json_value_to_pyobject(py: Python, value: &Value) -> PyResult<PyObject>
             }
             Ok(py_dict.into_py(py))
         }
+    }
+}
+
+/// Helper function to convert PyObject to serde_json::Value
+fn pyobject_to_serde_json_value(py: Python, obj: &PyAny) -> PyResult<Value> {
+    if obj.is_none() {
+        Ok(Value::Null)
+    } else if let Ok(b) = obj.extract::<bool>() {
+        Ok(Value::Bool(b))
+    } else if let Ok(i) = obj.extract::<i64>() {
+        Ok(Value::Number(i.into()))
+    } else if let Ok(u) = obj.extract::<u64>() {
+        Ok(Value::Number(u.into()))
+    } else if let Ok(f) = obj.extract::<f64>() {
+        Ok(Value::Number(serde_json::Number::from_f64(f).ok_or_else(
+            || PyException::new_err("Failed to convert float to JSON number"),
+        )?))
+    } else if let Ok(s) = obj.extract::<String>() {
+        Ok(Value::String(s))
+    } else if let Ok(list) = obj.cast_as::<PyList>() {
+        let mut array = Vec::new();
+        for item in list {
+            array.push(pyobject_to_serde_json_value(py, item)?);
+        }
+        Ok(Value::Array(array))
+    } else if let Ok(dict) = obj.cast_as::<PyDict>() {
+        let mut map = serde_json::Map::new();
+        for (key, value) in dict {
+            let key: String = key.extract()?;
+            map.insert(key, pyobject_to_serde_json_value(py, value)?);
+        }
+        Ok(Value::Object(map))
+    } else {
+        Err(PyException::new_err("Unsupported Python object type"))
     }
 }
