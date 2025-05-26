@@ -33,6 +33,7 @@ fn main() {
     let result = cbindgen::Builder::new()
         .with_pragma_once(true)
         .with_namespace("luwen")
+        .with_after_include("struct Chip;")
         .with_crate(std::env::var("CARGO_MANIFEST_DIR").unwrap())
         .generate()
         .expect("Unable to generate bindings");
