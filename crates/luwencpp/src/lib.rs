@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use luwen_if::{
-    chip::{ArcMsgOptions, Chip},
-    error::PlatformError,
-    ArcMsg, ArcMsgError, ArcMsgProtocolError, CallbackStorage, ChipImpl, FnOptions,
+    chip::ArcMsgOptions, error::PlatformError, ArcMsg, ArcMsgError, ArcMsgProtocolError,
+    CallbackStorage, ChipImpl, FnOptions,
 };
 
 #[repr(C)]
@@ -155,6 +154,19 @@ pub struct LuwenGlue {
         len: u64,
         user_data: *mut std::ffi::c_void,
     ),
+}
+
+/// Newtype wrapper for luwen_if::chip::Chip
+/// cbindgen:no-export
+#[repr(transparent)]
+pub struct Chip(luwen_if::chip::Chip);
+
+impl std::ops::Deref for Chip {
+    type Target = luwen_if::chip::Chip;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 /// SAFETY: I really don't have a way to guarantee that the user_data is safe to send to other threads
@@ -355,14 +367,14 @@ pub extern "C" fn luwen_open(arch: Arch, glue: LuwenGlue) -> *mut Chip {
         Arch::WORMHOLE => luwen_core::Arch::Wormhole,
     };
 
-    if let Ok(chip) = Chip::open(
+    if let Ok(chip) = luwen_if::chip::Chip::open(
         arch,
         CallbackStorage {
             callback: callback_glue,
             user_data: glue,
         },
     ) {
-        Box::leak(Box::new(chip))
+        Box::leak(Box::new(Chip(chip)))
     } else {
         std::ptr::null_mut()
     }
@@ -377,7 +389,9 @@ pub unsafe extern "C" fn luwen_open_remote(local_chip: *mut Chip, addr: EthAddr)
 
     if let Some(wh) = local_chip.as_wh() {
         let remote = wh.open_remote(luwen_if::EthAddr::from(addr)).unwrap();
-        Box::leak(Box::new(Chip::from(Box::new(remote) as Box<_>)))
+        Box::leak(Box::new(Chip(luwen_if::chip::Chip::from(
+            Box::new(remote) as Box<dyn ChipImpl>
+        ))))
     } else {
         std::ptr::null_mut()
     }
