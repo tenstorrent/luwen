@@ -157,8 +157,6 @@ pub struct LuwenGlue {
 }
 
 /// Newtype wrapper for luwen_if::chip::Chip
-/// cbindgen:no-export
-#[repr(transparent)]
 pub struct Chip(luwen_if::chip::Chip);
 
 impl std::ops::Deref for Chip {
