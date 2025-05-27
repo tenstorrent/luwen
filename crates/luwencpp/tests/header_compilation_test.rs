@@ -2,28 +2,24 @@ use cc;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
+use tempfile::tempdir;
 
-/// Get the cargo target directory in a robust way
-fn get_cargo_target_dir() -> PathBuf {
-    // First try CARGO_TARGET_DIR environment variable
-    if let Ok(target_dir) = env::var("CARGO_TARGET_DIR") {
-        return PathBuf::from(target_dir);
+/// Get the cargo target directory from OUT_DIR
+fn get_cargo_target_dir() -> Option<PathBuf> {
+    let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR not set"));
+    let mut sub_path = out_dir.as_path();
+    while let Some(parent) = sub_path.parent() {
+        if parent.ends_with("target") {
+            return Some(parent.to_path_buf());
+        }
+        sub_path = parent;
     }
-
-    // Then try to find it relative to the manifest directory
-    let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
-
-    // Go up to workspace root and then into target
-    let mut path = PathBuf::from(manifest_dir);
-    while !path.join("Cargo.lock").exists() && path.parent().is_some() {
-        path = path.parent().unwrap().to_path_buf();
-    }
-    path.join("target")
+    None
 }
 
 #[test]
 fn test_header_compiles() {
-    let target_dir = get_cargo_target_dir();
+    let target_dir = get_cargo_target_dir().expect("Could not find target directory");
     let profile = env::var("PROFILE").unwrap_or_else(|_| "debug".to_string());
     let header_path = target_dir.join(&profile).join("luwen.h");
 
@@ -41,7 +37,7 @@ fn test_header_compiles() {
 
 // Test that we can use Chip* without compilation errors
 void test_chip_forward_declaration() {
-    ::Chip* chip = nullptr;
+    luwen::Chip* chip = nullptr;
     luwen::LuwenGlue glue = {};
     chip = luwen::luwen_open(luwen::Arch::WORMHOLE, glue);
     
@@ -57,9 +53,9 @@ int main() {
 }
 "#;
 
-    // Use temp directory for test files
-    let temp_dir = env::temp_dir();
-    let test_file = temp_dir.join("test_luwen_header.cpp");
+    // Create a temporary directory that will be automatically cleaned up
+    let temp_dir = tempdir().expect("Failed to create temp directory");
+    let test_file = temp_dir.path().join("test_luwen_header.cpp");
 
     // Write the test file
     fs::write(&test_file, test_cpp).expect("Failed to write test file");
@@ -67,7 +63,7 @@ int main() {
     // Get the directory containing the header
     let header_dir = header_path.parent().unwrap();
 
-    // cc crate needs these environment variables (normally set by cargo in build scripts)
+    // Determine target triple based on platform
     let target = if cfg!(target_os = "macos") && cfg!(target_arch = "aarch64") {
         "aarch64-apple-darwin"
     } else if cfg!(target_os = "macos") && cfg!(target_arch = "x86_64") {
@@ -82,10 +78,6 @@ int main() {
         panic!("Unsupported platform");
     };
 
-    env::set_var("TARGET", target);
-    env::set_var("OPT_LEVEL", "0");
-    env::set_var("HOST", target);
-
     // Use cc crate to compile the test file
     let mut build = cc::Build::new();
     build
@@ -93,11 +85,12 @@ int main() {
         .include(header_dir)
         .file(&test_file)
         .warnings(false)
-        .flag("-std=c++11");
+        .flag("-std=c++11")
+        .out_dir(temp_dir.path())
+        .target(target)
+        .host(target)
+        .opt_level(0);
 
     // Try to compile - this will panic with a detailed error if compilation fails
     build.compile("test_luwen_header");
-
-    // Clean up test file
-    let _ = fs::remove_file(&test_file);
 }
