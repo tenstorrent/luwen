@@ -80,7 +80,7 @@ jobs:
           
   hardwre_test_wh:
     name: Hardware Test Suite (WH)
-    runs-on: "tt-beta-ubuntu-2204-n150-large-stable"
+    runs-on: "tt-lab-runners-syseng-n150"
 
     steps:
       - uses: actions/checkout@v3
@@ -114,7 +114,7 @@ jobs:
           
   hardwre_test_bh:
     name: Hardware Test Suite (BH)
-    runs-on: "tt-beta-ubuntu-2204-p150a-large-stable"
+    runs-on: "tt-lab-runners-syseng-p150a"
 
     steps:
       - uses: actions/checkout@v3
