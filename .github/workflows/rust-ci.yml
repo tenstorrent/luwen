@@ -112,7 +112,7 @@ jobs:
             --features test_n150 
             -- --test-threads 1
           
-  hardwre_test_bh:
+  hardware_test_bh:
     name: Hardware Test Suite (BH)
     runs-on: "tt-lab-runners-syseng-p150a"
 
