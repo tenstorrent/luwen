@@ -78,7 +78,7 @@ jobs:
           command: test
           args: --no-fail-fast
           
-  hardwre_test_wh:
+  hardware_test_wh:
     name: Hardware Test Suite (WH)
     runs-on: "tt-lab-runners-syseng-n150"
 
