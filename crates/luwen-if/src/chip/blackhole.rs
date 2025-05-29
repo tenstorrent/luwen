@@ -37,7 +37,7 @@ use std::collections::HashMap;
 
 // pub use telemetry_tags::telemetry_tags_to_u32;
 
-fn u32_from_slice(data: &[u8], index: u8) -> u32 {
+fn u32_from_slice(data: &[u8], index: u16) -> u32 {
     let mut output = 0;
     let index = index * 4;
     let data_chunk = &data[index as usize..(index + 4) as usize];
@@ -726,11 +726,11 @@ impl ChipImpl for Blackhole {
 
         // Parse telemetry data
         let mut telemetry_data = super::Telemetry::default();
-        for i in 0..entry_count as u8 {
+        for i in 0..entry_count as u16 {
             let entry = u32_from_slice(&telemetry_tags_data_block, i);
-            let tag = entry & 0xFF;
-            let offset = (entry >> 16) & 0xFF;
-            let data = u32_from_slice(&telem_data_block, offset as u8);
+            let tag = entry & 0xFFFF;
+            let offset = (entry >> 16) & 0xFFFF;
+            let data = u32_from_slice(&telem_data_block, offset as u16);
             // print!("Tag: {} Data: {:#02x}\n", tag, data);
             if let Some(tag) = TelemetryTags::from_u32(tag) {
                 match tag {
