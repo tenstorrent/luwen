@@ -6,6 +6,18 @@ Named after Antonie van Leeuwenhoek who invented the microsope.
 
 [https://github.com/tenstorrent/luwen](https://github.com/tenstorrent/luwen)
 
+## Prometheus Exporter
+
+Luwen includes a Prometheus exporter for hardware telemetry.
+
+To start it:
+```bash
+cargo build -p prometheus-exporter --release
+./target/release/prometheus-exporter
+```
+
+Metrics are exposed at `http://localhost:8080/metrics`.
+
 ## Design
 
 There are three usecases that I want to support here
