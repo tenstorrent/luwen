@@ -42,4 +42,5 @@ pub enum TelemetryTags {
     EnabledL2Cpu = 37,
     PcieUsage = 38,
     NocTranslation = 40,
+    FanRpm = 41,
 }
