@@ -13,7 +13,7 @@ pub enum Arch {
 
 impl Default for Arch {
     fn default() -> Self {
-        Arch::Unknown(0)
+        Self::Grayskull
     }
 }
 

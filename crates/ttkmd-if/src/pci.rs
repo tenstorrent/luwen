@@ -412,7 +412,13 @@ impl PciDevice {
 
     pub fn write_block_no_dma(&self, addr: u32, data: &[u8]) -> Result<(), PciError> {
         unsafe {
-            Self::memcpy_to_device(self.register_address_mut(addr), data);
+            let ptr = match &self.pci_bar {
+                Some(bar) => bar.register_address_mut(addr),
+                None => {
+                    return Err(PciError::BarUnmapped);
+                }
+            };
+            Self::memcpy_to_device(ptr, data);
         }
 
         Ok(())
@@ -420,7 +426,13 @@ impl PciDevice {
 
     pub fn read_block_no_dma(&self, addr: u32, data: &mut [u8]) -> Result<(), PciError> {
         unsafe {
-            Self::memcpy_from_device(data, self.register_address(addr));
+            let ptr = match &self.pci_bar {
+                Some(bar) => bar.register_address(addr),
+                None => {
+                    return Err(PciError::BarUnmapped);
+                }
+            };
+            Self::memcpy_from_device(data, ptr);
         }
 
         if data.len() >= std::mem::size_of::<u32>() {
