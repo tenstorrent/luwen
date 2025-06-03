@@ -293,11 +293,17 @@ pub fn get_specific_tlb_info(device: &PciDevice, tlb_index: u32) -> SpecificTlbI
         }
     };
 
-    let memory_type = if device.bar0_wc_size > tlb_data_addr {
-        MemoryType::Wc
-    } else {
-        MemoryType::Uc
-    };
+    let memory_type = device
+        .pci_bar
+        .as_ref()
+        .and_then(|v| {
+            if v.bar0_wc_size > tlb_data_addr {
+                Some(MemoryType::Wc)
+            } else {
+                None
+            }
+        })
+        .unwrap_or(MemoryType::Uc);
 
     SpecificTlbInfo {
         config_base: tlb_config_addr,
@@ -351,19 +357,22 @@ pub fn tlb_info(device: &PciDevice) -> DeviceTlbInfo {
 
     let mut count = 0;
     for index in 0..tlb_config.len() {
-        if count + tlb_config[index].size * tlb_config[index].count < device.bar0_wc_size {
-            tlb_config[index].memory_type = MemoryType::Wc;
-        } else if count + tlb_config[index].size < device.bar0_wc_size {
-            let new_info = TlbInfo {
-                count: (device.bar0_wc_size - count) / tlb_config[index].size,
-                size: tlb_config[index].size,
-                memory_type: MemoryType::Wc,
-            };
-            tlb_config.insert(index, new_info);
+        if let Some(pci_bar) = &device.pci_bar {
+            if count + tlb_config[index].size * tlb_config[index].count > pci_bar.bar0_wc_size {
+                tlb_config[index].memory_type = MemoryType::Wc;
+            } else if count + tlb_config[index].size > pci_bar.bar0_wc_size {
+                let new_info = TlbInfo {
+                    count: (pci_bar.bar0_wc_size - count) / tlb_config[index].size,
+                    size: tlb_config[index].size,
+                    memory_type: MemoryType::Wc,
+                };
+                tlb_config.insert(index, new_info);
 
-            tlb_config[index + 1].count -= (device.bar0_wc_size - count) / tlb_config[index].size;
+                tlb_config[index + 1].count -=
+                    (pci_bar.bar0_wc_size - count) / tlb_config[index].size;
+            }
+            count += tlb_config[index].size * tlb_config[index].count;
         }
-        count += tlb_config[index].size * tlb_config[index].count;
     }
 
     DeviceTlbInfo {

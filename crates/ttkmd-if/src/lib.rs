@@ -977,7 +977,6 @@ mod test {
             }
             Arch::Wormhole => (0, 10, 0xFFFB2002C),
             Arch::Blackhole => (8, 0, 0x0000000080050044),
-            Arch::Unknown(_) => todo!(),
         };
 
         let node_id = device

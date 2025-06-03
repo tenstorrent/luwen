@@ -339,11 +339,17 @@ pub fn get_specific_tlb_info(device: &PciDevice, tlb_index: u32) -> SpecificTlbI
         }
     };
 
-    let memory_type = if device.bar0_wc_size > tlb_data_addr {
-        MemoryType::Wc
-    } else {
-        MemoryType::Uc
-    };
+    let memory_type = device
+        .pci_bar
+        .as_ref()
+        .and_then(|v| {
+            if v.bar0_wc_size > tlb_data_addr {
+                Some(MemoryType::Wc)
+            } else {
+                None
+            }
+        })
+        .unwrap_or(MemoryType::Uc);
 
     SpecificTlbInfo {
         config_base: tlb_config_addr,

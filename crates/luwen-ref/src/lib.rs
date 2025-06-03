@@ -95,7 +95,6 @@ impl ExtendedPciDevice {
             default_tlb = PossibleTlbAllocation::Hardcoded(match device.arch {
                 luwen_core::Arch::Grayskull | luwen_core::Arch::Wormhole => 184,
                 luwen_core::Arch::Blackhole => 190,
-                luwen_core::Arch::Unknown(id) => unreachable!("Found unrecognizable id {id:x}"),
             });
         }
 
