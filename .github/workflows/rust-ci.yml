@@ -7,141 +7,222 @@ on:
     branches: [ main ]
   workflow_dispatch:  # Allow manual triggering
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 env:
+  RUSTFLAGS: -Dwarnings
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  RUSTUP_WINDOWS_PATH_ADD_BIN: 1
+  # Change to specific Rust release to pin
+  rust_stable: stable
+  rust_nightly: nightly-2025-06-01
+  rust_clippy: '1.87'
+  rust_min: '1.87'
 
 jobs:
-  check:
-    name: Check
-    strategy:
-        matrix:
-            os: [ubuntu-latest, ubuntu-22.04-arm]
-    runs-on: ${{ matrix.os }}
+  # Depends on all actions that are required for a "successful" CI run.
+  tests-pass:
+    name: all systems go
+    runs-on: ubuntu-latest
+    needs:
+      - clippy
+      - fmt
+      - docs
+      - minrust
 
+      - cross-check
+      - test
+      - hardware_test_wh
+      - hardware_test_bh
     steps:
-      - uses: actions/checkout@v3
+      - run: exit 0
 
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
+  basics:
+    name: basic checks
+    runs-on: ubuntu-latest
+    needs:
+      - clippy
+      - fmt
+      - docs
+      - minrust
+    steps:
+      - run: exit 0
 
-      - name: Cache Rust dependencies
-        uses: actions/cache@v3
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust ${{ env.rust_clippy }}
+        uses: dtolnay/rust-toolchain@stable
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-${{ runner.arch }}-cargo-check-${{ hashFiles('**/Cargo.lock') }}
+          toolchain: ${{ env.rust_clippy }}
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
 
       - name: Run cargo check
-        uses: actions-rs/cargo@v1
+        run: cargo check --workspace --all-targets --all-features
+
+      - name: Run cargo clippy
+        run: cargo clippy --workspace --all-targets --all-features
+
+  fmt:
+    name: fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@stable
         with:
-          command: check
-          args: --workspace
+          toolchain: ${{ env.rust_stable }}
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      # Check fmt
+      - name: "rustfmt --check"
+        # Workaround for rust-lang/cargo#7732
+        run: |
+          if ! rustfmt --check $(git ls-files '*.rs'); then
+            printf "Please run \`rustfmt \$(git ls-files '*.rs')\` to fix rustfmt errors.\nSee CONTRIBUTING.md for more details.\n" >&2
+            exit 1
+          fi
+
+  docs:
+    name: docs
+    runs-on: ${{ matrix.run.os }}
+    strategy:
+      matrix:
+        run:
+          - os: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust ${{ env.rust_nightly }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.rust_nightly }}
+      - uses: Swatinem/rust-cache@v2
+      - name: "doc --lib --all-features"
+        run: cargo doc --lib --no-deps --all-features --document-private-items
+
+  minrust:
+    name: minrust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust ${{ env.rust_min }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.rust_min }}
+      - uses: Swatinem/rust-cache@v2
+      - name: "check --workspace --all-features"
+        run: cargo check --workspace --all-features
+        env:
+          RUSTFLAGS: "" # remove -Dwarnings
+
+  cross-check:
+    needs: basics
+    name: Test build on non x86 targets
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - riscv64gc-unknown-linux-gnu
+          - aarch64-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.rust_stable }}
+          target: ${{ matrix.target }}
+
+      - uses: taiki-e/setup-cross-toolchain-action@v1
+        with:
+          target: ${{ matrix.target }}
+          qemu: '7.2'
+
+      - uses: Swatinem/rust-cache@v2
+
+      - run: |
+          set -euxo pipefail
+          cargo check --workspace --exclude pyluwen --all-features --target ${{ matrix.target }}
+          cargo build --workspace --exclude pyluwen --target ${{ matrix.target }}
 
   test:
-    name: Test Suite
+    needs: basics
+    name: Tests that don't require hardware
     strategy:
-        matrix:
-            os: [ubuntu-22.04, ubuntu-24.04, ubuntu-22.04-arm]
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-22.04-arm]
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
+            toolchain: ${{ env.rust_stable }}
 
-      - name: Cache Rust dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-${{ runner.arch }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+      - uses: Swatinem/rust-cache@v2
 
       - name: Run cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --no-fail-fast
+        run: |
+          set -euxo pipefail
+          cargo test --no-fail-fast --workspace --exclude pyluwen
+          cargo test --doc --no-fail-fast --workspace --exclude pyluwen --all-features
 
-  hardwre_test_wh:
+  hardware_test_wh:
+    needs: basics
     name: Hardware Test Suite (WH)
     runs-on: "tt-beta-ubuntu-2204-n150-large-stable"
 
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
+            toolchain: ${{ env.rust_stable }}
 
-      - name: Cache Rust dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-${{ runner.arch }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+      - uses: Swatinem/rust-cache@v2
 
       - name: Run cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          # All run in one thread; if it starts taking too long I could start requi
-          # guarenteed thread safety
-          args: |
-            --no-fail-fast --workspace --exclude pyluwen
+        # All run in one thread; if it starts taking too long I could start requi
+        # guarenteed thread safety
+        run: cargo test --no-fail-fast --workspace --exclude pyluwen
             --features test_hardware --features test_wormhole
             --features test_n150
             -- --test-threads 1
 
-  hardwre_test_bh:
+  hardware_test_bh:
+    needs: basics
     name: Hardware Test Suite (BH)
     runs-on: "tt-beta-ubuntu-2204-p150b-large-stable"
 
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
+            toolchain: ${{ env.rust_stable }}
 
-      - name: Cache Rust dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-${{ runner.arch }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+      - uses: Swatinem/rust-cache@v2
 
       - name: Run cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          # All run in one thread; if it starts taking too long I could start requi
-          # guarenteed thread safety
-          args: |
-            --no-fail-fast --workspace --exclude pyluwen
+        # All run in one thread; if it starts taking too long I could start requi
+        # guarenteed thread safety
+        run: cargo test --no-fail-fast --workspace --exclude pyluwen
             --features test_hardware --features test_blackhole
             --features test_p100a
             -- --test-threads 1
@@ -154,52 +235,3 @@ jobs:
 #          name: test-results
 #          path: test-results
 #          retention-days: 7
-
-  lints:
-    name: Lints
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          components: clippy
-
-      - name: Cache Rust dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-${{ runner.arch }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Run cargo clippy
-        uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --workspace --all-targets --all-features -- -D warnings
-
-  formatting:
-    name: Formatting
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          components: rustfmt
-
-      - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
