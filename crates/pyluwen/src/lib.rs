@@ -1744,14 +1744,14 @@ fn serde_json_value_to_pyobject(py: Python, value: &Value) -> PyResult<PyObject>
         Value::Null => Ok(py.None()),
         Value::Bool(b) => Ok(b.into_py(py)),
         Value::Number(n) => {
-            if n.is_i64() {
-                Ok(n.as_i64().unwrap().into_py(py))
-            } else if n.is_u64() {
-                Ok(n.as_u64().unwrap().into_py(py))
-            } else if n.is_f64() {
-                Ok(n.as_f64().unwrap().into_py(py))
+            if let Some(value) = n.as_i64() {
+                Ok(value.into_py(py))
+            } else if let Some(value) = n.as_u64() {
+                Ok(value.into_py(py))
+            } else if let Some(value) = n.as_f64() {
+                Ok(value.into_py(py))
             } else {
-                panic!("Unsupported number type");
+                unimplemented!("No support for number of type {n}")
             }
         }
         Value::String(s) => Ok(s.into_py(py)),
