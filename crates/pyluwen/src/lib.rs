@@ -640,9 +640,13 @@ impl PciChip {
 
     #[new]
     pub fn new(pci_interface: Option<usize>) -> PyResult<Self> {
-        let pci_interface = pci_interface.unwrap();
+        let pci_interface = pci_interface.unwrap_or(0);
 
-        let chip = luwen_ref::ExtendedPciDevice::open(pci_interface).unwrap();
+        let chip = luwen_ref::ExtendedPciDevice::open(pci_interface).map_err(|v| {
+            PyException::new_err(format!(
+                "Could not open chip on pci interface {pci_interface}\n Failed with: {v}"
+            ))
+        })?;
 
         let arch = chip.borrow().device.arch;
 
