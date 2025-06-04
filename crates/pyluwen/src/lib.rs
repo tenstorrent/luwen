@@ -700,8 +700,15 @@ impl PciChip {
         Ok(())
     }
 
-    pub fn board_id(&self) -> u64 {
-        self.0.inner.get_telemetry().unwrap().board_id
+    pub fn board_id(&self) -> PyResult<u64> {
+        Ok(self
+            .0
+            .inner
+            .get_telemetry()
+            .map_err(|v| {
+                PyException::new_err(format!("Could not access chip telemetry, failing with {v}"))
+            })?
+            .board_id)
     }
 
     pub fn device_id(&self) -> PyResult<u32> {
@@ -765,9 +772,9 @@ impl PciGrayskull {
                 ttkmd_if::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
                     "Invalid ordering {ordering}."
                 ))),
-                ordering => Ok(value.setup_tlb(
+                ordering => value.setup_tlb(
                     index, addr, x_start, y_start, x_end, y_end, noc_sel, mcast, ordering, linked,
-                )),
+                ),
             }
         } else {
             Err(PyException::new_err(
@@ -908,7 +915,7 @@ impl PciInterface<'_> {
         mcast: bool,
         ordering: ttkmd_if::tlb::Ordering,
         linked: bool,
-    ) -> (u64, u64) {
+    ) -> PyResult<(u64, u64)> {
         self.pci_interface
             .borrow_mut()
             .device
@@ -927,7 +934,7 @@ impl PciInterface<'_> {
                     ..Default::default()
                 },
             )
-            .unwrap()
+            .map_err(|v| PyException::new_err(v.to_string()))
     }
 
     pub fn noc_read(&self, tlb_index: u32, addr: u64, data: &mut [u8]) -> Result<(), String> {
@@ -944,7 +951,7 @@ impl PciInterface<'_> {
             .borrow_mut()
             .device
             .noc_read(&index, tlb, data)
-            .unwrap();
+            .map_err(|v| v.to_string())?;
 
         Ok(())
     }
@@ -963,7 +970,7 @@ impl PciInterface<'_> {
             .borrow_mut()
             .device
             .noc_write(&index, tlb, data)
-            .unwrap();
+            .map_err(|v| v.to_string())?;
 
         Ok(())
     }
@@ -1090,9 +1097,9 @@ impl PciWormhole {
                 ttkmd_if::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
                     "Invalid ordering {ordering}."
                 ))),
-                ordering => Ok(value.setup_tlb(
+                ordering => value.setup_tlb(
                     index, addr, x_start, y_start, x_end, y_end, noc_sel, mcast, ordering, linked,
-                )),
+                ),
             }
         } else {
             Err(PyException::new_err(
@@ -1295,9 +1302,9 @@ impl PciBlackhole {
                 ttkmd_if::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
                     "Invalid ordering {ordering}."
                 ))),
-                ordering => Ok(value.setup_tlb(
+                ordering => value.setup_tlb(
                     index, addr, x_start, y_start, x_end, y_end, noc_sel, mcast, ordering, linked,
-                )),
+                ),
             }
         } else {
             Err(PyException::new_err(
@@ -1483,7 +1490,13 @@ impl PciBlackhole {
             .0
             .get_boot_fs_tables_spi_read(tag_name)
             .map_err(|v| PyException::new_err(v.to_string()))?;
-        Ok(result.unwrap().1.spi_addr)
+        if let Some(result) = result {
+            Ok(result.1.spi_addr)
+        } else {
+            Err(PyException::new_err(format!(
+                "Was not able to find {tag_name} in spirom table"
+            )))
+        }
     }
 
     pub fn get_spirom_table_image_size(&self, tag_name: &str) -> PyResult<u32> {
@@ -1492,7 +1505,13 @@ impl PciBlackhole {
             .0
             .get_boot_fs_tables_spi_read(tag_name)
             .map_err(|v| PyException::new_err(v.to_string()))?;
-        Ok(result.unwrap().1.flags.image_size())
+        if let Some(result) = result {
+            Ok(result.1.flags.image_size())
+        } else {
+            Err(PyException::new_err(format!(
+                "Was not able to find {tag_name} in spirom table"
+            )))
+        }
     }
 }
 
