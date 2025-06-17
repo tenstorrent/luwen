@@ -1,11 +1,15 @@
-Package: rust-luwen
-Version: 0.3.7
+Source: rust-luwen
 Section: custom
 Priority: optional
+Maintainer: Daniel Rosen <drosen@tenstorrent.com>
+Package: rust-luwen
+Version: 0.3.7
 Architecture: all
 Essential: no
-Maintainer: Daniel Rosen <drosen@tenstorrent.com>
-Depends: libc6 (>= 2.34)
+Depends: 
+ ${misc:Depends},
+ ${python3:Depends},
+ ${shlibs:Depends},
 Description: A high-level interface for safe and efficient access Tenstorrent AI
  accelerators
  # Luwen
@@ -38,3 +42,14 @@ Description: A high-level interface for safe and efficient access Tenstorrent AI
      This means that you can modify pci tlbs and erisc cores being used or cut
  out the middle man entirely and
      issue raw calls.
+Rules-Requires-Root: no
+
+Package: python3-pyluwen
+Version: 0.3.7
+Architecture: all
+Essential: no
+Depends:
+ ${misc:Depends},
+ ${python3:Depends},
+ ${shlibs:Depends},
+ 
