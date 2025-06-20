@@ -716,23 +716,23 @@ impl PciDevice {
         while written < data.len() {
             let (offset, size) = self.setup_tlb(index, tlb.clone())?;
 
-            let to_read = &data[written..];
-            let to_read = &data[..(size as usize).min(to_read.len())];
+            let remaining_data = &data[written..];
+            let chunk = &remaining_data[..(size as usize).min(remaining_data.len())];
 
             match index {
                 PossibleTlbAllocation::Allocation(tlb_allocation) => unsafe {
                     Self::memcpy_to_device(
                         (tlb_allocation.uc_mapping.as_ptr() as *mut u8).byte_add(offset as usize),
-                        to_read,
+                        chunk,
                     );
                 },
                 PossibleTlbAllocation::Hardcoded(_index) => {
-                    self.write_block(offset as u32, to_read)?;
+                    self.write_block(offset as u32, chunk)?;
                 }
                 PossibleTlbAllocation::NoAllocation => todo!(),
             }
 
-            written += to_read.len();
+            written += chunk.len();
 
             tlb.local_offset = addr + written as u64;
         }
@@ -751,26 +751,24 @@ impl PciDevice {
         while read < data.len() {
             let (offset, size) = self.setup_tlb(index, tlb.clone())?;
 
-            let to_read = {
-                let to_read = &mut data[read..];
-                let read_len = to_read.len();
-                &mut data[..(size as usize).min(read_len)]
-            };
+            let remaining_buffer = &mut data[read..];
+            let chunk_len = (size as usize).min(remaining_buffer.len());
+            let chunk = &mut remaining_buffer[..chunk_len];
 
             match index {
                 PossibleTlbAllocation::Allocation(tlb_allocation) => unsafe {
                     Self::memcpy_from_device(
-                        to_read,
+                        chunk,
                         (tlb_allocation.uc_mapping.as_ptr() as *mut u8).byte_add(offset as usize),
                     );
                 },
                 PossibleTlbAllocation::Hardcoded(_index) => {
-                    self.read_block(offset as u32, to_read)?;
+                    self.read_block(offset as u32, chunk)?;
                 }
                 PossibleTlbAllocation::NoAllocation => todo!(),
             }
 
-            read += to_read.len();
+            read += chunk.len();
 
             tlb.local_offset = addr + read as u64;
         }
