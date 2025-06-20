@@ -580,7 +580,7 @@ impl PciDevice {
         }
     }
 
-    pub fn free_tlb(&self, alloc: &TlbAllocation) -> Result<bool, PciError> {
+    pub fn free_tlb(&self, alloc: &TlbAllocation) -> Result<(), PciError> {
         let result = unsafe {
             ioctl::free_tlb(
                 self.device_fd.as_raw_fd(),
@@ -592,14 +592,9 @@ impl PciDevice {
         };
 
         match result {
-            Ok(rc) => match rc {
-                0 => Ok(true),
-                _ => Ok(false),
-            },
-            Err(errno) => match errno {
-                nix::errno::Errno::EINVAL => Ok(false),
-                errno => Err(PciError::IoctlError(errno)),
-            },
+            Ok(0) => Ok(()),
+            Ok(rc) => Err(PciError::IoctlError(nix::errno::Errno::from_i32(rc))),
+            Err(errno) => Err(PciError::IoctlError(errno)),
         }
     }
 
@@ -607,7 +602,7 @@ impl PciDevice {
         &self,
         alloc: &TlbAllocation,
         config: ioctl::NocTlbConfig,
-    ) -> Result<bool, PciError> {
+    ) -> Result<(), PciError> {
         let result = unsafe {
             ioctl::configure_tlb(
                 self.device_fd.as_raw_fd(),
@@ -624,14 +619,9 @@ impl PciDevice {
         };
 
         match result {
-            Ok(rc) => match rc {
-                0 => Ok(true),
-                _ => Ok(false),
-            },
-            Err(errno) => match errno {
-                nix::errno::Errno::EINVAL => Ok(false),
-                errno => Err(PciError::IoctlError(errno)),
-            },
+            Ok(0) => Ok(()),
+            Ok(rc) => Err(PciError::IoctlError(nix::errno::Errno::from_i32(rc))),
+            Err(errno) => Err(PciError::IoctlError(errno)),
         }
     }
 
