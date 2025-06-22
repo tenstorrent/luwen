@@ -522,8 +522,8 @@ pub fn print_queue_state<D>(
         let mut j = 0;
         while j < Q_SIZE {
             q_data.push(read32(user_data, rd_addr)?);
-            j += j;
-            rd_addr += rd_addr;
+            j += 4;
+            rd_addr += 4;
         }
     }
 
