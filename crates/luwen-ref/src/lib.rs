@@ -64,24 +64,19 @@ impl ExtendedPciDevice {
 
         let default_tlb;
 
-        // Driver 1.35+ will have the allocation APIs enabled
-        // Grayskull does not support the allocation API
+        // Driver API 2+ has TLB allocation APIs supporting WH & BH.
         if device.arch != Arch::Grayskull && device.driver_version >= 2 {
-            // Try to allocate progressively smaller TLBs until we find one that looks like it'll work
-            let mut size = 1 << 20;
-
-            let mut tlb = None;
-            while size > 0 {
-                if let Ok(result) = device.allocate_tlb(size) {
-                    // have the tlb allocation
-                    tlb = Some(result);
-                    break;
+            let size = match device.arch {
+                Arch::Wormhole => 1 << 24,  // 16 MiB
+                Arch::Blackhole => 1 << 21, // 2 MiB
+                _ => {
+                    return Err(PciError::TlbAllocationError(
+                        "Unsupported architecture for TLB allocation".to_string(),
+                    ))
                 }
+            };
 
-                size <<= 1;
-            }
-
-            if let Some(tlb) = tlb {
+            if let Ok(tlb) = device.allocate_tlb(size) {
                 default_tlb = PossibleTlbAllocation::Allocation(tlb);
             } else {
                 // Couldn't get a tlb... ideally at this point we would fallback to using a slower but useable read/write API

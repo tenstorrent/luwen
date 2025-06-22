@@ -580,7 +580,7 @@ impl PciDevice {
         }
     }
 
-    pub fn free_tlb(&self, alloc: &TlbAllocation) -> Result<bool, PciError> {
+    pub fn free_tlb(&self, alloc: &TlbAllocation) -> Result<(), PciError> {
         let result = unsafe {
             ioctl::free_tlb(
                 self.device_fd.as_raw_fd(),
@@ -592,14 +592,9 @@ impl PciDevice {
         };
 
         match result {
-            Ok(rc) => match rc {
-                0 => Ok(true),
-                _ => Ok(false),
-            },
-            Err(errno) => match errno {
-                nix::errno::Errno::EINVAL => Ok(false),
-                errno => Err(PciError::IoctlError(errno)),
-            },
+            Ok(0) => Ok(()),
+            Ok(rc) => Err(PciError::IoctlError(nix::errno::Errno::from_i32(rc))),
+            Err(errno) => Err(PciError::IoctlError(errno)),
         }
     }
 
@@ -607,7 +602,7 @@ impl PciDevice {
         &self,
         alloc: &TlbAllocation,
         config: ioctl::NocTlbConfig,
-    ) -> Result<bool, PciError> {
+    ) -> Result<(), PciError> {
         let result = unsafe {
             ioctl::configure_tlb(
                 self.device_fd.as_raw_fd(),
@@ -624,14 +619,9 @@ impl PciDevice {
         };
 
         match result {
-            Ok(rc) => match rc {
-                0 => Ok(true),
-                _ => Ok(false),
-            },
-            Err(errno) => match errno {
-                nix::errno::Errno::EINVAL => Ok(false),
-                errno => Err(PciError::IoctlError(errno)),
-            },
+            Ok(0) => Ok(()),
+            Ok(rc) => Err(PciError::IoctlError(nix::errno::Errno::from_i32(rc))),
+            Err(errno) => Err(PciError::IoctlError(errno)),
         }
     }
 
@@ -726,23 +716,23 @@ impl PciDevice {
         while written < data.len() {
             let (offset, size) = self.setup_tlb(index, tlb.clone())?;
 
-            let to_read = &data[written..];
-            let to_read = &data[..(size as usize).min(to_read.len())];
+            let remaining_data = &data[written..];
+            let chunk = &remaining_data[..(size as usize).min(remaining_data.len())];
 
             match index {
                 PossibleTlbAllocation::Allocation(tlb_allocation) => unsafe {
                     Self::memcpy_to_device(
                         (tlb_allocation.uc_mapping.as_ptr() as *mut u8).byte_add(offset as usize),
-                        to_read,
+                        chunk,
                     );
                 },
                 PossibleTlbAllocation::Hardcoded(_index) => {
-                    self.write_block(offset as u32, to_read)?;
+                    self.write_block(offset as u32, chunk)?;
                 }
                 PossibleTlbAllocation::NoAllocation => todo!(),
             }
 
-            written += to_read.len();
+            written += chunk.len();
 
             tlb.local_offset = addr + written as u64;
         }
@@ -761,26 +751,24 @@ impl PciDevice {
         while read < data.len() {
             let (offset, size) = self.setup_tlb(index, tlb.clone())?;
 
-            let to_read = {
-                let to_read = &mut data[read..];
-                let read_len = to_read.len();
-                &mut data[..(size as usize).min(read_len)]
-            };
+            let remaining_buffer = &mut data[read..];
+            let chunk_len = (size as usize).min(remaining_buffer.len());
+            let chunk = &mut remaining_buffer[..chunk_len];
 
             match index {
                 PossibleTlbAllocation::Allocation(tlb_allocation) => unsafe {
                     Self::memcpy_from_device(
-                        to_read,
+                        chunk,
                         (tlb_allocation.uc_mapping.as_ptr() as *mut u8).byte_add(offset as usize),
                     );
                 },
                 PossibleTlbAllocation::Hardcoded(_index) => {
-                    self.read_block(offset as u32, to_read)?;
+                    self.read_block(offset as u32, chunk)?;
                 }
                 PossibleTlbAllocation::NoAllocation => todo!(),
             }
 
-            read += to_read.len();
+            read += chunk.len();
 
             tlb.local_offset = addr + read as u64;
         }
