@@ -98,7 +98,6 @@ pub struct BarMapping {
 pub struct TlbAllocation {
     pub id: u32,
     pub uc_mapping: memmap2::MmapMut,
-    pub wc_mapping: memmap2::MmapMut,
     pub size: u64,
 }
 
@@ -558,20 +557,11 @@ impl PciDevice {
         }
         .map_err(|_err| PciError::TlbAllocationError("Failed to map uc buffer".to_string()))?;
 
-        let wc_mapping = unsafe {
-            memmap2::MmapOptions::default()
-                .len(size as usize)
-                .offset(data.output.mmap_offset_wc)
-                .map_mut(self.device_fd.as_raw_fd())
-        }
-        .map_err(|_err| PciError::TlbAllocationError("Failed to map wc buffer".to_string()))?;
-
         match result {
             Ok(rc) => match rc {
                 0 => Ok(TlbAllocation {
                     id: data.output.id,
                     uc_mapping,
-                    wc_mapping,
                     size,
                 }),
                 errno => Err(PciError::IoctlError(nix::errno::Errno::from_i32(errno))),
