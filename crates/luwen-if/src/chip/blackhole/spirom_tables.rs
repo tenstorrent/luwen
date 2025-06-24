@@ -25,6 +25,13 @@ pub fn remove_padding_proto_bin(proto_bin: &[u8]) -> Result<&[u8], Box<dyn std::
     if proto_bin.is_empty() {
         return Err("Input slice is empty".into());
     }
+    // Some FW versions (80.18.0 - 18.5.0) have a bug padding proto_bins to a multiple of 8 bytes
+    // using trailing 0s. Valid encoded protobufs shouldn't have extra 0s after the padding
+    let proto_bin = if proto_bin.len() % 8 == 0 && proto_bin.ends_with(&[0, 0, 0, 0]) {
+        &proto_bin[..proto_bin.len() - 4]
+    } else {
+        proto_bin
+    };
     let last_byte = proto_bin[proto_bin.len() - 1] as usize;
     // Ensure the input slice has enough bytes to remove the padding
     if proto_bin.len() < last_byte + 1 {
