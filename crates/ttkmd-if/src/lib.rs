@@ -97,7 +97,7 @@ pub struct BarMapping {
 #[derive(Debug)]
 pub struct TlbAllocation {
     pub id: u32,
-    pub uc_mapping: Option<memmap2::MmapMut>,
+    pub uc_mapping: memmap2::MmapMut,
     pub size: u64,
 }
 
@@ -561,7 +561,7 @@ impl PciDevice {
             Ok(rc) => match rc {
                 0 => Ok(TlbAllocation {
                     id: data.output.id,
-                    uc_mapping: Some(uc_mapping),
+                    uc_mapping,
                     size,
                 }),
                 errno => Err(PciError::IoctlError(nix::errno::Errno::from_i32(errno))),
@@ -570,16 +570,17 @@ impl PciDevice {
         }
     }
 
-    pub fn free_tlb(&self, alloc: &mut TlbAllocation) -> Result<(), PciError> {
+    pub fn free_tlb(&self, alloc: TlbAllocation) -> Result<(), PciError> {
+        let id = alloc.id;
+
         // Explicitly unmap, otherwise the ioctl will return EBUSY
-        if let Some(mmap) = alloc.uc_mapping.take() {
-            drop(mmap);
-        }
+        drop(alloc);
+
         let result = unsafe {
             ioctl::free_tlb(
                 self.device_fd.as_raw_fd(),
                 (&mut ioctl::FreeTlb {
-                    input: ioctl::FreeTlbIn { id: alloc.id },
+                    input: ioctl::FreeTlbIn { id },
                     output: ioctl::FreeTlbOut {},
                 }) as *mut _,
             )
@@ -716,12 +717,7 @@ impl PciDevice {
             match index {
                 PossibleTlbAllocation::Allocation(tlb_allocation) => unsafe {
                     Self::memcpy_to_device(
-                        (tlb_allocation
-                            .uc_mapping
-                            .as_ref()
-                            .expect("No mapping")
-                            .as_ptr() as *mut u8)
-                            .byte_add(offset as usize),
+                        (tlb_allocation.uc_mapping.as_ptr() as *mut u8).byte_add(offset as usize),
                         chunk,
                     );
                 },
@@ -758,12 +754,7 @@ impl PciDevice {
                 PossibleTlbAllocation::Allocation(tlb_allocation) => unsafe {
                     Self::memcpy_from_device(
                         chunk,
-                        (tlb_allocation
-                            .uc_mapping
-                            .as_ref()
-                            .expect("No mapping")
-                            .as_ptr() as *mut u8)
-                            .byte_add(offset as usize),
+                        (tlb_allocation.uc_mapping.as_ptr() as *mut u8).byte_add(offset as usize),
                     );
                 },
                 PossibleTlbAllocation::Hardcoded(_index) => {
@@ -794,12 +785,8 @@ impl PciDevice {
         match tlb_index {
             PossibleTlbAllocation::Allocation(tlb_allocation) => self.write32_no_translation(
                 unsafe {
-                    (tlb_allocation
-                        .uc_mapping
-                        .as_ref()
-                        .expect("No mapping")
-                        .as_ptr() as *mut u8)
-                        .byte_add(offset as usize) as usize
+                    (tlb_allocation.uc_mapping.as_ptr() as *mut u8).byte_add(offset as usize)
+                        as usize
                 },
                 data,
             ),
@@ -821,12 +808,8 @@ impl PciDevice {
         match tlb_index {
             PossibleTlbAllocation::Allocation(tlb_allocation) => {
                 self.read32_no_translation(unsafe {
-                    (tlb_allocation
-                        .uc_mapping
-                        .as_ref()
-                        .expect("No mapping")
-                        .as_ptr() as *mut u8)
-                        .byte_add(offset as usize) as usize
+                    (tlb_allocation.uc_mapping.as_ptr() as *mut u8).byte_add(offset as usize)
+                        as usize
                 })
             }
             PossibleTlbAllocation::Hardcoded(_) => self.read32(offset as u32),
