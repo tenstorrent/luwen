@@ -136,6 +136,7 @@ pub struct Telemetry {
     pub enabled_gddr: u32,
     pub enabled_l2cpu: u32,
     pub enabled_pcie: u32,
+    pub fan_rpm: u32,
 }
 
 impl Telemetry {
