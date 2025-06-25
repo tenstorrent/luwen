@@ -34,6 +34,14 @@ pub fn remove_padding_proto_bin(proto_bin: &[u8]) -> Result<&[u8], Box<dyn std::
     Ok(&proto_bin[..proto_bin.len() - last_byte - 1])
 }
 
+pub fn trim_four_trailing_zeros(proto_bin: &[u8]) -> &[u8] {
+    // Some proto bins have 4 extra zero bytes after the conventional padding
+    if proto_bin.ends_with(&[0, 0, 0, 0]) {
+        return &proto_bin[..proto_bin.len() - 4];
+    }
+    proto_bin
+}
+
 // Generic function to convert any serializable type into a HashMap
 pub fn to_hash_map<T: Serialize>(value: T) -> HashMap<String, Value> {
     // Serialize the value to JSON

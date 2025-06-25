@@ -434,6 +434,7 @@ impl Blackhole {
         self.spi_read(spi_addr, &mut proto_bin)?;
         let final_decode_map: HashMap<String, Value>;
         // remove padding
+        proto_bin = spirom_tables::trim_four_trailing_zeros(&proto_bin).to_vec();
         proto_bin = spirom_tables::remove_padding_proto_bin(&proto_bin)?.to_vec();
 
         if tag_name == "cmfwcfg" || tag_name == "origcfg" {
