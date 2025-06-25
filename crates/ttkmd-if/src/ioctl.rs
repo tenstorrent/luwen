@@ -299,7 +299,7 @@ pub struct NocTlbConfig {
     pub linked: u8,
     pub static_vc: u8,
     pub reserved0: [u8; 3],
-    pub reserved1: [u8; 2],
+    pub reserved1: [u32; 2],
 }
 
 #[derive(Default)]
