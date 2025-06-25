@@ -253,6 +253,8 @@ pub struct Telemetry {
     enabled_pcie: u32,
     #[pyo3(get)]
     fan_rpm: u32,
+    #[pyo3(get)]
+    tbp: u32,
 }
 impl From<luwen_if::chip::Telemetry> for Telemetry {
     fn from(value: luwen_if::chip::Telemetry) -> Self {
@@ -321,6 +323,7 @@ impl From<luwen_if::chip::Telemetry> for Telemetry {
             enabled_l2cpu: value.enabled_l2cpu,
             enabled_pcie: value.enabled_pcie,
             fan_rpm: value.fan_rpm,
+            tbp: value.tbp,
         }
     }
 }
