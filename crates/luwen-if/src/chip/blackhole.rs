@@ -778,6 +778,7 @@ impl ChipImpl for Blackhole {
                         telemetry_data.noc_translation_enabled = data != 0
                     }
                     TelemetryTags::FanRpm => telemetry_data.fan_rpm = data,
+                    TelemetryTags::Tbp => telemetry_data.tbp = data,
                     _ => (),
                 }
             }
