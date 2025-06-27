@@ -1,10 +1,11 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
 
-#[derive(Clone, Hash, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Hash, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Arch {
     Grayskull,
     Wormhole,
