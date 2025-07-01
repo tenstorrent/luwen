@@ -147,7 +147,7 @@ impl Telemetry {
         let day = (self.wh_fw_date >> 16) & 0xFF;
         let _hour = (self.wh_fw_date >> 8) & 0xFF;
         let _minute = self.wh_fw_date & 0xFF;
-        format!("{:04}-{:02}-{:02}", year, month, day)
+        format!("{year:04}-{month:02}-{day:02}")
     }
 
     /// Return ARC firmware version in MAJOR.MINOR.PATCH format.
@@ -155,7 +155,7 @@ impl Telemetry {
         let major = (self.arc0_fw_version >> 16) & 0xFF;
         let minor = (self.arc0_fw_version >> 8) & 0xFF;
         let patch = self.arc0_fw_version & 0xFF;
-        format!("{}.{}.{}", major, minor, patch)
+        format!("{major}.{minor}.{patch}")
     }
 
     /// Return Ethernet firmware version in MAJOR.MINOR.PATCH format.
@@ -163,7 +163,7 @@ impl Telemetry {
         let major = (self.eth_fw_version >> 16) & 0x0FF;
         let minor = (self.eth_fw_version >> 12) & 0x00F;
         let patch = self.eth_fw_version & 0xFFF;
-        format!("{}.{}.{}", major, minor, patch)
+        format!("{major}.{minor}.{patch}")
     }
 
     /// Return the board serial number as an integer.

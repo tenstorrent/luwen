@@ -76,7 +76,7 @@ mod tests {
                 // Verify the decoding was successful
                 assert!(decode_msg.is_ok(), "Failed to decode flshinfo table");
                 let mut flshinfo = decode_msg.unwrap();
-                println!("Decoded flshinfo: {:#?}", flshinfo);
+                println!("Decoded flshinfo: {flshinfo:#?}");
 
                 if let Some(date_programmed) = flshinfo.get_mut("date_programmed") {
                     *date_programmed = json!(111111); // Modify the value anc convert to a serde_json Value

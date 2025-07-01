@@ -84,13 +84,13 @@ pub fn main() -> Result<(), LuwenError> {
 
             for (i, d) in data.iter().enumerate() {
                 if *d != (i + 1) as u8 {
-                    panic!("Mismatch at index {}", i);
+                    panic!("Mismatch at index {i}");
                 }
             }
 
             for (i, d) in turbo_data.iter().enumerate() {
                 if *d != (i + 1) as u8 {
-                    panic!("Mismatch at index {}", i);
+                    panic!("Mismatch at index {i}");
                 }
             }
         }

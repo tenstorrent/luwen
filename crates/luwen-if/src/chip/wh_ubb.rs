@@ -23,11 +23,9 @@ pub fn wh_ubb_ipmi_reset(
     op_mode: &str,
     reset_time: &str,
 ) -> Result<(), String> {
-    let full_command = format!(
-        "sudo ipmitool raw 0x30 0x8B {} {} {} {}",
-        ubb_num, dev_num, op_mode, reset_time
-    );
-    println!("Executing command: {}", full_command);
+    let full_command =
+        format!("sudo ipmitool raw 0x30 0x8B {ubb_num} {dev_num} {op_mode} {reset_time}");
+    println!("Executing command: {full_command}");
 
     let output = Command::new("sudo")
         .arg("ipmitool")
@@ -39,7 +37,7 @@ pub fn wh_ubb_ipmi_reset(
         .arg(op_mode)
         .arg(reset_time)
         .output()
-        .map_err(|e| format!("Failed to execute ipmitool: {}", e))?;
+        .map_err(|e| format!("Failed to execute ipmitool: {e}"))?;
 
     if output.status.success() {
         Ok(())
@@ -65,7 +63,7 @@ pub fn ubb_wait_for_driver_load() {
                 return;
             }
         }
-        println!("Waiting for driver load ... {} seconds", attempts);
+        println!("Waiting for driver load ... {attempts} seconds");
         std::thread::sleep(std::time::Duration::from_secs(1));
         attempts += 1;
     }

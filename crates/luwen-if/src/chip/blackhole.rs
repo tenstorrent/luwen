@@ -425,7 +425,7 @@ impl Blackhole {
         // Decode the proto bin and convert it to a HashMap
         let tag_info = self
             .get_boot_fs_tables_spi_read(tag_name)?
-            .ok_or_else(|| format!("Tag '{}' not found in boot FS tables", tag_name))?;
+            .ok_or_else(|| format!("Tag '{tag_name}' not found in boot FS tables"))?;
         let spi_addr = tag_info.1.spi_addr;
         let image_size = tag_info.1.flags.image_size();
 
@@ -448,7 +448,7 @@ impl Blackhole {
                 spirom_tables::flash_info::FlashInfoTable::decode(&*proto_bin)?,
             );
         } else {
-            return Err(format!("Unsupported tag name: {}", tag_name).into());
+            return Err(format!("Unsupported tag name: {tag_name}").into());
         };
         Ok(final_decode_map)
     }
@@ -469,7 +469,7 @@ impl Blackhole {
             spirom_tables::from_hash_map::<spirom_tables::flash_info::FlashInfoTable>(hashmap)
                 .encode_to_vec()
         } else {
-            return Err(format!("Unsupported tag name: {}", tag_name).into());
+            return Err(format!("Unsupported tag name: {tag_name}").into());
         };
         // Pad the proto bin to be a multiple of 4 bytes to fit into the spirom requirements
         let padding = 4 - (proto_bin.len() % 4);
@@ -480,7 +480,7 @@ impl Blackhole {
         // Write the proto bin to the spirom and update the checksums
         let tag_info = self
             .get_boot_fs_tables_spi_read(tag_name)?
-            .ok_or_else(|| format!("Tag '{}' not found in boot FS tables", tag_name))?;
+            .ok_or_else(|| format!("Tag '{tag_name}' not found in boot FS tables"))?;
 
         let mut fd_in_spi = tag_info.1;
         fd_in_spi.flags.set_image_size(proto_bin.len() as u32);
@@ -687,10 +687,7 @@ impl ChipImpl for Blackhole {
         // Check if the address is within CSM memory. Otherwise, it must be invalid
         if !(0x10000000..=0x1007FFFF).contains(&telem_struct_addr) {
             return Err(PlatformError::Generic(
-                format!(
-                    "Invalid Telemetry struct address: 0x{:08x}",
-                    telem_struct_addr
-                ),
+                format!("Invalid Telemetry struct address: 0x{telem_struct_addr:08x}"),
                 BtWrapper::capture(),
             ));
         }

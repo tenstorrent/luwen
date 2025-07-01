@@ -16,7 +16,7 @@ fn link_reset(interface: usize) -> bool {
     let fd = if let Ok(fd) = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
-        .open(format!("/dev/tenstorrent/{}", interface))
+        .open(format!("/dev/tenstorrent/{interface}"))
     {
         fd
     } else {

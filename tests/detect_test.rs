@@ -45,7 +45,7 @@ mod tests {
 
                     // Test Grayskull-specific functionality
                     let scratch_value = gs.axi_sread32("ARC_RESET.SCRATCH[0]").unwrap();
-                    println!("Grayskull scratch value: {:x}", scratch_value);
+                    println!("Grayskull scratch value: {scratch_value:x}");
 
                     println!(
                         "Grayskull Chip: {:?}, Status: {:?}, Ethernet: {:?}",
@@ -127,7 +127,7 @@ mod tests {
 
                     // Test Blackhole-specific functionality
                     let telemetry = bh.get_telemetry().unwrap();
-                    println!("Blackhole telemetry: {:?}", telemetry);
+                    println!("Blackhole telemetry: {telemetry:?}");
 
                     // Test arc message
                     let result = bh
@@ -140,11 +140,11 @@ mod tests {
                             ..Default::default()
                         })
                         .unwrap();
-                    println!("ARC message result: {:?}", result);
+                    println!("ARC message result: {result:?}");
 
                     // Read scratch register
                     let scratch_value = bh.axi_sread32("arc_ss.reset_unit.SCRATCH_RAM[0]").unwrap();
-                    println!("Blackhole scratch value: {:x}", scratch_value);
+                    println!("Blackhole scratch value: {scratch_value:x}");
 
                     println!(
                         "Blackhole Chip: {:?}, Status: {:?}, Ethernet: {:?}",

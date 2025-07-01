@@ -17,11 +17,11 @@ pub(crate) fn read_bar0_base(config_space: &std::fs::File) -> u64 {
     match size {
         Ok(size) => {
             if size != std::mem::size_of::<u64>() {
-                panic!("Failed to read BAR0 config space: {}", size);
+                panic!("Failed to read BAR0 config space: {size}");
             }
         }
         Err(err) => {
-            panic!("Failed to read BAR0 config space: {}", err);
+            panic!("Failed to read BAR0 config space: {err}");
         }
     }
 

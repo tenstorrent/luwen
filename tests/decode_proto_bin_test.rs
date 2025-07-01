@@ -36,7 +36,7 @@ mod tests {
             if let Some(bh) = device.as_bh() {
                 // Test decoding the boardcfg table from the boot fs
                 let decode_msg = bh.decode_boot_fs_table("boardcfg");
-                println!("Decoded boardcfg: {:#?}", decode_msg);
+                println!("Decoded boardcfg: {decode_msg:#?}");
 
                 // Verify the decoding was successful
                 assert!(decode_msg.is_ok(), "Failed to decode boardcfg table");
@@ -61,7 +61,7 @@ mod tests {
             if let Some(bh) = device.as_bh() {
                 // Test decoding the flshinfo table from the boot fs
                 let decode_msg = bh.decode_boot_fs_table("flshinfo");
-                println!("Decoded flshinfo: {:#?}", decode_msg);
+                println!("Decoded flshinfo: {decode_msg:#?}");
 
                 // Verify the decoding was successful
                 assert!(decode_msg.is_ok(), "Failed to decode flshinfo table");
@@ -86,7 +86,7 @@ mod tests {
             if let Some(bh) = device.as_bh() {
                 // Test decoding the cmfwcfg table from the boot fs
                 let decode_msg = bh.decode_boot_fs_table("cmfwcfg");
-                println!("Decoded cmfwcfg: {:#?}", decode_msg);
+                println!("Decoded cmfwcfg: {decode_msg:#?}");
 
                 // Verify the decoding was successful
                 assert!(decode_msg.is_ok(), "Failed to decode cmfwcfg table");
@@ -111,7 +111,7 @@ mod tests {
             if let Some(bh) = device.as_bh() {
                 // Test decoding the origcfg table from the boot fs
                 let decode_msg = bh.decode_boot_fs_table("origcfg");
-                println!("Decoded origcfg: {:#?}", decode_msg);
+                println!("Decoded origcfg: {decode_msg:#?}");
                 // There isn't much else to test here -- most boards
                 // don't actually have an origcfg so there's nothing
                 // to validate.

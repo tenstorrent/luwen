@@ -80,7 +80,7 @@ pub fn detect_chips_options_notui(
 
     let chips = match luwen_if::detect_chips(chips, &mut init_callback, options) {
         Err(InitError::CallbackError(err)) => {
-            eprintln!("Ran into error from status callback;\n{}", err);
+            eprintln!("Ran into error from status callback;\n{err}");
             return Err(luwen_if::error::PlatformError::Generic(
                 "Hit error from status callback".to_string(),
                 luwen_if::error::BtWrapper::capture(),
@@ -217,7 +217,7 @@ pub fn detect_chips_options_tui(
     let chips = match luwen_if::detect_chips(chips, &mut init_callback, options) {
         Err(InitError::CallbackError(err)) => {
             chip_detect_bar
-                .finish_with_message(format!("Ran into error from status callback;\n{}", err));
+                .finish_with_message(format!("Ran into error from status callback;\n{err}"));
             return Err(luwen_if::error::PlatformError::Generic(
                 "Hit error from status callback".to_string(),
                 luwen_if::error::BtWrapper::capture(),

@@ -39,7 +39,7 @@ mod tests {
                 let mut board_info = [0u8; 8];
                 wh.spi_read(board_info_addr, &mut board_info).unwrap();
                 let board_info_value = u64::from_le_bytes(board_info);
-                println!("Wormhole BOARD_INFO: {:016X}", board_info_value);
+                println!("Wormhole BOARD_INFO: {board_info_value:016X}");
                 assert_ne!(board_info_value, 0, "Board info should not be zero");
 
                 // Test read-modify-write on spare/scratch area
@@ -74,15 +74,14 @@ mod tests {
                 // Verify read-after-write
                 assert_eq!(
                     verify_value, new_value,
-                    "SPI write verification failed: expected {:?}, got {:?}",
-                    new_value, verify_value
+                    "SPI write verification failed: expected {new_value:?}, got {verify_value:?}"
                 );
 
                 // Read wider area to check SPI handling of different sizes
                 let mut wide_value = [0u8; 8];
                 wh.spi_read(spare_addr, &mut wide_value).unwrap();
                 let wide_value_u64 = u64::from_le_bytes(wide_value);
-                println!("Wide read at 0x{:X}: {:016X}", spare_addr, wide_value_u64);
+                println!("Wide read at 0x{spare_addr:X}: {wide_value_u64:016X}");
 
                 // Verify first 2 bytes match our written value
                 assert_eq!(
@@ -113,7 +112,7 @@ mod tests {
                 let mut board_info = [0u8; 8];
                 gs.spi_read(board_info_addr, &mut board_info).unwrap();
                 let board_info_value = u64::from_le_bytes(board_info);
-                println!("Grayskull BOARD_INFO: {:016X}", board_info_value);
+                println!("Grayskull BOARD_INFO: {board_info_value:016X}");
                 assert_ne!(board_info_value, 0, "Board info should not be zero");
 
                 // Test read-modify-write on spare/scratch area
@@ -148,15 +147,14 @@ mod tests {
                 // Verify read-after-write
                 assert_eq!(
                     verify_value, new_value,
-                    "SPI write verification failed: expected {:?}, got {:?}",
-                    new_value, verify_value
+                    "SPI write verification failed: expected {new_value:?}, got {verify_value:?}"
                 );
 
                 // Read wider area to check SPI handling of different sizes
                 let mut wide_value = [0u8; 8];
                 gs.spi_read(spare_addr, &mut wide_value).unwrap();
                 let wide_value_u64 = u64::from_le_bytes(wide_value);
-                println!("Wide read at 0x{:X}: {:016X}", spare_addr, wide_value_u64);
+                println!("Wide read at 0x{spare_addr:X}: {wide_value_u64:016X}");
 
                 // Verify first 2 bytes match our written value
                 assert_eq!(

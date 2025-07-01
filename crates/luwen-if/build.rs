@@ -5,8 +5,8 @@ fn try_to_compiled_proto_file_by_name(
     protoc_path: Option<PathBuf>,
     out_dir: &str,
 ) -> Result<(), std::io::Error> {
-    let proto_file = format!("{}.proto", name);
-    let outname = format!("{}/{}.rs", out_dir, name);
+    let proto_file = format!("{name}.proto");
+    let outname = format!("{out_dir}/{name}.rs");
     let mut protoc_build_config = prost_build::Config::new();
     protoc_build_config.out_dir(out_dir);
 
@@ -18,7 +18,7 @@ fn try_to_compiled_proto_file_by_name(
     }
 
     protoc_build_config.compile_protos(&[proto_file], &["bh_spirom_protobufs/"])?;
-    fs::rename(format!("{}/_.rs", out_dir), outname)?;
+    fs::rename(format!("{out_dir}/_.rs"), outname)?;
     Ok(())
 }
 

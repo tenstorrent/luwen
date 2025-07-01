@@ -90,11 +90,10 @@ mod tests {
 
         // Check TDC is within expected range (3-200)
         let tdc = telemetry.tdc & 0xFFFF;
-        println!("TDC reading: {}", tdc);
+        println!("TDC reading: {tdc}");
         assert!(
             (3..=300).contains(&tdc),
-            "Board TDC (temperature) reading is outside of the expected range: {}",
-            tdc
+            "Board TDC (temperature) reading is outside of the expected range: {tdc}"
         );
 
         // Check asic temperature
