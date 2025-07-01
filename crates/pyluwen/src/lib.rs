@@ -1075,7 +1075,7 @@ impl PciWormhole {
         Ok(RemoteWormhole(
             self.0
                 .open_remote((rack_x, rack_y, shelf_x, shelf_y))
-                .map_err(|v| PyException::new_err(format!("Could not open remote: {}", v)))?,
+                .map_err(|v| PyException::new_err(format!("Could not open remote: {v}")))?,
         ))
     }
 
@@ -1128,9 +1128,9 @@ impl PciWormhole {
         let value = PciInterface::from_wh(self);
 
         if let Some(value) = value {
-            Ok(value.allocate_dma_buffer(size).map_err(|v| {
-                PyException::new_err(format!("Could not allocate DMA buffer: {}", v))
-            })?)
+            Ok(value
+                .allocate_dma_buffer(size)
+                .map_err(|v| PyException::new_err(format!("Could not allocate DMA buffer: {v}")))?)
         } else {
             Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
@@ -1160,7 +1160,7 @@ impl PciWormhole {
                     read_threshold,
                     write_threshold,
                 )
-                .map_err(|v| PyException::new_err(format!("Could perform dma config: {}", v)))?)
+                .map_err(|v| PyException::new_err(format!("Could perform dma config: {v}")))?)
         } else {
             Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
@@ -1180,7 +1180,7 @@ impl PciWormhole {
         if let Some(value) = value {
             Ok(value
                 .dma_transfer_turbo(addr, physical_dma_buffer, size, write)
-                .map_err(|v| PyException::new_err(format!("Could perform dma transfer: {}", v)))?)
+                .map_err(|v| PyException::new_err(format!("Could perform dma transfer: {v}")))?)
         } else {
             Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
@@ -1333,9 +1333,9 @@ impl PciBlackhole {
         let value = PciInterface::from_bh(self);
 
         if let Some(value) = value {
-            Ok(value.allocate_dma_buffer(size).map_err(|v| {
-                PyException::new_err(format!("Could not allocate DMA buffer: {}", v))
-            })?)
+            Ok(value
+                .allocate_dma_buffer(size)
+                .map_err(|v| PyException::new_err(format!("Could not allocate DMA buffer: {v}")))?)
         } else {
             Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
@@ -1365,7 +1365,7 @@ impl PciBlackhole {
                     read_threshold,
                     write_threshold,
                 )
-                .map_err(|v| PyException::new_err(format!("Could perform dma config: {}", v)))?)
+                .map_err(|v| PyException::new_err(format!("Could perform dma config: {v}")))?)
         } else {
             Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
@@ -1385,7 +1385,7 @@ impl PciBlackhole {
         if let Some(value) = value {
             Ok(value
                 .dma_transfer_turbo(addr, physical_dma_buffer, size, write)
-                .map_err(|v| PyException::new_err(format!("Could perform dma transfer: {}", v)))?)
+                .map_err(|v| PyException::new_err(format!("Could perform dma transfer: {v}")))?)
         } else {
             Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
@@ -1596,8 +1596,7 @@ pub fn detect_chips_fallible(
 
         if !error_interfaces.is_empty() {
             return Err(PyException::new_err(format!(
-                "Could not open TT-PCI device: {:?}; expected one of {:?}",
-                error_interfaces, all_devices
+                "Could not open TT-PCI device: {error_interfaces:?}; expected one of {all_devices:?}"
             )));
         }
 
@@ -1631,7 +1630,7 @@ pub fn detect_chips_fallible(
     let mut converted_chip_filter = Vec::with_capacity(chip_filter.len());
     for filter in chip_filter {
         converted_chip_filter.push(Arch::from_str(&filter).map_err(|value| {
-            PyException::new_err(format!("Could not parse chip arch: {}", value))
+            PyException::new_err(format!("Could not parse chip arch: {value}"))
         })?);
     }
     let options = ChipDetectOptions {

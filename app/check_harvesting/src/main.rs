@@ -50,5 +50,5 @@ fn main() {
     output.pop();
     output.pop();
     output.push_str("\n}");
-    print!("{}", output);
+    print!("{output}");
 }

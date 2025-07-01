@@ -269,7 +269,7 @@ pub fn generate_map(file: impl AsRef<str>) -> Result<(), LuwenError> {
     let file = file.as_ref();
 
     if let Err(_err) = std::fs::write(file, output) {
-        Err(LuwenError::Custom(format!("Failed to write to {}", file)))
+        Err(LuwenError::Custom(format!("Failed to write to {file}")))
     } else {
         Ok(())
     }

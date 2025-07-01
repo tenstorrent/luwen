@@ -68,7 +68,7 @@ fn read_write_test(
                 let r = u32::from_le_bytes([r[0], r[1], r[2], r[3]]);
 
                 if r == d {
-                    println!("Match at {}", index)
+                    println!("Match at {index}")
                 }
             }
             panic!("Data mismatch at {index} ({d:x} != {r:x})");

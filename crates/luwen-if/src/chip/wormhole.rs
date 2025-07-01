@@ -451,7 +451,7 @@ impl ChipImpl for Wormhole {
                                     PlatformError::AxiError(error) => {
                                         *comms = CommsStatus::CommunicationError(error.to_string());
                                         return Ok(ChipInitResult::ErrorAbort(
-                                            format!("ARC AXI error: {}", error),
+                                            format!("ARC AXI error: {error}"),
                                             backtrace::Backtrace::capture(),
                                         ));
                                     }
@@ -465,8 +465,7 @@ impl ChipImpl for Wormhole {
                                     } => {
                                         return Ok(ChipInitResult::ErrorAbort(
                                             format!(
-                                                "expected chip: {}, actual detected chip: {}",
-                                                expected, actual
+                                                "expected chip: {expected}, actual detected chip: {actual}"
                                             ),
                                             backtrace.0,
                                         ))
@@ -484,8 +483,7 @@ impl ChipImpl for Wormhole {
                                             .join(", ");
                                         return Ok(ChipInitResult::ErrorAbort(
                                             format!(
-                                                "expected chip: {}, actual detected chips: {}",
-                                                expected_chips, actual
+                                                "expected chip: {expected_chips}, actual detected chips: {actual}"
                                             ),
                                             backtrace.0,
                                         ));
@@ -564,11 +562,11 @@ impl ChipImpl for Wormhole {
                             // This means that ARC hung, we should stop initializing this chip in case
                             // we hit something like a noc hang.
                             PlatformError::ArcMsgError(error) => {
-                                return Ok(ChipInitResult::ErrorContinue(format!("Telemetry ARC message error: {}; we expected to have communication, but lost it.", error), backtrace::Backtrace::capture()));
+                                return Ok(ChipInitResult::ErrorContinue(format!("Telemetry ARC message error: {error}; we expected to have communication, but lost it."), backtrace::Backtrace::capture()));
                             }
 
                             PlatformError::MessageError(error) => {
-                                return Ok(ChipInitResult::ErrorContinue(format!("Telemetry ARC message error: {:?}; we expected to have communication, but lost it.", error), backtrace::Backtrace::capture()));
+                                return Ok(ChipInitResult::ErrorContinue(format!("Telemetry ARC message error: {error:?}; we expected to have communication, but lost it."), backtrace::Backtrace::capture()));
                             }
 
                             // This is an "expected error" but we probably can't recover from it, so we should abort the init.
@@ -577,12 +575,12 @@ impl ChipImpl for Wormhole {
                             // We don't expect to hit these cases so if we do, we should assume that something went terribly
                             // wrong and abort the init.
                             PlatformError::WrongChipArch {actual, expected, backtrace} => {
-                                return Ok(ChipInitResult::ErrorAbort(format!("expected chip: {}, actual detected chip: {}", expected, actual), backtrace.0))
+                                return Ok(ChipInitResult::ErrorAbort(format!("expected chip: {expected}, actual detected chip: {actual}"), backtrace.0))
                             }
 
                             PlatformError::WrongChipArchs {actual, expected, backtrace} => {
                                 let expected_chips = expected.iter().map(|arch| arch.to_string()).collect::<Vec<_>>().join(", ");
-                                return Ok(ChipInitResult::ErrorAbort(format!("expected chip: {}, actual detected chips: {}", expected_chips, actual), backtrace.0));
+                                return Ok(ChipInitResult::ErrorAbort(format!("expected chip: {expected_chips}, actual detected chips: {actual}"), backtrace.0));
                             }
 
                             PlatformError::Generic(error, backtrace) => {
@@ -701,8 +699,7 @@ impl ChipImpl for Wormhole {
                                     let false_count = eth_cores.iter().filter(|&&x| !x).count();
                                     return Ok(ChipInitResult::ErrorContinue(
                                         format!(
-                                            "Ethernet training not complete on [{}/16] ports",
-                                            false_count
+                                            "Ethernet training not complete on [{false_count}/16] ports"
                                         ),
                                         backtrace::Backtrace::capture(),
                                     ));
@@ -719,7 +716,7 @@ impl ChipImpl for Wormhole {
                                 // We don't expect to hit these cases so if we do, we should assume that something went terribly
                                 // wrong and abort the init.
                                 PlatformError::UnsupportedFwVersion { version, required } => {
-                                    return Ok(ChipInitResult::ErrorAbort(format!("Required Ethernet Firmware Version: {}, current version: {:?}", required, version), backtrace::Backtrace::capture()));
+                                    return Ok(ChipInitResult::ErrorAbort(format!("Required Ethernet Firmware Version: {required}, current version: {version:?}"), backtrace::Backtrace::capture()));
                                 }
                                 PlatformError::WrongChipArch {
                                     actual,
@@ -728,9 +725,8 @@ impl ChipImpl for Wormhole {
                                 } => {
                                     return Ok(ChipInitResult::ErrorAbort(
                                         format!(
-                                            "expected chip: {}, actual detected chip: {}",
-                                            expected, actual
-                                        ),
+                                        "expected chip: {expected}, actual detected chip: {actual}"
+                                    ),
                                         backtrace.0,
                                     ))
                                 }
@@ -747,8 +743,7 @@ impl ChipImpl for Wormhole {
                                         .join(", ");
                                     return Ok(ChipInitResult::ErrorAbort(
                                         format!(
-                                            "expected chip: {}, actual detected chips: {}",
-                                            expected_chips, actual
+                                            "expected chip: {expected_chips}, actual detected chips: {actual}"
                                         ),
                                         backtrace.0,
                                     ));

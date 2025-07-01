@@ -169,8 +169,8 @@ fn compare_and_reset(expected: &dyn Any) {
                 // let bt1 = err.to_string();
                 // let bt2 = platform_error.to_string();
                 // assert_eq!(bt1, bt2);
-                println!("Actual: {:?}", err);
-                println!("Expected: {:?}", platform_error);
+                println!("Actual: {err:?}");
+                println!("Expected: {platform_error:?}");
             }
             _ => panic!("Expected error not found"),
         }
@@ -184,8 +184,8 @@ fn compare_and_reset(expected: &dyn Any) {
                 // let bt1 = err.to_string();
                 // let bt2 = backtrace.to_string();
                 // assert_eq!(bt1, bt2);
-                println!("Actual: {:?}", err);
-                println!("Expected: {:?}", backtrace);
+                println!("Actual: {err:?}");
+                println!("Expected: {backtrace:?}");
             }
             _ => panic!("Expected error not found"),
         }
@@ -291,7 +291,7 @@ fn main() {
                     }
                     Err(panic_info) => {
                         if let Some(s) = panic_info.downcast_ref::<&str>() {
-                            println!("Panic occurred: {}", s);
+                            println!("Panic occurred: {s}");
                         } else {
                             println!("Panic occurred");
                         }

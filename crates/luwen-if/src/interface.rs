@@ -82,10 +82,7 @@ impl DeviceInfo {
         let bus = format!("{:02x}", self.bus);
         let slot = format!("{:02x}", self.slot);
         let function = format!("{:01x}", self.function);
-        format!(
-            "/sys/bus/pci/devices/{}:{}:{}.{}/",
-            domain, bus, slot, function
-        )
+        format!("/sys/bus/pci/devices/{domain}:{bus}:{slot}.{function}/")
     }
 
     /// Return link width; valid values of `s` are "current" and "max".

@@ -20,7 +20,7 @@ pub fn hardware_available() -> bool {
             true
         }
         Err(e) => {
-            println!("Test SKIPPED: Error detecting chips: {}", e);
+            println!("Test SKIPPED: Error detecting chips: {e}");
             false
         }
     }
@@ -61,7 +61,7 @@ where
             true
         }
         Err(e) => {
-            println!("Test SKIPPED: Error detecting chips: {}", e);
+            println!("Test SKIPPED: Error detecting chips: {e}");
             false
         }
     }

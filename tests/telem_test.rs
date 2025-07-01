@@ -39,10 +39,10 @@ mod tests {
                 // Only test Wormhole chips
                 if let Some(wh) = upgraded_chip.as_wh() {
                     let status = chip.status();
-                    println!("Wormhole chip status: {:?}", status);
+                    println!("Wormhole chip status: {status:?}");
 
                     let eth_status = chip.eth_safe();
-                    println!("Wormhole ethernet status: {:?}", eth_status);
+                    println!("Wormhole ethernet status: {eth_status:?}");
 
                     println!("Testing Wormhole chip");
 
@@ -89,16 +89,16 @@ mod tests {
                 // Only test Grayskull chips
                 if let Some(gs) = upgraded_chip.as_gs() {
                     let status = chip.status();
-                    println!("Grayskull chip status: {:?}", status);
+                    println!("Grayskull chip status: {status:?}");
 
                     let eth_status = chip.eth_safe();
-                    println!("Grayskull ethernet status: {:?}", eth_status);
+                    println!("Grayskull ethernet status: {eth_status:?}");
 
                     println!("Testing Grayskull chip");
 
                     // Read scratch register
                     let scratch_value = gs.axi_sread32("ARC_RESET.SCRATCH[0]").unwrap();
-                    println!("Grayskull scratch value: {:x}", scratch_value);
+                    println!("Grayskull scratch value: {scratch_value:x}");
 
                     // Print chip information
                     println!(
@@ -134,10 +134,10 @@ mod tests {
                 // Only test Blackhole chips
                 if let Some(bh) = upgraded_chip.as_bh() {
                     let status = chip.status();
-                    println!("Blackhole chip status: {:?}", status);
+                    println!("Blackhole chip status: {status:?}");
 
                     let eth_status = chip.eth_safe();
-                    println!("Blackhole ethernet status: {:?}", eth_status);
+                    println!("Blackhole ethernet status: {eth_status:?}");
 
                     println!("Testing Blackhole chip");
 
@@ -145,8 +145,8 @@ mod tests {
                     let telemetry1 = bh.get_telemetry().unwrap();
                     let telemetry2 = bh.get_telemetry().unwrap();
 
-                    println!("Blackhole telemetry: {:?}", telemetry1);
-                    println!("Blackhole telemetry: {:?}", telemetry2);
+                    println!("Blackhole telemetry: {telemetry1:?}");
+                    println!("Blackhole telemetry: {telemetry2:?}");
 
                     // Get subsystem ID
                     if let Some(subsystem) = bh.get_if::<luwen_if::chip::NocInterface>()
@@ -156,7 +156,7 @@ mod tests {
                                 .downcast_ref::<luwen_if::CallbackStorage<luwen_ref::ExtendedPciDeviceWrapper>>()
                         })
                         .map(|v| v.user_data.borrow().device.physical.subsystem_id) {
-                        println!("Blackhole subsystem ID: {:x}", subsystem);
+                        println!("Blackhole subsystem ID: {subsystem:x}");
                         assert_ne!(subsystem, 0, "Subsystem ID should be non-zero");
                     }
 

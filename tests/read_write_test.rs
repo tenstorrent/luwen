@@ -110,8 +110,7 @@ mod tests {
         let readback = fixture.raw_device.read32(fixture.aligned_addr).unwrap();
         assert_eq!(
             readback, 0x0000_faca,
-            "Aligned read/write of 0xfaca failed, got 0x{:x}",
-            readback
+            "Aligned read/write of 0xfaca failed, got 0x{readback:x}"
         );
 
         // Test 2: Aligned write/read with 32-bit pattern
@@ -122,8 +121,7 @@ mod tests {
         let readback = fixture.raw_device.read32(fixture.aligned_addr).unwrap();
         assert_eq!(
             readback, 0xcdcd_cdcd,
-            "Aligned read/write of 0xcdcdcdcd failed, got 0x{:x}",
-            readback
+            "Aligned read/write of 0xcdcdcdcd failed, got 0x{readback:x}"
         );
 
         // Test 3: Aligned write/read at next word boundary
@@ -134,8 +132,7 @@ mod tests {
         let readback = fixture.raw_device.read32(fixture.aligned_addr + 4).unwrap();
         assert_eq!(
             readback, 0xcdcd_cdcd,
-            "Aligned read/write at next word boundary failed, got 0x{:x}",
-            readback
+            "Aligned read/write at next word boundary failed, got 0x{readback:x}"
         );
     }
 
@@ -160,15 +157,13 @@ mod tests {
         let readback = fixture.raw_device.read32(fixture.aligned_addr).unwrap();
         assert_eq!(
             readback, 0xdeadcd,
-            "Unaligned write +1 effect on current word failed, got 0x{:x}",
-            readback
+            "Unaligned write +1 effect on current word failed, got 0x{readback:x}"
         );
 
         let readback = fixture.raw_device.read32(fixture.aligned_addr + 4).unwrap();
         assert_eq!(
             readback, 0xcdcdcd00,
-            "Unaligned write +1 effect on next word failed, got 0x{:x}",
-            readback
+            "Unaligned write +1 effect on next word failed, got 0x{readback:x}"
         );
 
         // Reset test area to known pattern
@@ -184,15 +179,13 @@ mod tests {
         let readback = fixture.raw_device.read32(fixture.aligned_addr).unwrap();
         assert_eq!(
             readback, 0xfecdcdcd,
-            "Unaligned write +3 effect on current word failed, got 0x{:x}",
-            readback
+            "Unaligned write +3 effect on current word failed, got 0x{readback:x}"
         );
 
         let readback = fixture.raw_device.read32(fixture.aligned_addr + 4).unwrap();
         assert_eq!(
             readback, 0xcd000c0f,
-            "Unaligned write +3 effect on next word failed, got 0x{:x}",
-            readback
+            "Unaligned write +3 effect on next word failed, got 0x{readback:x}"
         );
     }
 
@@ -212,8 +205,7 @@ mod tests {
         let readback = fixture.raw_device.read32(fixture.aligned_addr).unwrap();
         assert_eq!(
             readback, 0x01234567,
-            "Sequential pattern write/read failed, got 0x{:x}",
-            readback
+            "Sequential pattern write/read failed, got 0x{readback:x}"
         );
 
         // Write to adjacent word
@@ -224,8 +216,7 @@ mod tests {
         let readback = fixture.raw_device.read32(fixture.aligned_addr + 4).unwrap();
         assert_eq!(
             readback, 0xabcdef,
-            "Sequential pattern write/read at next word failed, got 0x{:x}",
-            readback
+            "Sequential pattern write/read at next word failed, got 0x{readback:x}"
         );
 
         // Test 7: Verify unaligned reads with sequential data
@@ -233,16 +224,14 @@ mod tests {
         let readback = fixture.raw_device.read32(fixture.aligned_addr + 1).unwrap();
         assert_eq!(
             readback, 0xef012345,
-            "Unaligned read +1 with sequential pattern failed, got 0x{:x}",
-            readback
+            "Unaligned read +1 with sequential pattern failed, got 0x{readback:x}"
         );
 
         // Read with +3 byte offset (crosses word boundary)
         let readback = fixture.raw_device.read32(fixture.aligned_addr + 3).unwrap();
         assert_eq!(
             readback, 0xabcdef01,
-            "Unaligned read +3 with sequential pattern failed, got 0x{:x}",
-            readback
+            "Unaligned read +3 with sequential pattern failed, got 0x{readback:x}"
         );
     }
 
@@ -376,8 +365,7 @@ mod tests {
         let reg_readback = fixture.raw_device.read32(fixture.aligned_addr + 1).unwrap();
         assert_eq!(
             reg_readback, 0xef012345,
-            "Register read at +1 doesn't match expected pattern, got 0x{:x}",
-            reg_readback
+            "Register read at +1 doesn't match expected pattern, got 0x{reg_readback:x}"
         );
 
         // Verify unaligned block read at +1 offset

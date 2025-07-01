@@ -25,8 +25,7 @@ fn test_header_compiles() {
     // The header should exist since cargo builds the crate before running tests
     if !header_path.exists() {
         panic!(
-            "Could not find generated luwen.h header file at {:?}. Make sure luwencpp is built.",
-            header_path
+            "Could not find generated luwen.h header file at {header_path:?}. Make sure luwencpp is built."
         );
     }
 
@@ -39,7 +38,7 @@ void test_chip_forward_declaration() {
     luwen::Chip* chip = nullptr;
     luwen::LuwenGlue glue = {};
     chip = luwen::luwen_open(luwen::Arch::WORMHOLE, glue);
-    
+
     if (chip) {
         luwen::chip_telemetry(chip);
         luwen::luwen_close(chip);
