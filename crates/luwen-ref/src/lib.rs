@@ -17,7 +17,9 @@ mod wormhole;
 
 use wormhole::ethernet::{self, EthCommCoord};
 
-pub use detect::{detect_chips, detect_chips_fallible, detect_local_chips};
+pub use detect::{
+    detect_chips, detect_chips_fallible, detect_chips_silent, detect_local_chips, start_detect,
+};
 pub use ttkmd_if::{DmaBuffer, DmaConfig, PciDevice, Tlb};
 
 #[derive(Clone)]
