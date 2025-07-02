@@ -704,7 +704,7 @@ checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 
 [[package]]
 name = "luwen"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "bincode",
  "clap",
@@ -728,7 +728,7 @@ dependencies = [
 
 [[package]]
 name = "luwen-if"
-version = "0.6.5"
+version = "0.6.6"
 dependencies = [
  "bincode",
  "bitfield-struct",
@@ -1158,7 +1158,7 @@ source = "git+https://github.com/TTDRosen/rust-protoc-bin-vendored?rev=3cf2dd3df
 
 [[package]]
 name = "pyluwen"
-version = "0.7.6"
+version = "0.7.7"
 dependencies = [
  "luwen-core",
  "luwen-if",
