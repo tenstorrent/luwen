@@ -1,9 +1,19 @@
 [package]
 name = "pyluwen"
 version = "0.7.7"
-description = "Python bindings for luwen"
+description = "Python bindings for Tenstorrent's luwen - a low level hardware interface library"
 edition = "2021"
 license = "Apache-2.0"
+readme = "../../README.md"
+authors = []
+keywords = [
+	"Tenstorrent",
+	"Grayskull",
+	"Wormhole",
+	"Blackhole",
+	"hardware"
+]
+
 
 [lib]
 crate-type = ["cdylib"]
