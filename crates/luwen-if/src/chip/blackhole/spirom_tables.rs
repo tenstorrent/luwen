@@ -4,13 +4,13 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 pub mod flash_info {
-    include!(concat!(env!("OUT_DIR"), "/flash_info.rs"));
+    include!("../../generated/flash_info.rs");
 }
 pub mod fw_table {
-    include!(concat!(env!("OUT_DIR"), "/fw_table.rs"));
+    include!("../../generated/fw_table.rs");
 }
 pub mod read_only {
-    include!(concat!(env!("OUT_DIR"), "/read_only.rs"));
+    include!("../../generated/read_only.rs");
 }
 
 pub fn remove_padding_proto_bin(proto_bin: &[u8]) -> Result<&[u8], Box<dyn std::error::Error>> {
