@@ -43,3 +43,14 @@ jobs:
       PATCH:  ${{ inputs.PATCH }}
       NUMBER_OF_COMMITS_SINCE_TAG:  ${{ inputs.NUMBER_OF_COMMITS_SINCE_TAG }}
     secrets: inherit
+  builddeb2404:
+    needs:
+      - build_all_depends
+    uses: ./.github/workflows/build-deb-ubuntu-24.04.yml
+    with:
+      ref: ${{ inputs.ref }}
+      MAJOR:  ${{ inputs.MAJOR }}
+      MINOR:  ${{ inputs.MINOR }}
+      PATCH:  ${{ inputs.PATCH }}
+      NUMBER_OF_COMMITS_SINCE_TAG:  ${{ inputs.NUMBER_OF_COMMITS_SINCE_TAG }}
+    secrets: inherit
