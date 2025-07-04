@@ -1,21 +1,35 @@
-[build-system]
-requires = [
-	"maturin>=1.2,<2.0",
-]
-build-backend = "maturin"
-
 [project]
 name = "pyluwen"
 requires-python = ">=3.7"
 
-dynamic = ["version"]
+dynamic = [
+	"version",
+	"summary",
+	"description",
+	"description_content_type",
+	"keywords",
+	"home_page",
+	"author",
+	"author_email",
+	"license",
+	"project_url",
+]
 
 classifiers = [
 	"Programming Language :: Rust",
 	"Programming Language :: Python :: Implementation :: CPython",
 	"Programming Language :: Python :: Implementation :: PyPy",
+	"License :: OSI Approved :: Apache Software License",
+	"Operating System :: POSIX :: Linux",
+	"Topic :: System :: Hardware",
+	"Topic :: Utilities",
 ]
 
+[build-system]
+requires = [
+	"maturin>=1.2,<2.0",
+]
+build-backend = "maturin"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]

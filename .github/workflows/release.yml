@@ -1,0 +1,434 @@
+name: Create Release
+run-name: Create Release
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  # what this should do is properly do a release of everything here
+  # that has a new version in it.  We aren't there yet.  So in the
+  # interim assume the main core, c++ bindings, and python bindings
+  # are all part of a release now, and they will be using the same version
+  # going forward.
+
+  ###
+  # Repo Updates
+  #   So, fun fact, the way actions/checkout@v4 works it pulls / works based on what triggered it
+  #   this leads to a problem because I don't want to progress till various things have completed
+  #   in a roughly specific order, but I also need to know what/where things came from - which ok
+  #   fair enough.
+  #
+  #   This means that repo changes, so version changes, changelogs, etc I guess all need to happen
+  #   not only at once but somehow need to wait on things down the line outside this triggering to
+  #   come back and allow other things to happen.  Or I suppose I snag the sha from versionchange
+  #   and pass it along as "latest" in the series, could work too and bypass some of this?
+  ###
+  tempbranch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      rc_ref: ${{ steps.rc_ref.outputs.rc_ref }}
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+          fetch-depth: 0
+      - name: Figure out branch name
+        id: rc_ref
+        run: |
+          export rc_ref="rc_ref=rc-temp-$( git rev-parse --short HEAD )-$( date +%Y.%m.%d-%H.%M.%S )"
+          echo "${rc_ref}"
+          echo "${rc_ref}" >> "$GITHUB_OUTPUT"
+      - name: Do up the branch quick
+        run: git checkout -b "${{ steps.rc_ref.outputs.rc_ref }}"
+      - name: Push the branch to work from
+        run: git push --branches
+
+  versionchange:
+    needs:
+      - tempbranch
+    # Runs on needs to be the oldest we can make it
+    # just to make sure that the cargo is the oldest
+    # we likely need to support
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    outputs:
+      git_hash: ${{ steps.new-git-hash.outputs.git_hash }}
+      luwen_version: ${{ steps.luwenver.outputs.luwen_version }}
+      luwen_version_new: ${{ steps.new-luwen-version.outputs.luwen_version_new }}
+      version_major: ${{ steps.version.outputs.major }}
+      version_minor: ${{ steps.version.outputs.minor }}
+      version_patch: ${{ steps.version.outputs.patch }}
+      version_prerelease: ${{ steps.version.outputs.prerelease }}
+      version_build: ${{ steps.version.outputs.build }}
+      version_full: ${{ steps.version.outputs.full }}
+      number_of_commits_since_tag: ${{ steps.num-commits-since-tag.outputs.num_commits_since_tag }}
+    steps:
+      - name: Install cargo
+        run: sudo apt install -y cargo
+      - uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+          fetch-depth: 0
+          ref: ${{ needs.tempbranch.outputs.rc_ref }}
+      - name: Git e-mail
+        run: git config --global user.email "${EMAIL}"
+      - name: Git name
+        run: git config --global user.name "${NAME}"
+      - name: Install cargo-workspaces
+        run: cargo install cargo-workspaces@0.3.6 --locked
+      - name: What version are we?
+        id: luwenver
+        run: |
+          export luwen_ver="$( cargo metadata --format-version 1 | jq '.packages[] | select( .name =="luwen" ) | .version' | sed 's/"//g' )"
+          echo "luwen_version=${luwen_ver}"
+          echo "luwen_version=${luwen_ver}" >> "$GITHUB_OUTPUT"
+      - name: Bump the version
+        run: cargo ws version patch --allow-branch ${{ needs.tempbranch.outputs.rc_ref }} --no-git-tag --message "Cargo Release %v" -y
+      - name: What NEW Version?
+        id: new-luwen-version
+        run: |
+          export luwen_version_new="$( cargo metadata --format-version 1 | jq '.packages[] | select( .name =="luwen" ) | .version' | sed 's/"//g' )"
+          echo "luwen_version_new=${luwen_version_new}"
+          echo "luwen_version_new=${luwen_version_new}" >> "$GITHUB_OUTPUT"
+      - name: Parse version from string
+        id: version
+        uses: release-kit/semver@v2
+        with:
+          string: ${{ steps.new-luwen-version.outputs.luwen_version_new }}
+      - name: Find number of commits since last tag
+        id: num-commits-since-tag
+        run: |
+          export num_commits_since="num_commits_since_tag=$( git rev-list $(git describe --tags --abbrev=0)..HEAD --count )"
+          echo "${num_commits_since}"
+          echo "${num_commits_since}" >> "$GITHUB_OUTPUT"
+      - run: echo ${{ steps.luwenver.outputs.luwen_version }}
+      - name: Update Cargo.lock
+        run: |
+          cargo update
+          git commit \
+            Cargo.lock \
+            -m "Cargo.lock: updating for ${{ steps.luwenver.outputs.luwen_version }}"
+          git push
+      - name: Find New Git Hash
+        id: new-git-hash
+        run: |
+          export git_hash_env="git_hash=$( git log --format="%H" -n 1 )"
+          echo "${git_hash_env}"
+          echo "${git_hash_env}" >> "$GITHUB_OUTPUT"
+      - name: New Git Hash
+        run: echo "${git_hash_env}"
+    env:
+      EMAIL: releases@tenstorrent.com
+      NAME: Tenstorrent Releases
+
+  ###
+  # Change Logs Generation
+  ###
+  changelogs:
+    needs:
+      - tempbranch
+      - versionchange
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+    outputs:
+      git_hash: ${{ steps.new-git-hash.outputs.git_hash }}
+    env:
+        MAJOR: ${{ needs.versionchange.outputs.version_major }}
+        MINOR: ${{ needs.versionchange.outputs.version_minor }}
+        PATCH: ${{ needs.versionchange.outputs.version_patch }}
+        NUMBER_OF_COMMITS_SINCE_TAG: ${{ needs.versionchange.outputs.number_of_commits_since_tag }}
+    steps:
+      - name: dump the envs, I'm curious
+        run: env
+      - name: New Git Hash
+        run: echo "${{ needs.versionchange.outputs.git_hash }}"
+      - run: echo ${{ needs.versionchange.outputs.git_hash }}
+      - run: sudo apt update
+      - run: |
+          sudo apt install -y \
+            git-buildpackage
+      - uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+          fetch-depth: 0
+          ref: ${{ needs.tempbranch.outputs.rc_ref }}
+      # Ok checkout doesn't do what I want it to do in the way it does it *sigh*
+      # so we need to snag a pull to catch up from where it started
+      #- run: git pull
+      - run: git log --format="%H" -n 1
+      #- name: Extract version from tag
+      #  uses: damienaicheh/extract-version-from-tag-action@v1.3.0
+      - run: git tag
+      # Ok this needs to get up leveled somewhere so that it can be shared across Debian and Ubuntu obviously
+      - run: ls -lah
+      - name: Link the Ubuntu build stuff in as 'debian/'
+        run: ln -s debian.ubuntu debian
+      - name: Generate Ubuntu Changelog
+        run: |
+          echo "Major: ${MAJOR}"
+          echo "Minor: ${MINOR}"
+          echo "Patch: ${PATCH}"
+          echo "Num Patch: ${NUMBER_OF_COMMITS_SINCE_TAG}"
+          gbp dch \
+            --debian-branch ${{ needs.tempbranch.outputs.rc_ref }} \
+            -R \
+            -N ${MAJOR}.${MINOR}.${PATCH} \
+            --spawn-editor=never
+        env:
+          EMAIL: releases@tenstorrent.com
+          NAME: Tenstorrent Releases
+      - name: Link the Debian build stuff in as 'debian/'
+        run: rm debian
+      - run:  ln -s debian.debian debian
+      - run: ls -lah
+      - name: Generate Debian Changelog
+        run: |
+          gbp dch \
+            --debian-branch ${{ needs.tempbranch.outputs.rc_ref }} \
+            -R \
+            N ${MAJOR}.${MINOR}.${PATCH} \
+            --spawn-editor=never
+        env:
+          EMAIL: releases@tenstorrent.com
+          NAME: Tenstorrent Releases
+      - name: ok what happened
+        run: git diff
+      - name: Setup commit
+        run: |
+          git config --global user.email "${EMAIL}"
+          git config --global user.name "${NAME}"
+          git add .
+          git commit \
+            -m "Generating Ubuntu & Debian Changelog for ${MAJOR}.${MINOR}.${PATCH}-${NUMBER_OF_COMMITS_SINCE_TAG}"
+          git pull --rebase
+          git push
+        env:
+          EMAIL: releases@tenstorrent.com
+          NAME: Tenstorrent Releases
+      - name: Find New Git Hash
+        id: new-git-hash
+        run: |
+          export git_hash_env="git_hash=$( git log --format="%H" -n 1 )"
+          echo "${git_hash_env}"
+          echo "${git_hash_env}" >> "$GITHUB_OUTPUT"
+
+  ###
+  # Trigger Building Everything
+  ###
+  buildall:
+    needs:
+      - tempbranch
+      - versionchange
+      - changelogs
+    uses: ./.github/workflows/build-all.yml
+    with:
+      ref: ${{ needs.tempbranch.outputs.rc_ref }}
+      MAJOR: ${{ needs.versionchange.outputs.version_major }}
+      MINOR: ${{ needs.versionchange.outputs.version_minor }}
+      PATCH: ${{ needs.versionchange.outputs.version_patch }}
+      NUMBER_OF_COMMITS_SINCE_TAG: ${{ needs.versionchange.outputs.number_of_commits_since_tag }}
+    secrets: inherit
+
+  # Tag the Release
+  ###
+  tagrelease:
+    needs:
+      - versionchange
+      - changelogs
+      - buildall
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+    steps:
+      - name: dump the envs, I'm curious
+        run: env
+      - name: New Git Hash
+        run: echo "${{ needs.changelogs.outputs.git_hash }}"
+      - run: echo ${{ needs.versionchange.outputs.git_hash }}
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.changelogs.outputs.git_hash }}
+          fetch-tags: true
+          fetch-depth: 0
+      - run: git log --format="%H" -n 1
+      - run: |
+          echo ${{ needs.versionchange.outputs.luwen_version_new }}
+          echo ${{ needs.versionchange.outputs.git_hash }}
+          git tag v${{ needs.versionchange.outputs.luwen_version_new }}
+          git tag
+          git push --tags
+
+  ###
+  # Generate Release
+  ###
+  generaterelease:
+    needs:
+      - tempbranch
+      - versionchange
+      - changelogs
+      - buildall
+      - tagrelease
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Build Changelog
+        id: build_changelog
+        uses: mikepenz/release-changelog-builder-action@v5
+        with:
+          mode: "HYBRID" # Include both PRs and direct commits
+          configurationJSON: |
+            {
+              "template": "#{{CHANGELOG}}\n\n## Contributors\n#{{CONTRIBUTORS}}\n\n## Installation\n\nInstall this version with:\n```bash\n/bin/bash -c \"$(curl -fsSL https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/install.sh)\"\n```\n\nLatest version can always be installed using:\n```bash\n/bin/bash -c \"$(curl -fsSL https://github.com/${{ github.repository }}/releases/latest/download/install.sh)\"\n```",
+              "categories": [
+                {
+                  "title": "## 🔄 Changes",
+                  "labels": []
+                }
+              ],
+              "pr_template": "- #{{TITLE}} (#{{NUMBER}}) by @#{{AUTHOR}}",
+              "commit_template": "- #{{TITLE}} (#{{MERGE_SHA}}) by @#{{AUTHOR}}"
+            }
+
+      - name: FIND!
+        run: find ${GITHUB_WORKSPACE} -type f
+
+      - name: Deb file renames so they don't overlap
+        run: |
+          for x in $( \
+            find ${GITHUB_WORKSPACE} -type f -iname \*.deb | \
+            grep -v "artifacts-ubuntu" \
+          )
+          do
+            want="$( \
+              echo "${x}" | \
+              xargs dirname | \
+              tr "/" "\n" | \
+              tail -n 1 \
+              )"
+            mv -v \
+              "${x}" \
+              "$( echo "${x}" | xargs dirname )/${want}"
+          done
+
+      - name: Find the deb & whl files
+        run: find ${GITHUB_WORKSPACE} -type f -iname \*.deb -o -iname \*.whl -exec ls -lah {} \;
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.versionchange.outputs.luwen_version_new }}
+          files: |
+            ${{ github.workspace }}/python3-pyluwen_*/*.deb
+            ${{ github.workspace }}/python-package-*/*.whl
+          body: ${{ steps.build_changelog.outputs.changelog }}
+          draft: false
+          prerelease: false
+
+  ###
+  # Merge back
+  ###
+  mergeback:
+    needs:
+      - tempbranch
+      - generaterelease
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout fun!
+        uses: actions/checkout@v4
+        with:
+          # Note: you want the original ref, we are merging back
+          #ref: ${{ github.ref }}"
+          fetch-tags: true
+          fetch-depth: 0
+      - name: Merge back
+        run: |
+          git log -3
+          git rebase origin/${{ needs.tempbranch.outputs.rc_ref }}
+          git pull --rebase
+          git log -3
+          git push
+          git push origin --delete ${{ needs.tempbranch.outputs.rc_ref }}
+
+  ###
+  # Publish TEST PyPi
+  ###
+  publish-to-testpypi:
+    name: Publish Python 🐍 distribution 📦 to TestPyPI
+    needs:
+      - buildall
+      - generaterelease
+    runs-on: ubuntu-latest
+
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/luwen
+
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
+
+    steps:
+      - name: Download all the dists
+        uses: actions/download-artifact@v4
+        with:
+          pattern: python-package-*
+          path: dist/
+          merge-multiple: true
+      - name: Publish distribution 📦 to TestPyPI
+        #run: echo "Hi!"
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          verbose: true
+
+  ###
+  # Publish PyPi
+  ###
+  publish-pypi:
+    needs:
+      - buildall
+      - generaterelease
+      - publish-to-testpypi
+    runs-on: ubuntu-latest
+    name: >-
+      Publish Python 🐍 distribution 📦 to PyPI
+    #if: startsWith(github.ref, 'refs/tags/')  # only publish to PyPI on tag pushes
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pyluwen
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
+
+    steps:
+    - name: Download all the dists
+      uses: actions/download-artifact@v4
+      with:
+        pattern: python-package-*
+        path: dist/
+        merge-multiple: true
+    - name: Publish distribution 📦 to PyPI
+      run: echo "Hi!"
+      #uses: pypa/gh-action-pypi-publish@release/v1
+      #with:
+      #  verbose: true
+

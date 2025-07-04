@@ -1,0 +1,102 @@
+name: Build 🐍 📦 wheels
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        default: ${{ github.ref }}
+        required: false
+        type: string
+
+jobs:
+  # Build non-abi3 wheels for Python 3.8-3.10
+  build-py-version-specific:
+    name: Build version-specific wheels 📦
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9", "3.10"]
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.ref }}
+        fetch-tags: true
+        fetch-depth: 0
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install pypa/build
+      run: >-
+        python3 -m
+        pip install
+        build
+        --user
+    - name: Build wheel for Python ${{ matrix.python-version }}
+      uses: PyO3/maturin-action@v1
+      with:
+        target: x86_64
+        manylinux: 2014
+        args: --release --out dist -m crates/pyluwen/Cargo.toml --interpreter python${{ matrix.python-version }}
+        before-script-linux: |
+          which unzip || apt install unzip || echo "not apt"
+          which unzip || yum install unzip || echo "not yum"
+          which unzip
+          PROTOC=protoc-21.12-linux-x86_64.zip
+          if [ "$(arch)" == "i686" ]; then PROTOC=protoc-21.12-linux-x86_32.zip; fi
+          curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v21.12/$PROTOC
+          unzip $PROTOC -d protoc3
+          mv -v protoc3/bin/* /usr/local/bin/
+          mv -v protoc3/include/* /usr/local/include/
+    - name: Store the wheel
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-package-py${{ matrix.python-version }}
+        path: dist
+
+  # Build abi3 wheel for Python 3.11+
+  build-py-abi3:
+    name: Build abi3 wheel for Python 3.11+ 📦
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.ref }}
+        fetch-tags: true
+        fetch-depth: 0
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+    - name: Install pypa/build
+      run: >-
+        python3 -m
+        pip install
+        build
+        --user
+    - name: Build abi3 wheel
+      uses: PyO3/maturin-action@v1
+      with:
+        target: x86_64
+        manylinux: 2014
+        args: --release --sdist --out dist -m crates/pyluwen/Cargo.toml --features abi3-py311
+        before-script-linux: |
+          which unzip || apt install unzip || echo "not apt"
+          which unzip || yum install unzip || echo "not yum"
+          which unzip
+          PROTOC=protoc-21.12-linux-x86_64.zip
+          if [ "$(arch)" == "i686" ]; then PROTOC=protoc-21.12-linux-x86_32.zip; fi
+          curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v21.12/$PROTOC
+          unzip $PROTOC -d protoc3
+          mv -v protoc3/bin/* /usr/local/bin/
+          mv -v protoc3/include/* /usr/local/include/
+    - name: Store the wheel
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-package-abi3
+        path: dist
+
+

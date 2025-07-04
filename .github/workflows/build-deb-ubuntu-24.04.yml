@@ -1,0 +1,189 @@
+name: Build Release debian package - Ubuntu 24.04
+run-name: Build Release debian package - Ubuntu 24.04
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        default: ${{ github.ref }}
+        required: false
+        type: string
+      MAJOR:
+        required: false
+        type: string
+      MINOR:
+        required: false
+        type: string
+      PATCH:
+        required: false
+        type: string
+      NUMBER_OF_COMMITS_SINCE_TAG:
+        required: false
+        type: string
+
+jobs:
+  builddeb2404:
+    name: Build Release debian package - Ubuntu 24.04
+    runs-on: ubuntu-24.04
+    steps:
+      - run: sudo apt update
+      - run: |
+          sudo apt install -y \
+            build-essential \
+            cargo \
+            debhelper \
+            dh-python \
+            dh-sequence-python3 \
+            git-buildpackage \
+            gnupg \
+            libpython3-all-dev \
+            protobuf-compiler \
+            pybuild-plugin-pyproject \
+            python3-maturin \
+            python3-pip
+      - name: Import GPG key
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: $${{ secrets.GPG_KEY_RELEASE }}
+      - run: gpg --list-keys
+      - run: gpg --list-secret-keys
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-tags: true
+          fetch-depth: 0
+      - name: Extract version from tag
+        uses: damienaicheh/extract-version-from-tag-action@v1.3.0
+      - run: git tag
+      - name: Ok Figure out version
+        run: |
+          if [[ -n "${{ inputs.MAJOR }}" ]]
+          then
+            echo "MAJOR=${{ inputs.MAJOR }}" >> $GITHUB_ENV
+            echo "MAJOR=${{ inputs.MAJOR }}"
+          fi
+
+          if [[ -n "${{ inputs.MINOR }}" ]]
+          then
+            echo "MINOR=${{ inputs.MINOR }}" >> $GITHUB_ENV
+            echo "MINOR=${{ inputs.MINOR }}"
+          fi
+
+          if [[ -n "${{ inputs.PATCH }}" ]]
+          then
+            echo "PATCH=${{ inputs.PATCH }}" >> $GITHUB_ENV
+            echo "PATCH=${{ inputs.PATCH }}"
+          fi
+
+          if [[ -n "${{ inputs.MAJOR }}" ]]
+          then
+            echo "NUMBER_OF_COMMITS_SINCE_TAG=${{ inputs.NUMBER_OF_COMMITS_SINCE_TAG }}" >> $GITHUB_ENV
+            echo "NUMBER_OF_COMMITS_SINCE_TAG=${{ inputs.NUMBER_OF_COMMITS_SINCE_TAG }}"
+          fi
+      #- run: |
+      #    if [[ "main" = "${{ github.ref_name }}" ]]; \
+      #    then \
+      #      git checkout -b master main;\
+      #    fi
+      # Setup for building on Ubuntu
+      #   Ubuntu requires the package itself to be vendored as opposed to using system
+      #   packages.  We need to create a vendored tree and then stash it with the build
+      - run: cargo vendor
+      - run: |
+          mkdir .cargo \
+          && \
+          cp \
+            debian.ubuntu/cargo.toml-vendored \
+            .cargo/config.toml
+      - run: |
+          ( \
+            cd crates/pyluwen \
+            && \
+            cargo vendor \
+            && \
+            cd ../../ \
+          )
+      - run: |
+          mkdir crates/pyluwen/.cargo \
+          && \
+          cp \
+            debian.ubuntu/cargo.toml-vendored \
+            crates/pyluwen/.cargo/config.toml
+      # Ok this needs to get up leveled somewhere so that it can be shared across Debian and Ubuntu obviously
+      - run: ls -lah
+      - name: Link the Ubuntu build stuff in as 'debian/'
+        run: ln -s debian.ubuntu debian
+      - run: |
+          gbp dch \
+            --debian-branch ${{ inputs.ref }} \
+            -R \
+            -N ${MAJOR}.${MINOR}.${PATCH} \
+            --spawn-editor=never
+            #--commit \
+            #--commit-msg="Generating Debian Changelog for ${MAJOR}.${MINOR}.${PATCH}-${NUMBER_OF_COMMITS_SINCE_TAG}"
+        env:
+          EMAIL: releases@tenstorrent.com
+          NAME: Tenstorrent Releases
+      - run: |
+          gbp buildpackage \
+            --git-ignore-new
+            #--git-upstream-tag='v%(version)s'
+            # --git-tag
+        continue-on-error: true
+      - name: Move Debian packages
+        run: mkdir -p artifacts && mv ../*.deb artifacts/
+      - name: Stash the vendor directory for artifacting as well
+        run: tar -czvf artifacts/vendor.tar.gz vendor
+      - name: Copy Changelog to artifacts
+        run: cp debian/changelog artifacts/changelog
+      - name: Set environment variable for distro 
+        id: distro_ident
+        run: |
+          source /etc/os-release && \
+          echo "DISTRO_IDENT=$( echo \"${NAME}\" | sed 's/"//g' | tr '[:upper:]' '[:lower:]' )-${VERSION_ID}" \
+                >> $GITHUB_ENV
+      - name: Set environment variable for deb filename
+        id: deb_filename
+        run: echo "DEB_FILENAME=$(basename artifacts/*.deb)" >> $GITHUB_ENV
+      - name: Set environment variable for deb filename
+        id: deb_filename_distro
+        run: echo DEB_FILENAME_DISTRO=$(basename artifacts/*.deb | sed "s/_all/_all-${DISTRO_IDENT}/" ) >> $GITHUB_ENV
+      - name: Upload Debian package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.DEB_FILENAME_DISTRO }}
+          path: artifacts/${{ env.DEB_FILENAME }}
+      - name: Upload Vendor
+        uses: actions/upload-artifact@v4
+        with:
+          name: vendor-${{ env.DISTRO_IDENT }}.tar.gz
+          path: artifacts/vendor.tar.gz
+      - name: Upload Changelog
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-changelog-${{ env.DISTRO_IDENT }}
+          path: debian/changelog
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ env.DISTRO_IDENT }}.zip
+          path: artifacts/
+      #- name: release
+      #  uses: actions/create-release@v1
+      #  id: create_release
+      #  with:
+      #    draft: false
+      #    prerelease: false
+      #    release_name: ${{ github.ref_name }}
+      #    tag_name: ${{ github.ref }}
+      #    #body_path: CHANGELOG.md
+      #  env:
+      #    GITHUB_TOKEN: ${{ github.token }}
+      #- name: Push Git Tag
+      #  run: |
+      #    git push origin --tags
+      #- name: upload debian package
+      #  run: gh release upload ${{ github.ref_name }} ../*.deb
+      #  env:
+      #    GITHUB_TOKEN: ${{ github.TOKEN }}
+

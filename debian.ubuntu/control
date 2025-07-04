@@ -1,0 +1,78 @@
+Source: rust-luwen
+Section: custom
+Priority: optional
+Maintainer: Daniel Rosen <drosen@tenstorrent.com>
+Build-depends:
+ cargo:native,
+ debhelper (>= 4.0.0),
+ dh-python,
+ libpython3-all-dev,
+ rustc:native (>= 1.70),
+ dh-sequence-python3,
+ python3,
+
+# librust-bincode-dev,
+# librust-bitfield-struct-dev,
+# librust-cfg-aliases-dev,
+# librust-clap-3-dev,
+# librust-clap-derive-dev,
+# librust-indicatif-dev,
+# librust-memmap2-dev,
+# librust-nix-dev,
+# librust-rust-embed-dev,
+# librust-thiserror-dev,
+# python3-pip-whl,
+# python3-pip,
+# python3-venv,
+
+Package: rust-luwen
+Version: 0.3.7
+Architecture: all
+Essential: no
+Depends: 
+ ${misc:Depends},
+ ${python3:Depends},
+ ${shlibs:Depends},
+Description: A high-level interface for safe and efficient access Tenstorrent AI
+ accelerators
+ # Luwen
+ .
+ Named after Antonie van Leeuwenhoek who invested the microsope.
+ .
+ ## Official Repository
+ .
+ [https://github.com/tenstorrent/luwen](https://github.com/tenstorrent/luwen)
+ .
+ ## Design
+ .
+ There are three usecases that I want to support here
+ .
+ 1. High level interface to software tooling allowing all syseng diagnostics
+ collectable via tt-smi and tt-mod to be
+ readback and interacted with as a library.
+     - This will only be a high level interface so it will only support pci
+ connections and remote connections via pci
+     - Will ignore all details of using communication channels such as which pci
+ tlb or which erisc core to use.
+ 1. General chip discovery and init, replacing create-ethernet-map and tt-smi
+ wait. We'll probably also add the ability
+ to issue resets.
+ 1. Low level syseng-only debug capability (via pyluwen)
+     - To avoid needing to have multiple in flight stacks you will be able to
+ drop down a level and access the
+     implemented communication apis directly. Practically this means direct
+ access to the types defined in luwen-ref.
+     This means that you can modify pci tlbs and erisc cores being used or cut
+ out the middle man entirely and
+     issue raw calls.
+Rules-Requires-Root: no
+
+Package: python3-pyluwen
+Version: 0.3.7
+Architecture: all
+Essential: no
+Depends:
+ ${misc:Depends},
+ ${python3:Depends},
+ ${shlibs:Depends},
+ 

@@ -7,13 +7,13 @@
 %global path_ttkmd_if %{cargo_registry}/ttkmd-if-%{version_no_tilde}
 
 Name:           rust-luwen
-Version:        0.3.7
-Release:        %autorelease.git.142.499b83b
+Version:        0.4.8
+Release:        %autorelease
 Summary:        High-level interface for safe and efficient access Tenstorrent AI accelerators
 
 License:        Apache-2.0
 URL:            https://crates.io/crates/luwen
-Source: rust-luwen-git-142.499b83b.tar.gz
+Source: 	%{name}-%{version}.tar.gz
 
 BuildRequires:  cargo-rpm-macros >= 24
 BuildRequires:  python%{python3_pkgversion}-devel
@@ -145,11 +145,26 @@ use the "internal_metrics" feature of the "%{crate}" crate.
 %{python3_sitearch}/pyluwen/
 
 ############################
+# Luwen Test Binaries
+############################
+%package     -n luwen-test-bin
+Summary:        Testing and Debug binaries associated with Luwen
+
+%description -n luwen-test-bin
+%{_description}
+
+This is Testing and Debug binaries associated with Luwen
+
+%files       -n luwen-test-bin
+%{_bindir}/*
+%{_exec_prefix}/lib/debug/usr/bin/*
+
+############################
 # Main package
 ############################
 
 %prep
-%autosetup -p1 -n rust-luwen-git-142.499b83b -p1
+%autosetup -p1 
 %cargo_prep
 
 %generate_buildrequires

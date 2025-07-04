@@ -1,0 +1,34 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/default.mk
+include /usr/share/rustc/architecture.mk
+export CFLAGS CXXFLAGS CPPFLAGS LDFLAGS
+export DEB_HOST_RUST_TYPE DEB_HOST_GNU_TYPE
+export PATH := /usr/share/cargo/bin:$(PATH)
+export CARGO=/usr/share/cargo/bin/cargo
+export CARGO_HOME=$(CURDIR)/debian/cargo_home
+export CARGO_REGISTRY=$(CURDIR)/debian/cargo_registry
+export DEB_CARGO_CRATE=$(DEB_SOURCE)_$(DEB_VERSION_UPSTREAM)
+export DEB_BUILD_MAINT_OPTIONS=hardening=+bindnow
+
+export PYBUILD_SYSTEM=pyproject
+export PYBUILD_NAME=pyluwen
+export DH_VERBOSE=3
+
+%:
+	$(CARGO) prepare-debian debian/cargo_registry --link-from-system
+	dh $@ \
+		--parallel \
+		--with=python3 \
+		--buildsystem=pybuild \
+		--sourcedirectory=crates/pyluwen
+	echo "Done Stage 1"
+
+execute_after_dh_auto_clean:
+	rm -rf debian/cargo_registry
+	echo "Done Stage 2"
+
+execute_before_dh_auto_configure:
+	$(CARGO) prepare-debian debian/cargo_registry --link-from-system
+	rm -f Cargo.lock
+	echo "Done Stage 3"
