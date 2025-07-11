@@ -43,7 +43,7 @@ jobs:
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@v6
         with:
-          gpg_private_key: $${{ secrets.GPG_KEY_RELEASE }}
+          gpg_private_key: ${{ secrets.PKG_SIGNING_KEY_DEB }}
       - run: gpg --list-keys
       - run: gpg --list-secret-keys
       - run: sudo pip install --upgrade pip && sudo pip install maturin
