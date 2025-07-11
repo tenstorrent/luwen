@@ -377,8 +377,8 @@ jobs:
     runs-on: ubuntu-latest
 
     environment:
-      name: testpypi
-      url: https://test.pypi.org/p/luwen
+      name: pypi-release
+      url: https://test.pypi.org/p/pyluwen
 
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
