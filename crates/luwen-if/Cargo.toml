@@ -24,6 +24,5 @@ bytemuck = {version = "1.22.0", features = ["derive"]}
 
 [build-dependencies]
 prost-build = "0.13.5"
-protoc-bin-vendored = {git = "https://github.com/TTDRosen/rust-protoc-bin-vendored", rev = "3cf2dd3df18b0a864f896d2fedf7acbacf3ac2c6"}
 home = { version = "=0.5.5", default-features = false }
 
