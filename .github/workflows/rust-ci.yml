@@ -32,6 +32,9 @@ jobs:
           toolchain: stable
           override: true
 
+      - name: Install `protoc` for Ubuntu
+        run: sudo apt install -y protobuf-compiler
+
       - name: Cache Rust dependencies
         uses: actions/cache@v3
         with:
@@ -64,6 +67,9 @@ jobs:
           toolchain: stable
           override: true
 
+      - name: Install `protoc` for Ubuntu
+        run: sudo apt install -y protobuf-compiler
+
       - name: Cache Rust dependencies
         uses: actions/cache@v3
         with:
@@ -91,6 +97,9 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+
+      - name: Install `protoc` for Ubuntu
+        run: sudo apt install -y protobuf-compiler
 
       - name: Cache Rust dependencies
         uses: actions/cache@v3
@@ -125,6 +134,9 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+
+      - name: Install `protoc` for Ubuntu
+        run: sudo apt install -y protobuf-compiler
 
       - name: Cache Rust dependencies
         uses: actions/cache@v3
@@ -169,6 +181,9 @@ jobs:
           override: true
           components: clippy
 
+      - name: Install `protoc` for Ubuntu
+        run: sudo apt install -y protobuf-compiler
+
       - name: Cache Rust dependencies
         uses: actions/cache@v3
         with:
@@ -197,6 +212,9 @@ jobs:
           toolchain: stable
           override: true
           components: rustfmt
+
+      - name: Install `protoc` for Ubuntu
+        run: sudo apt install -y protobuf-compiler
 
       - name: Run cargo fmt
         uses: actions-rs/cargo@v1
