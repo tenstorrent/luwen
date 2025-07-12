@@ -17,6 +17,8 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.8", "3.9", "3.10"]
+    outputs:
+      short-ref: ${{ steps.shortref.outputs.short-ref }}
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -24,6 +26,9 @@ jobs:
         ref: ${{ inputs.ref }}
         fetch-tags: true
         fetch-depth: 0
+    - name: Short ref
+      id: shortref
+      run: echo "short-ref=$( git rev-parse --short HEAD )" >> "$GITHUB_OUTPUT"
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:
@@ -34,6 +39,22 @@ jobs:
         pip install
         build
         --user
+    - name: Install cargo edit
+      run: cargo install cargo-edit@0.13.0 --locked
+    - name: Install cargo-workspaces
+      run: cargo install cargo-workspaces@0.3.6 --locked
+    - name: Add Git short-ref to version
+      run: |
+        ver=$( \
+          cargo \
+            metadata \
+            --format-version=1 \
+            --no-deps | \
+          jq '.packages[] | select(.name == "pyluwen") | .version' | \
+          sed 's/"//g' \
+        )
+        ver="${ver}-${{ steps.shortref.outputs.short-ref }}"
+        cargo ws version custom "${ver}" --all --no-git-commit --force "*" --yes
     - name: Build wheel for Python ${{ matrix.python-version }}
       uses: PyO3/maturin-action@v1
       with:
@@ -53,13 +74,15 @@ jobs:
     - name: Store the wheel
       uses: actions/upload-artifact@v4
       with:
-        name: python-package-py${{ matrix.python-version }}
+        name: python-package-py${{ matrix.python-version }}-${{ steps.shortref.outputs.short-ref }}
         path: dist
 
   # Build abi3 wheel for Python 3.11+
   build-py-abi3:
     name: Build abi3 wheel for Python 3.11+ 📦
     runs-on: ubuntu-24.04
+    outputs:
+      short-ref: ${{ steps.shortref.outputs.short-ref }}
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -67,6 +90,9 @@ jobs:
         ref: ${{ inputs.ref }}
         fetch-tags: true
         fetch-depth: 0
+    - name: Short ref
+      id: shortref
+      run: echo "short-ref=$( git rev-parse --short HEAD )" >> "$GITHUB_OUTPUT"
     - name: Set up Python 3.11
       uses: actions/setup-python@v5
       with:
@@ -77,6 +103,22 @@ jobs:
         pip install
         build
         --user
+    - name: Install cargo edit
+      run: cargo install cargo-edit@0.13.0 --locked
+    - name: Install cargo-workspaces
+      run: cargo install cargo-workspaces@0.3.6 --locked
+    - name: Add Git short-ref to version
+      run: |
+        ver=$( \
+          cargo \
+            metadata \
+            --format-version=1 \
+            --no-deps | \
+          jq '.packages[] | select(.name == "pyluwen") | .version' | \
+          sed 's/"//g' \
+        )
+        ver="${ver}-${{ steps.shortref.outputs.short-ref }}"
+        cargo ws version custom "${ver}" --all --no-git-commit --force "*" --yes
     - name: Build abi3 wheel
       uses: PyO3/maturin-action@v1
       with:
@@ -96,7 +138,7 @@ jobs:
     - name: Store the wheel
       uses: actions/upload-artifact@v4
       with:
-        name: python-package-abi3
+        name: python-package-abi3-${{ steps.shortref.outputs.short-ref }}
         path: dist
 
 
