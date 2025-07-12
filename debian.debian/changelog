@@ -1,8 +1,5 @@
-rust-luwen (0.0.1) unstable; urgency=low
+rust-luwen (0.0.1) unstable; urgency=medium
   [ Evangelos Ribeiro Tzaras ]
   * [f6d90d5] docs: gbp-clone: testing
 
- -- John 'Warthog9' Hawley <jhawley@tenstorrent.com>  Tue, 14 May 2024 15:47:44 -0800
-
-
-
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Sat, 12 Jul 2025 00:10:48 +0000
