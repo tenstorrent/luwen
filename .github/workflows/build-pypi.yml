@@ -53,7 +53,7 @@ jobs:
     - name: Store the wheel
       uses: actions/upload-artifact@v4
       with:
-        name: python-package-py${{ matrix.python-version }}
+        name: python-package-py${{ matrix.python-version }}-$( git rev-parse --short HEAD )
         path: dist
 
   # Build abi3 wheel for Python 3.11+
@@ -96,7 +96,7 @@ jobs:
     - name: Store the wheel
       uses: actions/upload-artifact@v4
       with:
-        name: python-package-abi3
+        name: python-package-abi3-$( git rev-parse --short HEAD )
         path: dist
 
 
