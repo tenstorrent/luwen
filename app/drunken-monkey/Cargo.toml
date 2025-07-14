@@ -1,10 +1,10 @@
 [package]
 name = "drunken-monkey"
-version = "0.2.0"
+version = "0.7.8"
 edition = "2021"
 
 [dependencies]
 clap = {version = "4.4.14", features = ["derive"]}
 
-luwen-if = {path = "../../crates/luwen-if", version = "0.6.0" }
-luwen-ref = {path = "../../crates/luwen-ref", version = "0.5.1" }
+luwen-if = {path = "../../crates/luwen-if", version = "0.7.8" }
+luwen-ref = {path = "../../crates/luwen-ref", version = "0.7.8" }
