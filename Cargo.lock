@@ -188,7 +188,7 @@ checksum = "9555578bc9e57714c812a1f84e4fc5b4d21fcb063490c624de019f7464c91268"
 
 [[package]]
 name = "check_harvesting"
-version = "0.1.1"
+version = "0.7.8"
 dependencies = [
  "clap",
  "luwen-core",
@@ -275,7 +275,7 @@ dependencies = [
 
 [[package]]
 name = "create-ethernet-map"
-version = "0.2.0"
+version = "0.7.8"
 dependencies = [
  "clap",
  "luwen-core",
@@ -348,7 +348,7 @@ dependencies = [
 
 [[package]]
 name = "drunken-monkey"
-version = "0.2.0"
+version = "0.7.8"
 dependencies = [
  "clap",
  "luwen-if",
@@ -704,7 +704,7 @@ checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 
 [[package]]
 name = "luwen"
-version = "0.7.5"
+version = "0.7.8"
 dependencies = [
  "bincode",
  "clap",
@@ -728,7 +728,7 @@ dependencies = [
 
 [[package]]
 name = "luwen-if"
-version = "0.6.7"
+version = "0.7.8"
 dependencies = [
  "bincode",
  "bitfield-struct",
@@ -741,7 +741,6 @@ dependencies = [
  "prost",
  "prost-build",
  "prost-types",
- "protoc-bin-vendored",
  "rust-embed",
  "serde",
  "serde_json",
@@ -750,7 +749,7 @@ dependencies = [
 
 [[package]]
 name = "luwen-ref"
-version = "0.5.3"
+version = "0.7.8"
 dependencies = [
  "indicatif",
  "luwen-core",
@@ -762,7 +761,7 @@ dependencies = [
 
 [[package]]
 name = "luwencpp"
-version = "0.3.1"
+version = "0.7.8"
 dependencies = [
  "cbindgen",
  "cc",
@@ -1025,7 +1024,7 @@ dependencies = [
 
 [[package]]
 name = "prometheus-exporter"
-version = "0.2.0"
+version = "0.7.8"
 dependencies = [
  "clap",
  "luwen-core",
@@ -1108,57 +1107,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
 
 [[package]]
-name = "protoc-bin-vendored"
-version = "3.1.0"
-source = "git+https://github.com/TTDRosen/rust-protoc-bin-vendored?rev=3cf2dd3df18b0a864f896d2fedf7acbacf3ac2c6#3cf2dd3df18b0a864f896d2fedf7acbacf3ac2c6"
-dependencies = [
- "protoc-bin-vendored-linux-aarch_64",
- "protoc-bin-vendored-linux-ppcle_64",
- "protoc-bin-vendored-linux-x86_32",
- "protoc-bin-vendored-linux-x86_64",
- "protoc-bin-vendored-macos-aarch_64",
- "protoc-bin-vendored-macos-x86_64",
- "protoc-bin-vendored-win32",
-]
-
-[[package]]
-name = "protoc-bin-vendored-linux-aarch_64"
-version = "3.1.0"
-source = "git+https://github.com/TTDRosen/rust-protoc-bin-vendored?rev=3cf2dd3df18b0a864f896d2fedf7acbacf3ac2c6#3cf2dd3df18b0a864f896d2fedf7acbacf3ac2c6"
-
-[[package]]
-name = "protoc-bin-vendored-linux-ppcle_64"
-version = "3.1.0"
-source = "git+https://github.com/TTDRosen/rust-protoc-bin-vendored?rev=3cf2dd3df18b0a864f896d2fedf7acbacf3ac2c6#3cf2dd3df18b0a864f896d2fedf7acbacf3ac2c6"
-
-[[package]]
-name = "protoc-bin-vendored-linux-x86_32"
-version = "3.1.0"
-source = "git+https://github.com/TTDRosen/rust-protoc-bin-vendored?rev=3cf2dd3df18b0a864f896d2fedf7acbacf3ac2c6#3cf2dd3df18b0a864f896d2fedf7acbacf3ac2c6"
-
-[[package]]
-name = "protoc-bin-vendored-linux-x86_64"
-version = "3.1.0"
-source = "git+https://github.com/TTDRosen/rust-protoc-bin-vendored?rev=3cf2dd3df18b0a864f896d2fedf7acbacf3ac2c6#3cf2dd3df18b0a864f896d2fedf7acbacf3ac2c6"
-
-[[package]]
-name = "protoc-bin-vendored-macos-aarch_64"
-version = "3.1.0"
-source = "git+https://github.com/TTDRosen/rust-protoc-bin-vendored?rev=3cf2dd3df18b0a864f896d2fedf7acbacf3ac2c6#3cf2dd3df18b0a864f896d2fedf7acbacf3ac2c6"
-
-[[package]]
-name = "protoc-bin-vendored-macos-x86_64"
-version = "3.1.0"
-source = "git+https://github.com/TTDRosen/rust-protoc-bin-vendored?rev=3cf2dd3df18b0a864f896d2fedf7acbacf3ac2c6#3cf2dd3df18b0a864f896d2fedf7acbacf3ac2c6"
-
-[[package]]
-name = "protoc-bin-vendored-win32"
-version = "3.1.0"
-source = "git+https://github.com/TTDRosen/rust-protoc-bin-vendored?rev=3cf2dd3df18b0a864f896d2fedf7acbacf3ac2c6#3cf2dd3df18b0a864f896d2fedf7acbacf3ac2c6"
-
-[[package]]
 name = "pyluwen"
-version = "0.7.7"
+version = "0.7.8"
 dependencies = [
  "luwen-core",
  "luwen-if",
@@ -1325,7 +1275,7 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
 name = "reset"
-version = "0.1.1"
+version = "0.7.8"
 dependencies = [
  "clap",
  "luwen-core",
