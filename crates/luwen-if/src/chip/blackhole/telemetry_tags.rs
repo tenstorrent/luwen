@@ -43,4 +43,5 @@ pub enum TelemetryTags {
     PcieUsage = 38,
     NocTranslation = 40,
     FanRpm = 41,
+    Tbp = 54,
 }
