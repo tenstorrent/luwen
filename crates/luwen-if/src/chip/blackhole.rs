@@ -775,6 +775,22 @@ impl ChipImpl for Blackhole {
                         telemetry_data.noc_translation_enabled = data != 0
                     }
                     TelemetryTags::FanRpm => telemetry_data.fan_rpm = data,
+                    TelemetryTags::Gddr01Temp => telemetry_data.gddr01_temp = data,
+                    TelemetryTags::Gddr23Temp => telemetry_data.gddr23_temp = data,
+                    TelemetryTags::Gddr45Temp => telemetry_data.gddr45_temp = data,
+                    TelemetryTags::Gddr67Temp => telemetry_data.gddr67_temp = data,
+                    TelemetryTags::Gddr01CorrErrs => telemetry_data.gddr01_corr_errs = data,
+                    TelemetryTags::Gddr23CorrErrs => telemetry_data.gddr23_corr_errs = data,
+                    TelemetryTags::Gddr45CorrErrs => telemetry_data.gddr45_corr_errs = data,
+                    TelemetryTags::Gddr67CorrErrs => telemetry_data.gddr67_corr_errs = data,
+                    TelemetryTags::GddrUncorrErrs => telemetry_data.gddr_uncorr_errs = data,
+                    TelemetryTags::MaxGddrTemp => telemetry_data.max_gddr_temp = data,
+                    TelemetryTags::AsicLocation => telemetry_data.asic_location = data,
+                    TelemetryTags::BoardPowerLimit => telemetry_data.board_power_limit = data,
+                    TelemetryTags::InputPower => telemetry_data.input_power = data,
+                    TelemetryTags::ThermTripCount => telemetry_data.therm_trip_count = data,
+                    TelemetryTags::AsicIdHigh => telemetry_data.asic_id_high = data,
+                    TelemetryTags::AsicIdLow => telemetry_data.asic_id_low = data,
                     _ => (),
                 }
             }
