@@ -27,10 +27,6 @@ jobs:
         ref: ${{ inputs.ref }}
         fetch-tags: true
         fetch-depth: 0
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
     - name: Install pypa/build
       run: >-
         python3 -m
@@ -72,10 +68,6 @@ jobs:
         ref: ${{ inputs.ref }}
         fetch-tags: true
         fetch-depth: 0
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
     - name: Install pypa/build
       run: >-
         python3 -m
