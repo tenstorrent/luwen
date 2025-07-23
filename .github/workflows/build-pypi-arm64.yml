@@ -1,16 +1,13 @@
 name: Build 🐍 📦 wheels
 
 on:
-  push:
-    branches:
-      - asahi
-#  workflow_dispatch:
-#  workflow_call:
-#    inputs:
-#      ref:
-#        default: ${{ github.ref }}
-#        required: false
-#        type: string
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        default: ${{ github.ref }}
+        required: false
+        type: string
 
 jobs:
   # Build non-abi3 wheels for Python 3.8-3.10
