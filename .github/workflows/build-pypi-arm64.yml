@@ -57,7 +57,7 @@ jobs:
   # Build abi3 wheel for Python 3.11+
   build-py-abi3:
     name: Build abi3 wheel for Python 3.11+ 📦
-    runs-on: local-runner
+    runs-on: self-hosted
     strategy:
       matrix:
         python-version: ["3.11", "3.12", "2.13"]
