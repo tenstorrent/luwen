@@ -1,9 +1,6 @@
 use std::{env, fs};
 
-fn try_to_compiled_proto_file_by_name(
-    name: &str,
-    out_dir: &str,
-) -> Result<(), std::io::Error> {
+fn try_to_compiled_proto_file_by_name(name: &str, out_dir: &str) -> Result<(), std::io::Error> {
     let proto_file = format!("{name}.proto");
     let outname = format!("{out_dir}/{name}.rs");
     let mut protoc_build_config = prost_build::Config::new();
