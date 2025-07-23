@@ -11,8 +11,8 @@ mod wormhole;
 #[repr(u8)]
 pub enum Ordering {
     RELAXED = 0,
-    STRICT = 1,
     #[default]
+    STRICT = 1,
     POSTED = 2,
     PostedStrict = 3,
     UNKNOWN(u8),
