@@ -660,135 +660,150 @@ impl ChipImpl for Wormhole {
         if !status.arc_status.is_waiting() {
             // We need arc to be alive so that we can check which cores are enabled
             if !status.arc_status.has_error() {
-                // Only try to initiliaze the ethernet if we are not in noc_safe mode.
-                if !status.init_options.noc_safe {
-                    let status = &mut status.eth_status;
+                // Only do eth training if board type is not UBB
+                // By this point arc should be alive so we can safely access telem
+                let telem = self.get_telemetry()?;
+                let board_type:u64 = telem.board_id_low as u64 | ((telem.board_id_high as u64) << 32);
+                let board_upi: u64 = (board_type >> 36) & 0xFFFFF;
+                const WH_6U_GLX_UPI: u64 = 0x35;
 
-                    // We don't need to get the eth training status if we aren't waiting to see if dram has
-                    // trained...
-                    if status.is_waiting() {
-                        let eth_training_status = match self.check_ethernet_training_complete() {
-                            Ok(eth_status) => eth_status,
-                            Err(err) => match err {
-                                // ARC should be initialized at this point, hitting an error here means
-                                // that we can no longer progress in the init.
-                                PlatformError::ArcMsgError(error) => {
-                                    return Ok(ChipInitResult::ErrorContinue(
-                                        error.to_string(),
-                                        backtrace::Backtrace::capture(),
-                                    ));
-                                }
+                if board_upi != WH_6U_GLX_UPI {
+                    // Only try to initiliaze the ethernet if we are not in noc_safe mode.
+                    if !status.init_options.noc_safe {
+                        let status = &mut status.eth_status;
 
-                                PlatformError::MessageError(error) => {
-                                    return Ok(ChipInitResult::ErrorContinue(
-                                        error.to_string(),
-                                        backtrace::Backtrace::capture(),
-                                    ));
-                                }
-
-                                PlatformError::ArcNotReady(error, backtrace) => {
-                                    return Ok(ChipInitResult::ErrorContinue(
-                                        error.to_string(),
-                                        backtrace.0,
-                                    ));
-                                }
-
-                                // We are checking for ethernet training to complete... if we hit this than
-                                // something has gone terribly wrong
-                                PlatformError::EthernetTrainingNotComplete(eth_cores) => {
-                                    let false_count = eth_cores.iter().filter(|&&x| !x).count();
-                                    return Ok(ChipInitResult::ErrorContinue(
-                                        format!(
-                                            "Ethernet training not complete on [{false_count}/16] ports"
-                                        ),
-                                        backtrace::Backtrace::capture(),
-                                    ));
-                                }
-
-                                // This is an "expected error" but we probably can't recover from it, so we should abort the init.
-                                PlatformError::AxiError(error) => {
-                                    return Ok(ChipInitResult::ErrorAbort(
-                                        error.to_string(),
-                                        backtrace::Backtrace::capture(),
-                                    ));
-                                }
-
-                                // We don't expect to hit these cases so if we do, we should assume that something went terribly
-                                // wrong and abort the init.
-                                PlatformError::UnsupportedFwVersion { version, required } => {
-                                    return Ok(ChipInitResult::ErrorAbort(format!("Required Ethernet Firmware Version: {required}, current version: {version:?}"), backtrace::Backtrace::capture()));
-                                }
-                                PlatformError::WrongChipArch {
-                                    actual,
-                                    expected,
-                                    backtrace,
-                                } => {
-                                    return Ok(ChipInitResult::ErrorAbort(
-                                        format!(
-                                        "expected chip: {expected}, actual detected chip: {actual}"
-                                    ),
-                                        backtrace.0,
-                                    ))
-                                }
-
-                                PlatformError::WrongChipArchs {
-                                    actual,
-                                    expected,
-                                    backtrace,
-                                } => {
-                                    let expected_chips = expected
-                                        .iter()
-                                        .map(|arch| arch.to_string())
-                                        .collect::<Vec<_>>()
-                                        .join(", ");
-                                    return Ok(ChipInitResult::ErrorAbort(
-                                        format!(
-                                            "expected chip: {expected_chips}, actual detected chips: {actual}"
-                                        ),
-                                        backtrace.0,
-                                    ));
-                                }
-
-                                PlatformError::Generic(error, backtrace) => {
-                                    return Ok(ChipInitResult::ErrorAbort(error, backtrace.0));
-                                }
-
-                                PlatformError::GenericError(error, backtrace) => {
-                                    let err_msg = error.to_string();
-                                    return Ok(ChipInitResult::ErrorAbort(err_msg, backtrace.0));
-                                }
-                            },
-                        };
-                        for (eth_status, training_complete) in
-                            status.wait_status.iter_mut().zip(eth_training_status)
-                        {
-                            match eth_status {
-                                WaitStatus::Waiting(status_string) => {
-                                    if training_complete {
-                                        if let Err(_err) = self.check_ethernet_fw_version() {
-                                            *eth_status = WaitStatus::NotInitialized(
-                                                EthernetPartialInitError::FwOverwritten,
-                                            );
-                                        } else {
-                                            *eth_status = WaitStatus::JustFinished;
-                                        }
-                                    } else if status.start_time.elapsed() > status.timeout {
-                                        *eth_status = WaitStatus::Timeout(status.timeout);
-                                    } else {
-                                        *status_string = Some(format!(
-                                            "{}: Waiting for initial training to complete",
-                                            self.get_local_chip_coord()?
+                        // We don't need to get the eth training status if we aren't waiting to see if dram has
+                        // trained...
+                        if status.is_waiting() {
+                            let eth_training_status = match self.check_ethernet_training_complete() {
+                                Ok(eth_status) => eth_status,
+                                Err(err) => match err {
+                                    // ARC should be initialized at this point, hitting an error here means
+                                    // that we can no longer progress in the init.
+                                    PlatformError::ArcMsgError(error) => {
+                                        return Ok(ChipInitResult::ErrorContinue(
+                                            error.to_string(),
+                                            backtrace::Backtrace::capture(),
                                         ));
                                     }
+
+                                    PlatformError::MessageError(error) => {
+                                        return Ok(ChipInitResult::ErrorContinue(
+                                            error.to_string(),
+                                            backtrace::Backtrace::capture(),
+                                        ));
+                                    }
+
+                                    PlatformError::ArcNotReady(error, backtrace) => {
+                                        return Ok(ChipInitResult::ErrorContinue(
+                                            error.to_string(),
+                                            backtrace.0,
+                                        ));
+                                    }
+
+                                    // We are checking for ethernet training to complete... if we hit this than
+                                    // something has gone terribly wrong
+                                    PlatformError::EthernetTrainingNotComplete(eth_cores) => {
+                                        let false_count = eth_cores.iter().filter(|&&x| !x).count();
+                                        return Ok(ChipInitResult::ErrorContinue(
+                                            format!(
+                                                "Ethernet training not complete on [{false_count}/16] ports"
+                                            ),
+                                            backtrace::Backtrace::capture(),
+                                        ));
+                                    }
+
+                                    // This is an "expected error" but we probably can't recover from it, so we should abort the init.
+                                    PlatformError::AxiError(error) => {
+                                        return Ok(ChipInitResult::ErrorAbort(
+                                            error.to_string(),
+                                            backtrace::Backtrace::capture(),
+                                        ));
+                                    }
+
+                                    // We don't expect to hit these cases so if we do, we should assume that something went terribly
+                                    // wrong and abort the init.
+                                    PlatformError::UnsupportedFwVersion { version, required } => {
+                                        return Ok(ChipInitResult::ErrorAbort(format!("Required Ethernet Firmware Version: {required}, current version: {version:?}"), backtrace::Backtrace::capture()));
+                                    }
+                                    PlatformError::WrongChipArch {
+                                        actual,
+                                        expected,
+                                        backtrace,
+                                    } => {
+                                        return Ok(ChipInitResult::ErrorAbort(
+                                            format!(
+                                            "expected chip: {expected}, actual detected chip: {actual}"
+                                        ),
+                                            backtrace.0,
+                                        ))
+                                    }
+
+                                    PlatformError::WrongChipArchs {
+                                        actual,
+                                        expected,
+                                        backtrace,
+                                    } => {
+                                        let expected_chips = expected
+                                            .iter()
+                                            .map(|arch| arch.to_string())
+                                            .collect::<Vec<_>>()
+                                            .join(", ");
+                                        return Ok(ChipInitResult::ErrorAbort(
+                                            format!(
+                                                "expected chip: {expected_chips}, actual detected chips: {actual}"
+                                            ),
+                                            backtrace.0,
+                                        ));
+                                    }
+
+                                    PlatformError::Generic(error, backtrace) => {
+                                        return Ok(ChipInitResult::ErrorAbort(error, backtrace.0));
+                                    }
+
+                                    PlatformError::GenericError(error, backtrace) => {
+                                        let err_msg = error.to_string();
+                                        return Ok(ChipInitResult::ErrorAbort(err_msg, backtrace.0));
+                                    }
+                                },
+                            };
+                            for (eth_status, training_complete) in
+                                status.wait_status.iter_mut().zip(eth_training_status)
+                            {
+                                match eth_status {
+                                    WaitStatus::Waiting(status_string) => {
+                                        if training_complete {
+                                            if let Err(_err) = self.check_ethernet_fw_version() {
+                                                *eth_status = WaitStatus::NotInitialized(
+                                                    EthernetPartialInitError::FwOverwritten,
+                                                );
+                                            } else {
+                                                *eth_status = WaitStatus::JustFinished;
+                                            }
+                                        } else if status.start_time.elapsed() > status.timeout {
+                                            *eth_status = WaitStatus::Timeout(status.timeout);
+                                        } else {
+                                            *status_string = Some(format!(
+                                                "{}: Waiting for initial training to complete",
+                                                self.get_local_chip_coord()?
+                                            ));
+                                        }
+                                    }
+                                    WaitStatus::JustFinished => {
+                                        *eth_status = WaitStatus::Done;
+                                    }
+                                    _ => {}
                                 }
-                                WaitStatus::JustFinished => {
-                                    *eth_status = WaitStatus::Done;
-                                }
-                                _ => {}
                             }
+                        }
+                    } else {
+                        let status = &mut status.eth_status;
+                        for eth_status in status.wait_status.iter_mut() {
+                            *eth_status = WaitStatus::Done;
                         }
                     }
                 } else {
+                    // If WH UBB - skip ethernet training check
                     let status = &mut status.eth_status;
                     for eth_status in status.wait_status.iter_mut() {
                         *eth_status = WaitStatus::Done;

@@ -288,7 +288,13 @@ pub fn detect_chips<E>(
         let ident = if let Some(wh) = root_chip.as_wh() {
             if arc_ready {
                 if let Ok(telem) = root_chip.get_telemetry() {
-                    if !local_only && remote_ready {
+                    // If WH UBB - skip ethernet exploration
+                    let board_type:u64 = telem.board_id_low as u64 | ((telem.board_id_high as u64) << 32);
+                    let board_upi: u64 = (board_type >> 36) & 0xFFFFF;
+                    const WH_6U_GLX_UPI: u64 = 0x35;
+
+                    // Only investigate remotes if its not a UBB board or if we are not in noc_safe mode.
+                    if !local_only && remote_ready && board_upi != WH_6U_GLX_UPI {
                         remotes_to_investigate.push(root_index);
                     }
 
