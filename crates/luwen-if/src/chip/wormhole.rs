@@ -663,7 +663,8 @@ impl ChipImpl for Wormhole {
                 // Only do eth training if board type is not UBB
                 // By this point arc should be alive so we can safely access telem
                 let telem = self.get_telemetry()?;
-                let board_type:u64 = telem.board_id_low as u64 | ((telem.board_id_high as u64) << 32);
+                let board_type: u64 =
+                    telem.board_id_low as u64 | ((telem.board_id_high as u64) << 32);
                 let board_upi: u64 = (board_type >> 36) & 0xFFFFF;
                 const WH_6U_GLX_UPI: u64 = 0x35;
 

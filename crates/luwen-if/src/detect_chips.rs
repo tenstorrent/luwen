@@ -289,7 +289,8 @@ pub fn detect_chips<E>(
             if arc_ready {
                 if let Ok(telem) = root_chip.get_telemetry() {
                     // If WH UBB - skip ethernet exploration
-                    let board_type:u64 = telem.board_id_low as u64 | ((telem.board_id_high as u64) << 32);
+                    let board_type: u64 =
+                        telem.board_id_low as u64 | ((telem.board_id_high as u64) << 32);
                     let board_upi: u64 = (board_type >> 36) & 0xFFFFF;
                     const WH_6U_GLX_UPI: u64 = 0x35;
 
