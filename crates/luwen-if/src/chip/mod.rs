@@ -137,6 +137,22 @@ pub struct Telemetry {
     pub enabled_l2cpu: u32,
     pub enabled_pcie: u32,
     pub fan_rpm: u32,
+    pub gddr01_temp: u32,
+    pub gddr23_temp: u32,
+    pub gddr45_temp: u32,
+    pub gddr67_temp: u32,
+    pub gddr01_corr_errs: u32,
+    pub gddr23_corr_errs: u32,
+    pub gddr45_corr_errs: u32,
+    pub gddr67_corr_errs: u32,
+    pub gddr_uncorr_errs: u32,
+    pub max_gddr_temp: u32,
+    pub asic_location: u32,
+    pub board_power_limit: u32,
+    pub input_power: u32,
+    pub therm_trip_count: u32,
+    pub asic_id_high: u32,
+    pub asic_id_low: u32,
 }
 
 impl Telemetry {
