@@ -543,7 +543,11 @@ impl PciDevice {
     /// This function requires that dest is a value returned by the self.register_address
     /// function.
     pub unsafe fn memcpy_from_device(dest: &mut [u8], src: *const u8) {
-        let align = core::mem::align_of::<u32>();
+        let align = if cfg!(target_arch = "aarch64") {
+            4 * core::mem::align_of::<u32>()
+        } else {
+            core::mem::align_of::<u32>()
+        };
 
         let mut offset = 0;
         while offset < dest.len() {
