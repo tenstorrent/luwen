@@ -18,3 +18,6 @@ tracing = "0.1.40"
 [features]
 test_hardware = []
 test_grayskull = []
+
+[package.metadata.workspaces]
+independent = true
