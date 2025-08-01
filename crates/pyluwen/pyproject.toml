@@ -33,3 +33,6 @@ build-backend = "maturin"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
+unstable-flags = [
+	"next-lockfile-bump",
+]
