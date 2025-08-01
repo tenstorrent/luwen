@@ -26,6 +26,21 @@ jobs:
     name: Build Release debian package - Ubuntu 24.04
     runs-on: ubuntu-24.04
     steps:
+      - run: |
+          echo "What started this ref: ${{ github.ref }}"
+          echo "What started this ref: ${{ github.ref_name }}"
+          echo "What started this sha: ${{ github.sha }}"
+          echo "Did we get a ref pass in? ${{ inputs.ref }}"
+      - name: Figure out branch name
+        id: ref_name
+        run: |
+          echo "ref_name=${{ github.ref_name }}"
+          echo "ref_name=${{ github.ref_name }}" >> $GITHUB_ENV
+          if [[ -n "${{ inputs.ref }}" ]]
+          then
+            echo "ref_name=${{ github.ref_name }}"
+            echo "ref_name=${{ github.ref_name }}" >> $GITHUB_ENV
+          fi
       - run: sudo apt update
       - run: |
           sudo apt install -y \
@@ -110,7 +125,7 @@ jobs:
         run: ln -s debian.ubuntu debian
       - run: |
           gbp dch \
-            --debian-branch ${{ inputs.ref }} \
+            --debian-branch ${ref_name} \
             -R \
             -N ${MAJOR}.${MINOR}.${PATCH} \
             --spawn-editor=never
@@ -131,7 +146,7 @@ jobs:
         run: tar -czvf artifacts/vendor.tar.gz vendor
       - name: Copy Changelog to artifacts
         run: cp debian/changelog artifacts/changelog
-      - name: Set environment variable for distro 
+      - name: Set environment variable for distro
         id: distro_ident
         run: |
           source /etc/os-release && \

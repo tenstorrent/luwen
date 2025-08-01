@@ -110,6 +110,9 @@ jobs:
       - name: Update Cargo.lock
         run: |
           cargo update
+          cp Cargo.lock Cargo.lock.orig
+          cargo generate-lockfile --config "version=3"
+          diff -uNr Cargo.lock.orig Cargo.lock
           git commit \
             Cargo.lock \
             -m "Cargo.lock: updating for ${{ steps.luwenver.outputs.luwen_version }}"
