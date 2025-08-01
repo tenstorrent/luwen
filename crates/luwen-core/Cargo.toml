@@ -7,3 +7,6 @@ license = "Apache-2.0"
 
 [dependencies]
 thiserror = "1.0.40"
+
+[package.metadata.workspaces]
+independent = true
