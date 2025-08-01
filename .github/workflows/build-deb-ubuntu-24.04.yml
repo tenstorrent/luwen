@@ -38,8 +38,8 @@ jobs:
           echo "ref_name=${{ github.ref_name }}" >> $GITHUB_ENV
           if [[ -n "${{ inputs.ref }}" ]]
           then
-            echo "ref_name=${{ github.ref_name }}"
-            echo "ref_name=${{ github.ref_name }}" >> $GITHUB_ENV
+            echo "ref_name=${{ inputs.ref }}"
+            echo "ref_name=${{ inputs.ref }}" >> $GITHUB_ENV
           fi
       - run: sudo apt update
       - run: |
