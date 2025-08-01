@@ -1,6 +1,6 @@
 [package]
 name = "create-ethernet-map"
-version = "0.7.9"
+version = "0.7.10"
 edition = "2021"
 
 [lib]

@@ -1,6 +1,6 @@
 [package]
 name = "luwen"
-version = "0.7.10"
+version = "0.7.11"
 description = "A high-level interface for safe and efficient access Tenstorrent AI accelerators"
 edition = "2021"
 license = "Apache-2.0"
