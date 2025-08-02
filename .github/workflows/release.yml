@@ -109,13 +109,17 @@ jobs:
       - run: echo ${{ steps.luwenver.outputs.luwen_version }}
       - name: Update Cargo.lock
         run: |
-          cargo update
-          cp Cargo.lock Cargo.lock.orig
-          cargo generate-lockfile --config "version=3"
-          diff -uNr Cargo.lock.orig Cargo.lock
+          echo "*** Backing up file ***"
+          mv Cargo.lock Cargo.lock.orig
+          echo "*** Starting ***"
+          python3 helpers/cargo_lock_converter.py Cargo.lock.orig Cargo.lock
+          echo "*** Diffing ***"
+          diff -uNr Cargo.lock.orig Cargo.lock && echo "no difference" || echo "differences!"
+          echo "*** Commit ***"
           git commit \
             Cargo.lock \
-            -m "Cargo.lock: updating for ${{ steps.luwenver.outputs.luwen_version }}"
+            -m "Cargo.lock: updating for ${{ steps.luwenver.outputs.luwen_version_new }}"
+          echo "*** Push ***"
           git push
       - name: Find New Git Hash
         id: new-git-hash
