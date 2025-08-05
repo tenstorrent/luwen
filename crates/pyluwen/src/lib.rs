@@ -253,6 +253,38 @@ pub struct Telemetry {
     enabled_pcie: u32,
     #[pyo3(get)]
     fan_rpm: u32,
+    #[pyo3(get)]
+    gddr01_temp: u32,
+    #[pyo3(get)]
+    gddr23_temp: u32,
+    #[pyo3(get)]
+    gddr45_temp: u32,
+    #[pyo3(get)]
+    gddr67_temp: u32,
+    #[pyo3(get)]
+    gddr01_corr_errs: u32,
+    #[pyo3(get)]
+    gddr23_corr_errs: u32,
+    #[pyo3(get)]
+    gddr45_corr_errs: u32,
+    #[pyo3(get)]
+    gddr67_corr_errs: u32,
+    #[pyo3(get)]
+    gddr_uncorr_errs: u32,
+    #[pyo3(get)]
+    max_gddr_temp: u32,
+    #[pyo3(get)]
+    asic_location: u32,
+    #[pyo3(get)]
+    board_power_limit: u32,
+    #[pyo3(get)]
+    input_power: u32,
+    #[pyo3(get)]
+    therm_trip_count: u32,
+    #[pyo3(get)]
+    asic_id_high: u32,
+    #[pyo3(get)]
+    asic_id_low: u32,
 }
 impl From<luwen_if::chip::Telemetry> for Telemetry {
     fn from(value: luwen_if::chip::Telemetry) -> Self {
@@ -321,6 +353,22 @@ impl From<luwen_if::chip::Telemetry> for Telemetry {
             enabled_l2cpu: value.enabled_l2cpu,
             enabled_pcie: value.enabled_pcie,
             fan_rpm: value.fan_rpm,
+            gddr01_temp: value.gddr01_temp,
+            gddr23_temp: value.gddr23_temp,
+            gddr45_temp: value.gddr45_temp,
+            gddr67_temp: value.gddr67_temp,
+            gddr01_corr_errs: value.gddr01_corr_errs,
+            gddr23_corr_errs: value.gddr23_corr_errs,
+            gddr45_corr_errs: value.gddr45_corr_errs,
+            gddr67_corr_errs: value.gddr67_corr_errs,
+            gddr_uncorr_errs: value.gddr_uncorr_errs,
+            max_gddr_temp: value.max_gddr_temp,
+            asic_location: value.asic_location,
+            board_power_limit: value.board_power_limit,
+            input_power: value.input_power,
+            therm_trip_count: value.therm_trip_count,
+            asic_id_high: value.asic_id_high,
+            asic_id_low: value.asic_id_low,
         }
     }
 }
