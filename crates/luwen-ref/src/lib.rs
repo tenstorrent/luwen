@@ -28,11 +28,11 @@ pub struct ExtendedPciDeviceWrapper {
 }
 
 impl ExtendedPciDeviceWrapper {
-    pub fn borrow_mut(&self) -> RwLockWriteGuard<ExtendedPciDevice> {
+    pub fn borrow_mut(&self) -> RwLockWriteGuard<'_, ExtendedPciDevice> {
         self.inner.as_ref().write().unwrap()
     }
 
-    pub fn borrow(&self) -> RwLockReadGuard<ExtendedPciDevice> {
+    pub fn borrow(&self) -> RwLockReadGuard<'_, ExtendedPciDevice> {
         self.inner.as_ref().read().unwrap()
     }
 }
