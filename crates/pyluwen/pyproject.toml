@@ -2,6 +2,8 @@
 name = "pyluwen"
 requires-python = ">=3.10"
 
+readme = "README.md"
+
 dynamic = [
 	"version",
 	"summary",
@@ -33,3 +35,5 @@ build-backend = "maturin"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
+
+# vim: expandtab:ts=2:sw=2:ai
