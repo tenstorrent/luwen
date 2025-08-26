@@ -31,6 +31,18 @@ jobs:
           echo "What started this ref: ${{ github.ref }}"
           echo "What started this sha: ${{ github.sha }}"
           echo "Did we get a ref pass in? ${{ inputs.ref }}"
+  builddeb13:
+    needs:
+      - build_all_depends
+    name: Build Debian 13
+    uses: ./.github/workflows/build-deb-debian-13.yml
+    with:
+      ref: ${{ inputs.ref }}
+      MAJOR:  ${{ inputs.MAJOR }}
+      MINOR:  ${{ inputs.MINOR }}
+      PATCH:  ${{ inputs.PATCH }}
+      NUMBER_OF_COMMITS_SINCE_TAG:  ${{ inputs.NUMBER_OF_COMMITS_SINCE_TAG }}
+    secrets: inherit
   builddeb2204:
     needs:
       - build_all_depends

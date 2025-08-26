@@ -1,5 +1,5 @@
-name: Build Release debian package - Ubuntu 24.04
-run-name: Build Release debian package - Ubuntu 24.04
+name: Build Release debian package - Debian 13
+run-name: Build Release debian package - Debian 13
 on:
   workflow_dispatch:
   workflow_call:
@@ -22,9 +22,11 @@ on:
         type: string
 
 jobs:
-  builddeb2404:
-    name: Build Release debian package - Ubuntu 24.04
-    runs-on: ubuntu-24.04
+  builddeb13:
+    name: Build Release debian package - Debian 13
+    runs-on: ubuntu-latest
+    container:
+      image: debian:13
     steps:
       - run: |
           echo "What started this ref: ${{ github.ref }}"
@@ -41,9 +43,9 @@ jobs:
             echo "ref_name=${{ inputs.ref }}"
             echo "ref_name=${{ inputs.ref }}" >> $GITHUB_ENV
           fi
-      - run: sudo apt update
+      - run: apt update
       - run: |
-          sudo apt install -y \
+          apt install -y \
             build-essential \
             cargo \
             debhelper \
@@ -67,6 +69,8 @@ jobs:
           ref: ${{ inputs.ref }}
           fetch-tags: true
           fetch-depth: 0
+      - name: Mucking about with users
+        run: git config --global --add safe.directory /__w/luwen/luwen
       - name: Extract version from tag
         uses: damienaicheh/extract-version-from-tag-action@v1.3.0
       - run: git tag
@@ -146,9 +150,10 @@ jobs:
         run: cp debian/changelog artifacts/changelog
       - name: Set environment variable for distro
         id: distro_ident
+        shell: bash
         run: |
           source /etc/os-release && \
-          echo "DISTRO_IDENT=$( echo \"${NAME}\" | sed 's/"//g' | tr '[:upper:]' '[:lower:]' )-${VERSION_ID}" \
+          echo "DISTRO_IDENT=$( echo \"${ID}\" | sed 's/"//g' | tr '[:upper:]' '[:lower:]' )-${VERSION_ID}" \
                 >> $GITHUB_ENV
       - name: Set environment variable for deb filename
         id: deb_filename
