@@ -103,7 +103,7 @@ jobs:
           mkdir .cargo \
           && \
           cp \
-            debian.ubuntu/cargo.toml-vendored \
+            debian/cargo.toml-vendored \
             .cargo/config.toml
       - run: |
           ( \
@@ -117,12 +117,10 @@ jobs:
           mkdir crates/pyluwen/.cargo \
           && \
           cp \
-            debian.ubuntu/cargo.toml-vendored \
+            debian/cargo.toml-vendored \
             crates/pyluwen/.cargo/config.toml
       # Ok this needs to get up leveled somewhere so that it can be shared across Debian and Ubuntu obviously
       - run: ls -lah
-      - name: Link the Ubuntu build stuff in as 'debian/'
-        run: ln -s debian.ubuntu debian
       - run: |
           gbp dch \
             --debian-branch ${ref_name} \
