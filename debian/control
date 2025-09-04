@@ -70,6 +70,7 @@ Rules-Requires-Root: no
 Package: python3-pyluwen
 Version: 0.3.7
 Architecture: all
+Description: A high-level interface for safe and efficient access Tenstorrent AI accelerators
 Essential: no
 Depends:
  ${misc:Depends},
