@@ -448,7 +448,7 @@ pub extern "C" fn chip_arc_msg(
     return_3: *mut u32,
 ) -> CResult {
     match chip.arc_msg(ArcMsgOptions {
-        msg: ArcMsg::from_values(msg, arg0, arg1),
+        msg: ArcMsg::from_values(msg, arg0, arg1, Some(chip.0.get_arch())),
         wait_for_done,
         timeout: std::time::Duration::from_secs(timeout as u64),
         ..Default::default()

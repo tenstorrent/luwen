@@ -53,6 +53,7 @@ pub enum TypedArcMsg {
     GetSpiDumpAddr,
     SpiRead { addr: u32 },
     SpiWrite,
+    ReadTs { sensor_idx: u32 },
 }
 
 impl From<TypedArcMsg> for ArcMsg {
@@ -90,6 +91,7 @@ impl TypedArcMsg {
             TypedArcMsg::GetSpiDumpAddr => 0x29,
             TypedArcMsg::SpiRead { .. } => 0x2A,
             TypedArcMsg::SpiWrite => 0x2B,
+            TypedArcMsg::ReadTs { .. } => 0x1B,
         }
     }
 }
@@ -117,7 +119,8 @@ impl ArcMsg {
                 TypedArcMsg::Test { arg }
                 | TypedArcMsg::ResetSafeClks { arg }
                 | TypedArcMsg::ToggleTensixReset { arg }
-                | TypedArcMsg::SpiRead { addr: arg } => {
+                | TypedArcMsg::SpiRead { addr: arg }
+                | TypedArcMsg::ReadTs { sensor_idx: arg } => {
                     ((arg & 0xFFFF) as u16, ((arg >> 16) & 0xFFFF) as u16)
                 }
                 TypedArcMsg::SpiWrite => (0xFFFF, 0xFFFF),
@@ -141,7 +144,7 @@ impl ArcMsg {
         }
     }
 
-    pub fn from_values(msg: u32, arg0: u16, arg1: u16) -> Self {
+    pub fn from_values(msg: u32, arg0: u16, arg1: u16, arch: Option<luwen_core::Arch>) -> Self {
         let arg = ((arg1 as u32) << 16) | arg0 as u32;
         let msg = 0xFF & msg;
         let msg = match msg {
@@ -175,12 +178,28 @@ impl ArcMsg {
                 2 => FwType::FwBundleSPI,
                 _ => panic!("Unknown FW type {arg}"),
             }),
+            0x1B => {
+                // Only apply ReadTs for Blackhole boards
+                match arch {
+                    Some(luwen_core::Arch::Blackhole) => TypedArcMsg::ReadTs { sensor_idx: arg },
+                    _ => {
+                        unimplemented!("Message 0x1B not implemented for Non-Blackhole boards")
+                    }
+                }
+            }
             value => {
                 unimplemented!("Unknown ARC message {:#x}", value)
             }
         };
 
         ArcMsg::Typed(msg)
+    }
+
+    /// Backward compatibility method for when architecture is unknown
+    /// This will default to treating 0x1B as ReadTs for all boards (original behavior)
+    #[deprecated(note = "Use from_values with arch parameter to support board-specific behavior")]
+    pub fn from_values_legacy(msg: u32, arg0: u16, arg1: u16) -> Self {
+        Self::from_values(msg, arg0, arg1, Some(luwen_core::Arch::Blackhole))
     }
 }
 
