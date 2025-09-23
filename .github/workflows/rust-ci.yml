@@ -226,7 +226,7 @@ jobs:
   hardware_test_wh:
     needs: basics
     name: Hardware Test Suite (WH)
-    runs-on: "tt-beta-ubuntu-2204-n150-large-stable"
+    runs-on: "tt-ubuntu-2204-n150-stable"
 
     steps:
       - uses: actions/checkout@v4
@@ -254,7 +254,7 @@ jobs:
   hardware_test_bh:
     needs: basics
     name: Hardware Test Suite (BH)
-    runs-on: "tt-beta-ubuntu-2204-p150b-large-stable"
+    runs-on: "tt-ubuntu-2204-p150b-stable"
 
     steps:
       - uses: actions/checkout@v4
