@@ -684,17 +684,16 @@ impl ChipImpl for Blackhole {
         let mut scratch_reg_13_value = [0u8; 4];
         self.axi_read_field(&self.telemetry_struct_addr, &mut scratch_reg_13_value)?;
         let telem_struct_addr = u32::from_le_bytes(scratch_reg_13_value);
+        if telem_struct_addr == 0 {
+            return Err(PlatformError::ArcNotReady(
+                crate::error::ArcReadyError::BootIncomplete,
+                BtWrapper::capture(),
+            ));
+        }
         // Check if the address is within CSM memory. Otherwise, it must be invalid
         if !(0x10000000..=0x1007FFFF).contains(&telem_struct_addr) {
             return Err(PlatformError::Generic(
                 format!("Invalid Telemetry struct address: 0x{telem_struct_addr:08x}"),
-                BtWrapper::capture(),
-            ));
-        }
-
-        if telem_struct_addr == 0 {
-            return Err(PlatformError::ArcNotReady(
-                crate::error::ArcReadyError::BootIncomplete,
                 BtWrapper::capture(),
             ));
         }
