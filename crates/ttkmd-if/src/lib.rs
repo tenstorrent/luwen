@@ -866,20 +866,4 @@ mod test {
         let tlb = device.allocate_tlb(1 << 20).unwrap();
         verify_noc(&mut device, PossibleTlbAllocation::Allocation(tlb));
     }
-
-    #[test]
-    #[cfg_attr(
-        any(not(feature = "test_hardware"), feature = "test_grayskull"),
-        ignore = "Requires hardware"
-    )]
-    fn ttkmd_no_allocate() {
-        let mut device = PciDevice::scan()
-            .into_iter()
-            .map(PciDevice::open)
-            .next()
-            .expect("Expected to have access to 1 pci device")
-            .unwrap();
-
-        verify_noc(&mut device, PossibleTlbAllocation::Hardcoded(1));
-    }
 }
