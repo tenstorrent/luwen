@@ -712,6 +712,11 @@ impl PciChip {
             .map_err(|v| PyException::new_err(format!("Could not initialize chip: {v}")))?,
         ))
     }
+    pub fn close(&mut self) {
+        // No explicit action required; resources will be released when the object is dropped.
+        // This method exists for API symmetry and explicit intent.
+        println!("Closing PciChip and cleaning up resources.");
+    }
 
     #[pyo3(signature = (callback = None))]
     pub fn init(&mut self, callback: Option<PyObject>) -> PyResult<()> {
