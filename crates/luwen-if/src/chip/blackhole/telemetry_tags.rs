@@ -56,7 +56,11 @@ pub enum TelemetryTags {
     AsicLocation = 52,
     BoardPowerLimit = 53,
     InputPower = 54,
+    TdcLimitMax = 55,
+    ThmLimitThrottle = 56,
     ThermTripCount = 60,
     AsicIdHigh = 61,
     AsicIdLow = 62,
+    AiclkLimitMax = 63,
+    TdpLimitMax = 64,
 }

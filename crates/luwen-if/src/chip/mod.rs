@@ -150,9 +150,13 @@ pub struct Telemetry {
     pub asic_location: u32,
     pub board_power_limit: u32,
     pub input_power: u32,
+    pub tdc_limit_max: u32,
+    pub thm_limit_throttle: u32,
     pub therm_trip_count: u32,
     pub asic_id_high: u32,
     pub asic_id_low: u32,
+    pub aiclk_limit_max: u32,
+    pub tdp_limit_max: u32,
 }
 
 impl Telemetry {

@@ -808,9 +808,13 @@ impl ChipImpl for Blackhole {
                     TelemetryTags::AsicLocation => telemetry_data.asic_location = data,
                     TelemetryTags::BoardPowerLimit => telemetry_data.board_power_limit = data,
                     TelemetryTags::InputPower => telemetry_data.input_power = data,
+                    TelemetryTags::TdcLimitMax => telemetry_data.tdc_limit_max = data,
+                    TelemetryTags::ThmLimitThrottle => telemetry_data.thm_limit_throttle = data,
                     TelemetryTags::ThermTripCount => telemetry_data.therm_trip_count = data,
                     TelemetryTags::AsicIdHigh => telemetry_data.asic_id_high = data,
                     TelemetryTags::AsicIdLow => telemetry_data.asic_id_low = data,
+                    TelemetryTags::AiclkLimitMax => telemetry_data.aiclk_limit_max = data,
+                    TelemetryTags::TdpLimitMax => telemetry_data.tdp_limit_max = data,
                     _ => (),
                 }
             }

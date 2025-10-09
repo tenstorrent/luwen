@@ -280,11 +280,19 @@ pub struct Telemetry {
     #[pyo3(get)]
     input_power: u32,
     #[pyo3(get)]
+    tdc_limit_max: u32,
+    #[pyo3(get)]
+    thm_limit_throttle: u32,
+    #[pyo3(get)]
     therm_trip_count: u32,
     #[pyo3(get)]
     asic_id_high: u32,
     #[pyo3(get)]
     asic_id_low: u32,
+    #[pyo3(get)]
+    aiclk_limit_max: u32,
+    #[pyo3(get)]
+    tdp_limit_max: u32,
 }
 impl From<luwen_if::chip::Telemetry> for Telemetry {
     fn from(value: luwen_if::chip::Telemetry) -> Self {
@@ -366,9 +374,13 @@ impl From<luwen_if::chip::Telemetry> for Telemetry {
             asic_location: value.asic_location,
             board_power_limit: value.board_power_limit,
             input_power: value.input_power,
+            tdc_limit_max: value.tdc_limit_max,
+            thm_limit_throttle: value.thm_limit_throttle,
             therm_trip_count: value.therm_trip_count,
             asic_id_high: value.asic_id_high,
             asic_id_low: value.asic_id_low,
+            aiclk_limit_max: value.aiclk_limit_max,
+            tdp_limit_max: value.tdp_limit_max,
         }
     }
 }
