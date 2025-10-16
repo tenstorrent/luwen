@@ -344,6 +344,18 @@ impl Blackhole {
     pub fn spi_write(&self, mut addr: u32, value: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
         let buffer = self.get_spi_buffer()?;
 
+        /*
+         * Since SPI unlock/lock commands are not supported in older firmwares,
+         * we will ignore errors from them and return a default status
+         */
+        let (status, _, _) = self
+            .bh_arc_msg(0xC2, None, &[0, 0], None)
+            .unwrap_or_default();
+
+        if status != 0 {
+            return Err("Failed to unlock spi".into());
+        }
+
         for chunk in value.chunks(buffer.size as usize) {
             self.axi_write(buffer.addr as u64, chunk)?;
             let (status, _, _) = self.bh_arc_msg(
@@ -360,6 +372,15 @@ impl Blackhole {
             }
 
             addr += chunk.len() as u32;
+        }
+
+        /* Similar to above, ignore errors from lock command */
+        let (status, _, _) = self
+            .bh_arc_msg(0xC3, None, &[0, 0], None)
+            .unwrap_or_default();
+
+        if status != 0 {
+            return Err("Failed to lock spi".into());
         }
 
         Ok(())
