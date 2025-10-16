@@ -655,12 +655,32 @@ impl ChipImpl for Blackhole {
         let code = msg.msg.msg_code();
         let args = msg.msg.args();
 
-        let (_status, rc, response) = self.bh_arc_msg(
+        let (_status, rc, response) = match self.bh_arc_msg(
             code as u8,
             None,
             &[args.0 as u32 | ((args.1 as u32) << 16)],
             Some(msg.timeout),
-        )?;
+        ) {
+            Ok(result) => result,
+            Err(PlatformError::MessageError(message::MessageError::Timeout {
+                phase,
+                timeout: elapsed,
+            })) => {
+                if !msg.wait_for_done {
+                    /* If we are not waiting for done, ignore timeout error */
+                    return Ok(ArcMsgOk::Ok { rc: 0, arg: 0 });
+                }
+                return Err(PlatformError::MessageError(
+                    message::MessageError::Timeout {
+                        phase,
+                        timeout: elapsed,
+                    },
+                ));
+            }
+            Err(e) => {
+                return Err(e);
+            }
+        };
         Ok(ArcMsgOk::Ok {
             rc: rc as u32,
             arg: response[0],
