@@ -1,6 +1,6 @@
 [package]
 name = "pyluwen"
-version = "0.7.11"
+version = "0.7.12"
 description = "Python bindings for Tenstorrent's luwen - a low level hardware interface library"
 edition = "2021"
 license = "Apache-2.0"
