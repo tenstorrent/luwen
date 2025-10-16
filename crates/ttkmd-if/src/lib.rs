@@ -999,7 +999,7 @@ mod test {
             .expect("Expected to have access to 1 pci device")
             .unwrap();
 
-        let tlb = device.allocate_tlb(1 << 20).unwrap();
+        let tlb = device.allocate_tlb(1 << 21).unwrap();
         verify_noc(&mut device, PossibleTlbAllocation::Allocation(tlb));
     }
 
