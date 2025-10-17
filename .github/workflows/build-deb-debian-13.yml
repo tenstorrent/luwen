@@ -35,6 +35,7 @@ jobs:
           echo "Did we get a ref pass in? ${{ inputs.ref }}"
       - name: Figure out branch name
         id: ref_name
+        shell: bash
         run: |
           echo "ref_name=${{ github.ref_name }}"
           echo "ref_name=${{ github.ref_name }}" >> $GITHUB_ENV
@@ -75,6 +76,7 @@ jobs:
         uses: damienaicheh/extract-version-from-tag-action@v1.3.0
       - run: git tag
       - name: Ok Figure out version
+        shell: bash
         run: |
           if [[ -n "${{ inputs.MAJOR }}" ]]
           then

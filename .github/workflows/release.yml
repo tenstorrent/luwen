@@ -190,20 +190,6 @@ jobs:
         env:
           EMAIL: releases@tenstorrent.com
           NAME: Tenstorrent Releases
-      - name: Link the Debian build stuff in as 'debian/'
-        run: rm debian
-      - run:  ln -s debian.debian debian
-      - run: ls -lah
-      - name: Generate Debian Changelog
-        run: |
-          gbp dch \
-            --debian-branch ${{ needs.tempbranch.outputs.rc_ref }} \
-            -R \
-            N ${MAJOR}.${MINOR}.${PATCH} \
-            --spawn-editor=never
-        env:
-          EMAIL: releases@tenstorrent.com
-          NAME: Tenstorrent Releases
       - name: ok what happened
         run: git diff
       - name: Setup commit
