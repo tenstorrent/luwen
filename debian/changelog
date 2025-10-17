@@ -1,3 +1,32 @@
+rust-luwen (0.7.14) noble; urgency=medium
+
+  [ John 'Warthog9' Hawley ]
+  * Enable Debian 13 build in build-all
+
+  [ Petra Alexson ]
+  * BH telem: check if ARC not ready before checking if address out of bounds
+  * Pick up changes to CI runner naming scheme
+
+  [ Jonathan Baker ]
+  * Updated to automatic community labeling v2
+
+  [ Daniel DeGrasse ]
+  * BH spi: issue write unlock and write lock commands
+  * ttkmd-if: test: allocate 2MiB TLB
+
+  [ Petra Alexson ]
+  * telemetry: expose blackhole chip limits in telemetry
+
+  [ John 'Warthog9' Hawley ]
+  * Workflows: Fixing Ubuntu Builds
+  * Follow on to f16be9ccf0a73963b22bebbd6c47802b215ff196
+
+  [ Tenstorrent Releases ]
+  * Cargo Release independent packages
+  * Cargo.lock: updating for
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Fri, 17 Oct 2025 15:53:48 +0000
+
 rust-luwen (0.7.13) noble; urgency=medium
 
   [ John 'Warthog9' Hawley ]
