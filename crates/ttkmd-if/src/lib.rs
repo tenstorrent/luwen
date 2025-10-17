@@ -73,25 +73,10 @@ pub struct PhysicalDevice {
 }
 
 pub struct BarMapping {
-    pub bar_addr: u64,
     pub bar_size_bytes: u64,
-
     pub bar0_uc: memmap2::MmapMut,
-    #[allow(dead_code)]
     pub bar0_uc_size: u64,
     pub bar0_uc_offset: u64,
-
-    pub bar0_wc: Option<memmap2::MmapMut>,
-    pub bar0_wc_size: u64,
-
-    pub bar1_uc: Option<memmap2::MmapMut>,
-    pub bar1_uc_size: u64,
-
-    pub system_reg_mapping: Option<memmap2::MmapMut>,
-    #[allow(dead_code)]
-    pub system_reg_mapping_size: usize,
-    pub system_reg_start_offset: u32, // Registers >= this are system regs, use the mapping.
-    pub system_reg_offset_adjust: u32, // This is the offset of the first reg in the system reg mapping.
 }
 
 #[derive(Debug)]
@@ -194,38 +179,13 @@ impl PciDevice {
         }
 
         let mut bar0_uc_mapping = Mapping::default();
-        let mut bar0_wc_mapping = Mapping::default();
-        let mut bar1_uc_mapping = Mapping::default();
-        let mut _bar1_wc_mapping = Mapping::default();
-        let mut bar2_uc_mapping = Mapping::default();
-        let mut _bar2_wc_mapping = Mapping::default();
 
         for i in 0..mappings.input.output_mapping_count as usize {
-            match kmdif::MappingId::from_u32(mappings.output.mappings[i].mapping_id) {
-                kmdif::MappingId::Resource0Uc => {
-                    bar0_uc_mapping = mappings.output.mappings[i];
-                }
-                kmdif::MappingId::Resource0Wc => {
-                    bar0_wc_mapping = mappings.output.mappings[i];
-                }
-                kmdif::MappingId::Resource1Uc => {
-                    bar1_uc_mapping = mappings.output.mappings[i];
-                }
-                kmdif::MappingId::Resource1Wc => {
-                    _bar1_wc_mapping = mappings.output.mappings[i];
-                }
-                kmdif::MappingId::Resource2Uc => {
-                    bar2_uc_mapping = mappings.output.mappings[i];
-                }
-                kmdif::MappingId::Resource2Wc => {
-                    _bar2_wc_mapping = mappings.output.mappings[i];
-                }
-                kmdif::MappingId::Unused => {
-                    // println!("WARNING: recieved unused mapping id");
-                }
-                kmdif::MappingId::Unknown(v) => {
-                    println!("WARNING: recieved unknown mapping id {v}");
-                }
+            if let kmdif::MappingId::Resource0Uc =
+                kmdif::MappingId::from_u32(mappings.output.mappings[i].mapping_id)
+            {
+                bar0_uc_mapping = mappings.output.mappings[i];
+                break;
             }
         }
 
@@ -236,133 +196,37 @@ impl PciDevice {
             });
         }
 
-        let wc_mapping_size = if self.arch.is_blackhole() {
-            kmdif::BH_BAR0_WC_MAPPING_SIZE
+        // Map BAR0 uncached, beyond the TLB apertures.
+        let bar0_mapping_offset: u64 = if self.arch.is_blackhole() {
+            202 * (1 << 21) // 202 2MiB TLB windows
+        } else if self.arch.is_wormhole() {
+            156 * (1 << 20) + // 156 1MiB TLB windows
+             10 * (1 << 21) + // 10 2MiB TLB windows
+             20 * (1 << 24) // 20 16MiB TLB windows
         } else {
-            kmdif::GS_BAR0_WC_MAPPING_SIZE
+            panic!("Unsupported architecture");
         };
 
-        // if disable_wc
-        // bar0_wc_mapping = 0;
-        // bar0_wc_size = 0;
-        // else
-        let mut bar0_wc_size = 0;
-        let mut bar0_wc = None;
-        if bar0_wc_mapping.mapping_id == kmdif::MappingId::Resource0Wc.as_u32() {
-            bar0_wc_size = bar0_wc_mapping.mapping_size.min(wc_mapping_size);
-            let bar0_wc_map = unsafe {
-                memmap2::MmapOptions::default()
-                    .len(bar0_wc_size as usize)
-                    .offset(bar0_wc_mapping.mapping_base)
-                    .map_mut(self.device_fd.as_raw_fd())
-            };
-            match bar0_wc_map {
-                Ok(map) => {
-                    bar0_wc = Some(map);
-                }
-                Err(err) => {
-                    println!(
-                        "WARNING: Failed to map bar0_wc for {} with error {err}",
-                        self.id
-                    );
-                    bar0_wc_size = 0;
-                    bar0_wc = None;
-                }
-            }
-        }
-
-        let bar0_uc_size;
-        let bar0_uc_offset;
-        if bar0_wc.is_some() {
-            bar0_uc_size = bar0_uc_mapping.mapping_size.saturating_sub(wc_mapping_size);
-            bar0_uc_offset = wc_mapping_size;
-        } else {
-            // No WC mapping, map the entire BAR UC.
-            bar0_uc_size = bar0_uc_mapping.mapping_size;
-            bar0_uc_offset = 0;
-        }
-
+        let bar0_mapped_size = kmdif::BAR0_SIZE - bar0_mapping_offset as usize;
         let bar0_uc = unsafe {
             memmap2::MmapOptions::default()
-                .len(bar0_uc_size as usize)
-                .offset(bar0_uc_mapping.mapping_base + bar0_uc_offset)
+                .len(bar0_mapped_size)
+                .offset(bar0_mapping_offset)
                 .map_mut(self.device_fd.as_raw_fd())
         };
         let bar0_uc = match bar0_uc {
             Ok(map) => map,
             Err(err) => {
-                panic!("Failed to map bar0_uc for {} with error {err}", self.id);
+                panic!("Failed to map bar0 for {} with error {err}", self.id);
             }
         };
 
-        // let bar0_wc = if let Some(bar0_wc) = bar0_wc {
-        //     bar0_wc
-        // } else {
-        //     bar0_uc
-        // };
-
-        let mut system_reg_mapping_size = 0;
-        let mut system_reg_start_offset = 0;
-        let mut system_reg_offset_adjust = 0;
-        let mut system_reg_mapping = None;
-        if self.arch.is_wormhole() {
-            if bar2_uc_mapping.mapping_id != kmdif::MappingId::Resource2Uc.as_u32() {
-                panic!("Device {} has no BAR4 mapping", self.id);
-            }
-
-            system_reg_mapping_size = bar2_uc_mapping.mapping_size as usize;
-            let system_reg = unsafe {
-                memmap2::MmapOptions::default()
-                    .len(system_reg_mapping_size)
-                    .offset(bar2_uc_mapping.mapping_base)
-                    .map_mut(self.device_fd.as_raw_fd())
-            };
-            system_reg_mapping = match system_reg {
-                Ok(map) => Some(map),
-                Err(err) => {
-                    panic!(
-                        "BAR4 mapping failed for device {} with error {err}",
-                        self.id
-                    );
-                }
-            };
-
-            system_reg_start_offset = (512 - 16) * 1024 * 1024;
-            system_reg_offset_adjust = (512 - 32) * 1024 * 1024;
-        }
-
-        let mut bar1_uc = None;
-        let mut bar1_uc_size = 0;
-        if self.arch.is_blackhole() {
-            if bar1_uc_mapping.mapping_id != kmdif::MappingId::Resource1Uc.as_u32() {
-                panic!("Device {} has not Bar1 UC mapping", self.id);
-            }
-
-            bar1_uc_size = bar1_uc_mapping.mapping_size;
-            bar1_uc = Some(unsafe {
-                memmap2::MmapOptions::default()
-                    .len(bar1_uc_mapping.mapping_size as usize)
-                    .offset(bar1_uc_mapping.mapping_base)
-                    .map_mut(self.device_fd.as_raw_fd())
-                    .expect("Bar1 mapping failed for device {device_id}")
-            });
-        }
-
         self.pci_bar = Some(BarMapping {
-            bar_addr: pci::read_bar0_base(&self.config_space),
             bar_size_bytes: bar0_uc_mapping.mapping_size,
 
             bar0_uc,
-            bar0_uc_size,
-            bar0_uc_offset,
-            bar0_wc,
-            bar0_wc_size,
-            bar1_uc,
-            bar1_uc_size,
-            system_reg_mapping,
-            system_reg_mapping_size,
-            system_reg_start_offset,
-            system_reg_offset_adjust,
+            bar0_uc_size: bar0_mapped_size as u64,
+            bar0_uc_offset: bar0_mapping_offset,
         });
 
         Ok(())
@@ -1001,21 +865,5 @@ mod test {
 
         let tlb = device.allocate_tlb(1 << 21).unwrap();
         verify_noc(&mut device, PossibleTlbAllocation::Allocation(tlb));
-    }
-
-    #[test]
-    #[cfg_attr(
-        any(not(feature = "test_hardware"), feature = "test_grayskull"),
-        ignore = "Requires hardware"
-    )]
-    fn ttkmd_no_allocate() {
-        let mut device = PciDevice::scan()
-            .into_iter()
-            .map(PciDevice::open)
-            .next()
-            .expect("Expected to have access to 1 pci device")
-            .unwrap();
-
-        verify_noc(&mut device, PossibleTlbAllocation::Hardcoded(1));
     }
 }

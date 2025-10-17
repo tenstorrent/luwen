@@ -96,14 +96,6 @@ pub struct SpecificTlbInfo {
     pub memory_type: MemoryType,
 }
 
-pub fn get_per_tlb_info(device: &PciDevice, index: u32) -> SpecificTlbInfo {
-    match device.arch {
-        crate::Arch::Grayskull => grayskull::get_specific_tlb_info(device, index),
-        crate::Arch::Wormhole => wormhole::get_specific_tlb_info(device, index),
-        crate::Arch::Blackhole => blackhole::get_specific_tlb_info(device, index),
-    }
-}
-
 pub fn get_tlb(device: &PciDevice, index: u32) -> Result<Tlb, PciError> {
     match device.arch {
         crate::Arch::Grayskull => grayskull::get_tlb(device, index),
@@ -117,13 +109,5 @@ pub fn setup_tlb(device: &mut PciDevice, index: u32, tlb: Tlb) -> Result<(u64, u
         crate::Arch::Grayskull => grayskull::setup_tlb(device, index, tlb),
         crate::Arch::Wormhole => wormhole::setup_tlb(device, index, tlb),
         crate::Arch::Blackhole => blackhole::setup_tlb(device, index, tlb),
-    }
-}
-
-pub fn get_tlb_info(device: &PciDevice) -> DeviceTlbInfo {
-    match device.arch {
-        crate::Arch::Grayskull => grayskull::tlb_info(device),
-        crate::Arch::Wormhole => wormhole::tlb_info(device),
-        crate::Arch::Blackhole => blackhole::tlb_info(device),
     }
 }

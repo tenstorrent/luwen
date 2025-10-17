@@ -7,48 +7,29 @@ use crate::{error::PciError, kmdif, BarMapping, PciDevice};
 
 const ERROR_VALUE: u32 = 0xffffffff;
 
-pub(crate) fn read_bar0_base(config_space: &std::fs::File) -> u64 {
-    const BAR_ADDRESS_MASK: u64 = !0xFu64;
-
-    let bar0_config_offset = 0x10;
-
-    let mut bar01 = [0u8; std::mem::size_of::<u64>()];
-    let size = nix::sys::uio::pread(config_space.as_raw_fd(), &mut bar01, bar0_config_offset);
-    match size {
-        Ok(size) => {
-            if size != std::mem::size_of::<u64>() {
-                panic!("Failed to read BAR0 config space: {size}");
-            }
-        }
-        Err(err) => {
-            panic!("Failed to read BAR0 config space: {err}");
-        }
-    }
-
-    u64::from_ne_bytes(bar01) & BAR_ADDRESS_MASK
-}
-
 impl BarMapping {
+    // Do not use this method to access the NOC.
     unsafe fn register_address_mut<T>(&self, mut register_addr: u32) -> *mut T {
-        let reg_mapping: *mut u8;
-
-        if self.system_reg_mapping.is_some() && register_addr >= self.system_reg_start_offset {
-            let mapping = self.system_reg_mapping.as_ref().unwrap_unchecked();
-
-            register_addr -= self.system_reg_offset_adjust;
-            reg_mapping = mapping.as_ptr() as *mut u8;
-        } else if self.bar0_wc.is_some() && (register_addr as u64) < self.bar0_wc_size {
-            let mapping = self.bar0_wc.as_ref().unwrap_unchecked();
-
-            reg_mapping = mapping.as_ptr() as *mut u8;
-        } else {
-            register_addr -= self.bar0_uc_offset as u32;
-            reg_mapping = self.bar0_uc.as_ptr() as *mut u8;
+        if register_addr < self.bar0_uc_offset as u32 {
+            // Not a register address, but rather an address corresponding to a
+            // TLB aperture. Wholesale mapping of the BAR0 has been removed in
+            // favor of per-TLB mapping. Use the noc_write32 and noc_read32
+            // methods and the KMD-provided TLB allocation mechanism to access
+            // the chip NOC. This requires TT-KMD v2.0.0 or later.
+            panic!("{register_addr:x} is a TLB aperture address. Do you need to update to a newer version of tt-kmd?");
         }
+
+        if register_addr >= kmdif::BAR0_SIZE as u32 {
+            panic!("{register_addr:x} is outside of the BAR0 mapping");
+        }
+
+        register_addr -= self.bar0_uc_offset as u32;
+        let reg_mapping: *mut u8 = self.bar0_uc.as_ptr() as *mut u8;
 
         reg_mapping.offset(register_addr as isize) as *mut T
     }
 
+    // Do not use this method to access the NOC.
     unsafe fn register_address<T>(&self, register_addr: u32) -> *const T {
         self.register_address_mut(register_addr) as *const T
     }
@@ -131,6 +112,7 @@ impl PciDevice {
     }
 
     #[inline]
+    // Do not use this method to access the NOC.
     pub fn read32_no_translation(&self, addr: usize) -> Result<u32, PciError> {
         let data = if addr % core::mem::align_of::<u32>() != 0 {
             unsafe {
@@ -155,6 +137,7 @@ impl PciDevice {
     }
 
     #[inline]
+    // Do not use this method to access the NOC.
     pub fn read32(&self, addr: u32) -> Result<u32, PciError> {
         let read_pointer = match &self.pci_bar {
             Some(bar) => unsafe { bar.register_address::<u32>(addr) as usize },
@@ -166,6 +149,7 @@ impl PciDevice {
     }
 
     #[inline]
+    // Do not use this method to access the NOC.
     pub fn write32_no_translation(&mut self, addr: usize, data: u32) -> Result<(), PciError> {
         if addr % core::mem::align_of::<u32>() != 0 {
             unsafe {
@@ -194,6 +178,7 @@ impl PciDevice {
     }
 
     #[inline]
+    // Do not use this method to access the NOC.
     pub fn write32(&mut self, addr: u32, data: u32) -> Result<(), PciError> {
         let write_pointer = match &self.pci_bar {
             Some(bar) => unsafe { bar.register_address::<u32>(addr) as usize },
