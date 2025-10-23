@@ -1,10 +1,7 @@
 // SPDX-FileCopyrightText: © 2024 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    tlb::{MemoryType, SpecificTlbInfo, TlbInfo},
-    DeviceTlbInfo, PciDevice, PciError, Tlb,
-};
+use crate::{PciDevice, PciError, Tlb};
 
 use super::Ordering;
 
@@ -300,83 +297,4 @@ pub fn get_tlb(device: &PciDevice, tlb_index: u32) -> Result<Tlb, PciError> {
     };
 
     Ok(output)
-}
-
-pub fn get_specific_tlb_info(device: &PciDevice, tlb_index: u32) -> SpecificTlbInfo {
-    const TLB_CONFIG_BASE: u64 = 0x1FC00000;
-    const TLB_CONFIG_SIZE: u64 = (32 * 3) / 8;
-
-    const TLB_COUNT_2M: u64 = 202;
-    const TLB_COUNT_4G: u64 = 8;
-    const STRIDED_COUNT: u64 = 32;
-
-    const TLB_INDEX_2M: u64 = 0;
-    const TLB_END_2M: u64 = TLB_INDEX_2M + TLB_COUNT_2M - 1;
-    const TLB_INDEX_4G: u64 = TLB_COUNT_2M;
-    const TLB_END_4G: u64 = TLB_INDEX_4G + TLB_COUNT_4G - 1;
-
-    const TLB_BASE_2M: u64 = 0;
-    const TLB_BASE_4G: u64 = TLB_COUNT_2M * (1 << 32);
-
-    let tlb_config_addr = TLB_CONFIG_BASE + (tlb_index as u64 * TLB_CONFIG_SIZE);
-    let (_strided, tlb_data_addr, size) = match tlb_index as u64 {
-        TLB_INDEX_2M..=TLB_END_2M => {
-            let size = 1 << 21;
-
-            (
-                (TLB_INDEX_2M..(TLB_INDEX_2M + STRIDED_COUNT)).contains(&(tlb_index as u64)),
-                TLB_BASE_2M + size * tlb_index as u64,
-                size,
-            )
-        }
-        TLB_INDEX_4G..=TLB_END_4G => {
-            let size = 1 << 32;
-
-            (false, TLB_BASE_4G + size * (tlb_index - 156) as u64, size)
-        }
-        _ => {
-            panic!("TLB index out of range");
-        }
-    };
-
-    let memory_type = device
-        .pci_bar
-        .as_ref()
-        .and_then(|v| {
-            if v.bar0_wc_size > tlb_data_addr {
-                Some(MemoryType::Wc)
-            } else {
-                None
-            }
-        })
-        .unwrap_or(MemoryType::Uc);
-
-    SpecificTlbInfo {
-        config_base: tlb_config_addr,
-        data_base: tlb_data_addr,
-        size,
-        memory_type,
-    }
-}
-
-pub fn tlb_info(device: &PciDevice) -> DeviceTlbInfo {
-    const TLB_COUNT_2M: u64 = 202;
-    const TLB_COUNT_4G: u64 = 8;
-
-    DeviceTlbInfo {
-        device_id: device.id as u32,
-        total_count: 210,
-        tlb_config: vec![
-            TlbInfo {
-                count: TLB_COUNT_2M,
-                size: 1 << 21,
-                memory_type: MemoryType::Uc,
-            },
-            TlbInfo {
-                count: TLB_COUNT_4G,
-                size: 1 << 32,
-                memory_type: MemoryType::Uc,
-            },
-        ],
-    }
 }
