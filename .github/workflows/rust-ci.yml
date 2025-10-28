@@ -249,7 +249,6 @@ jobs:
         run: cargo test --no-fail-fast --workspace --exclude pyluwen
             --features test_hardware --features test_wormhole
             --features test_n150
-            -- --test-threads 1
 
   hardware_test_bh:
     needs: basics
@@ -277,7 +276,6 @@ jobs:
         run: cargo test --no-fail-fast --workspace --exclude pyluwen
             --features test_hardware --features test_blackhole
             --features test_p100a
-            -- --test-threads 1
 
 # Don't upload artifacts yet (since there's no junit file produced)
 #      - name: Archive test results
