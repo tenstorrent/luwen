@@ -1,0 +1,8 @@
+FROM python:alpine
+RUN apk add shadow make python3 rust cargo protoc maturin patchelf \
+  && adduser -D builder
+COPY --chown=builder . /home/builder/luwen
+WORKDIR /home/builder/luwen
+
+USER builder
+RUN make
