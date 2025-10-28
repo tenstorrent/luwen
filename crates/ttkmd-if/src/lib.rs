@@ -747,6 +747,7 @@ pub fn get_version() -> Option<DriverVersion> {
         .ok()
         .map(|version| driver_version_parse(&version))
 }
+
 #[cfg(test)]
 mod test {
     use super::*;

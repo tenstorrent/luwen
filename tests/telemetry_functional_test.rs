@@ -1,5 +1,7 @@
 #![cfg(test)]
 
+use serial_test::serial;
+
 use luwen_if::ChipImpl;
 
 /// Functional tests for chip telemetry
@@ -19,6 +21,7 @@ use luwen_if::ChipImpl;
 /// if hardware is not found, the test will be skipped.
 mod test_utils;
 
+#[serial]
 mod tests {
     use std::sync::Mutex;
 

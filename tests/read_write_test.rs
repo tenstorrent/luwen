@@ -1,5 +1,7 @@
 #![cfg(test)]
 
+use serial_test::serial;
+
 use luwen_if::{chip::ArcMsgOptions, ArcMsg, ArcMsgOk, ChipImpl, TypedArcMsg};
 use ttkmd_if::PciDevice;
 
@@ -19,6 +21,7 @@ use ttkmd_if::PciDevice;
 ///
 /// The tests will automatically detect if compatible hardware is present;
 /// if hardware is not found, the test will be skipped.
+#[serial]
 mod tests {
     use luwen_if::chip::HlComms;
     use luwen_ref::detect_chips_fallible;
