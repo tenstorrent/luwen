@@ -10,10 +10,10 @@ rust-version = "1.75.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-luwen-core = { path = "crates/luwen-core", version = "0.2.0" }
-luwen-if = { path = "crates/luwen-if", version = "0.7.8" }
-luwen-ref = { path = "crates/luwen-ref", version = "0.7.8" }
-ttkmd-if = { path = "crates/ttkmd-if", version = "0.2.1" }
+luwen-core = { workspace = true }
+luwen-if = { workspace = true }
+luwen-ref = { workspace = true }
+ttkmd-if = { workspace = true }
 
 serde = { "version" = "1.0.164", features = ["derive"] }
 serde_yaml = "0.9.22"
@@ -45,3 +45,10 @@ test_p300 = []
 
 [workspace]
 members = ["crates/*", "app/*"]
+
+[workspace.dependencies]
+luwen-core = { path = "crates/luwen-core", version = "0.2.0" }
+luwen-if = { path = "crates/luwen-if", version = "0.7.8" }
+luwen-ref = { path = "crates/luwen-ref", version = "0.7.8" }
+thiserror = "1.0.40"
+ttkmd-if = { path = "crates/ttkmd-if", version = "0.2.1" }

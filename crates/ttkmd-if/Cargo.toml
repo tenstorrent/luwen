@@ -6,13 +6,13 @@ edition = "2021"
 license = "Apache-2.0"
 
 [dependencies]
-luwen-core = {path = "../luwen-core", version = "0.2.0"}
+luwen-core = { workspace = true }
 
 nix = "0.26.2"
 memmap2 = "0.7.0"
 bitfield-struct = "0.6.0"
 
-thiserror = "1.0.40"
+thiserror = { workspace = true }
 tracing = "0.1.40"
 
 [features]
