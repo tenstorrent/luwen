@@ -8,7 +8,7 @@ Named after Antonie van Leeuwenhoek who invented the microsope.
 
 ## Prometheus Exporter
 
-Luwen includes a Prometheus exporter for hardware telemetry (see [`app/prometheus-exporter/`](app/prometheus-exporter/)).
+Luwen includes a Prometheus exporter for hardware telemetry (see [`apps/prometheus-exporter/`](apps/prometheus-exporter/)).
 
 To start it:
 
