@@ -44,7 +44,10 @@ test_p150 = []
 test_p300 = []
 
 [workspace]
-members = ["crates/*", "app/*"]
+members = [
+  "apps/*",
+  "crates/*",
+]
 
 [workspace.dependencies]
 thiserror = "1.0.40"
