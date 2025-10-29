@@ -17,8 +17,8 @@ assets = [
 crate-type = ["cdylib"]
 
 [dependencies]
-luwen-core = {path = "../luwen-core", version = "0.2.0"}
-luwen-if = {path = "../luwen-if", version = "0.7.8" }
+luwen-core = { workspace = true }
+luwen-if = { workspace = true }
 
 [build-dependencies]
 cbindgen = ">= 0.25.0"

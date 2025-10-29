@@ -6,7 +6,7 @@ edition = "2021"
 license = "Apache-2.0"
 
 [dependencies]
-thiserror = "1.0.40"
+thiserror = { workspace = true }
 
 [package.metadata.workspaces]
 independent = true
