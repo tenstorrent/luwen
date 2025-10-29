@@ -1,6 +1,6 @@
 .PHONY: whl
 justbuild:
-	$(MAKE) -C crates/pyluwen whl
+	$(MAKE) -C bind/pyluwen whl
 
 whl: justbuild
 ifndef DEST_DIR
@@ -13,7 +13,7 @@ dev-whl:
 ifndef DEST_DIR
 	$(error DEST_DIR is undefined)
 endif
-	$(MAKE) -C crates/pyluwen dev-whl
+	$(MAKE) -C bind/pyluwen dev-whl
 	ls target/wheels/pyluwen*.whl | xargs -I {} cp {} $(DEST_DIR)
 
 .PHONY: syseng-release
@@ -45,7 +45,7 @@ deb:
 
 .PHONY: rpm
 rpm:
-	$(MAKE) -C crates/luwencpp rpm
+	$(MAKE) -C bind/luwencpp rpm
 
 .PHONY: upload-ci-docker
 upload-ci-docker:
@@ -60,4 +60,4 @@ clean:
 
 .PHONY: pyluwen-pyi
 pyluwen-pyi:
-	$(MAKE) -C crates/pyluwen build-pyi
+	$(MAKE) -C bind/pyluwen build-pyi

@@ -177,7 +177,7 @@ This is Testing and Debug binaries associated with Luwen
 %{cargo_license} > LICENSE.dependencies
 
 # build pyluwen
-cd crates/pyluwen
+cd bind/pyluwen
 CFLAGS="${CFLAGS:-${RPM_OPT_FLAGS}}" \
 LDFLAGS="${LDFLAGS:-${RPM_LD_FLAGS}}" \
 maturin build --release %{?py_setup_args} %{?*}
@@ -193,7 +193,7 @@ maturin build --release %{?py_setup_args} %{?*}
 #
 (
 	# this is all cribbed from py3_install macro
-	cd crates/pyluwen
+	cd bind/pyluwen
 	/usr/bin/pip install . --root %{buildroot} --prefix %{_prefix}
 	rm -rfv %{buildroot}%{_bindir}/__pycache__
 )
