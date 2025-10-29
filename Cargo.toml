@@ -46,6 +46,7 @@ test_p300 = []
 [workspace]
 members = [
   "apps/*",
+  "bind/*",
   "crates/*",
 ]
 
