@@ -1,5 +1,5 @@
 use clap::ValueEnum;
-use luwen_if::chip::{HlComms, Wormhole};
+use luwen::api::chip::{HlComms, Wormhole};
 
 #[derive(Debug, Clone, ValueEnum)]
 pub enum EthHangMethod {

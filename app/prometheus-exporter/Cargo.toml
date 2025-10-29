@@ -6,12 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-luwen-core = { workspace = true }
-luwen-if = { workspace = true }
-luwen-ref = { workspace = true }
 clap = { version = "4.4.6", features = ["derive"] }
-prometheus_exporter = "0.8.5"
+luwen = { workspace = true }
 prometheus = { version = "0.13.3", features = ["process"] }
+prometheus_exporter = "0.8.5"
 
 [package.metadata.workspaces]
 independent = true

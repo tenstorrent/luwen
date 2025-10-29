@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use luwen_if::ChipImpl;
+use luwen::api::ChipImpl;
 
 mod blackhole;
 mod wormhole;
@@ -23,15 +23,15 @@ fn link_reset(interface: usize) -> bool {
         return false;
     };
 
-    let mut reset_device = ttkmd_if::ioctl::ResetDevice {
-        input: ttkmd_if::ioctl::ResetDeviceIn {
-            flags: ttkmd_if::ioctl::RESET_DEVICE_RESET_PCIE_LINK,
+    let mut reset_device = luwen::kmd::ioctl::ResetDevice {
+        input: luwen::kmd::ioctl::ResetDeviceIn {
+            flags: luwen::kmd::ioctl::RESET_DEVICE_RESET_PCIE_LINK,
             ..Default::default()
         },
         ..Default::default()
     };
     if unsafe {
-        ttkmd_if::ioctl::reset_device(std::os::fd::AsRawFd::as_raw_fd(&fd), &mut reset_device)
+        luwen::kmd::ioctl::reset_device(std::os::fd::AsRawFd::as_raw_fd(&fd), &mut reset_device)
     }
     .is_err()
     {
@@ -44,18 +44,18 @@ fn link_reset(interface: usize) -> bool {
 fn main() {
     let mut trackers = Vec::new();
     // The interfaces that we expect to be restored post reset...
-    let interfaces = luwen_ref::PciDevice::scan();
+    let interfaces = luwen::pcie::PciDevice::scan();
     println!("Found {} chips to reset", interfaces.len());
     for interface in interfaces.iter().copied() {
         // Just try to reset the link... if it fails then we should still try stuff
         link_reset(interface);
-        if let Ok(device) = ttkmd_if::PciDevice::open(interface) {
+        if let Ok(device) = luwen::kmd::PciDevice::open(interface) {
             let tracker = match device.arch {
-                luwen_core::Arch::Grayskull => continue,
-                luwen_core::Arch::Wormhole => {
+                luwen::core::Arch::Grayskull => continue,
+                luwen::core::Arch::Wormhole => {
                     Box::new(wormhole::ResetTracker::init(interface)) as Box<dyn Reset>
                 }
-                luwen_core::Arch::Blackhole => {
+                luwen::core::Arch::Blackhole => {
                     Box::new(blackhole::ResetTracker::init(interface)) as Box<dyn Reset>
                 }
             };
@@ -97,11 +97,11 @@ fn main() {
 
     let mut reinit_interfaces = HashSet::new();
 
-    let chips = luwen_ref::detect_chips_fallible().unwrap();
+    let chips = luwen::pcie::detect_chips_fallible().unwrap();
     for chip in chips {
         let chip = chip
             .init(&mut |_| Ok::<(), std::convert::Infallible>(()))
-            .map_err(Into::<luwen_if::error::PlatformError>::into)
+            .map_err(Into::<luwen::api::error::PlatformError>::into)
             .unwrap();
         if let Ok(Some(info)) = chip.get_device_info() {
             reinit_interfaces.insert(info.interface_id as usize);

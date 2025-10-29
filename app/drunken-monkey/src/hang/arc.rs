@@ -1,6 +1,6 @@
 use clap::ValueEnum;
 
-use luwen_if::{
+use luwen::api::{
     chip::{ArcMsgOptions, Chip, HlCommsInterface},
     ArcState, ChipImpl, TypedArcMsg,
 };
