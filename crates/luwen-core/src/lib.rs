@@ -4,27 +4,38 @@
 use std::fmt;
 use std::str::FromStr;
 
+/// Architecture generation.
+///
+/// Model specifier for a Tenstorrent architecture generation.
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Arch {
+    /// Grayskull.
+    ///
+    /// # Note
+    ///
+    /// This is a legacy architecture that is no longer supported. None of the
+    /// provided APIs guarantee support for Grayskull, and may only work
+    /// incidentally.
     Grayskull,
+    /// Wormhole.
     #[default]
     Wormhole,
+    /// Blackhole.
     Blackhole,
 }
 
 impl Arch {
+    /// Checks if the architecture is [`Arch::Grayskull`].
     pub fn is_grayskull(&self) -> bool {
         matches!(self, Arch::Grayskull)
     }
 
+    /// Checks if the architecture is [`Arch::Wormhole`].
     pub fn is_wormhole(&self) -> bool {
         matches!(self, Arch::Wormhole)
     }
 
-    pub fn is_grayskull(&self) -> bool {
-        matches!(self, Arch::Grayskull)
-    }
-
+    /// Checks if the architecture is [`Arch::Blackhole`].
     pub fn is_blackhole(&self) -> bool {
         matches!(self, Arch::Blackhole)
     }
