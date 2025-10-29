@@ -4,10 +4,8 @@ version = "0.7.10"
 edition = "2021"
 
 [dependencies]
-clap = {version = "4.4.14", features = ["derive"]}
-
-luwen-if = { workspace = true }
-luwen-ref = { workspace = true }
+clap = { version = "4.4.14", features = ["derive"] }
+luwen = { workspace = true }
 
 [package.metadata.workspaces]
 independent = true

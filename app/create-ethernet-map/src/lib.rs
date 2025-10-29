@@ -3,12 +3,12 @@
 
 use std::collections::{HashMap, HashSet};
 
-use luwen_core::Arch;
-use luwen_if::{
+use luwen::api::{
     chip::{ArcMsgOptions, HlComms, NeighbouringChip},
     ChipImpl, EthAddr,
 };
-use luwen_ref::error::LuwenError;
+use luwen::core::Arch;
+use luwen::{Error, Result};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct ChipIdent {
@@ -25,13 +25,13 @@ pub struct ChipData {
     pub boardtype: Option<String>,
 }
 
-pub fn generate_map(file: impl AsRef<str>) -> Result<(), LuwenError> {
+pub fn generate_map(file: impl AsRef<str>) -> Result<()> {
     let mut chips = HashMap::new();
     let mut chip_data = HashMap::new();
     let mut mmio_chips = Vec::new();
     let mut connection_map = HashMap::new();
 
-    for chip in luwen_ref::detect_chips()? {
+    for chip in luwen::pcie::detect_chips()? {
         let telemetry = chip.get_telemetry()?;
 
         let (ident, data) = if let Some(wh) = chip.as_wh() {
@@ -43,13 +43,13 @@ pub fn generate_map(file: impl AsRef<str>) -> Result<(), LuwenError> {
 
             let result = wh
                 .arc_msg(ArcMsgOptions {
-                    msg: luwen_if::ArcMsg::Typed(luwen_if::TypedArcMsg::GetHarvesting),
+                    msg: luwen::api::ArcMsg::Typed(luwen::api::TypedArcMsg::GetHarvesting),
                     ..Default::default()
                 })
                 .unwrap();
             let harvest_mask = match result {
-                luwen_if::ArcMsgOk::Ok { rc: _, arg } => arg,
-                luwen_if::ArcMsgOk::OkNoWait => unreachable!(),
+                luwen::api::ArcMsgOk::Ok { rc: _, arg } => arg,
+                luwen::api::ArcMsgOk::OkNoWait => unreachable!(),
             };
 
             let ident = ChipIdent {
@@ -118,13 +118,13 @@ pub fn generate_map(file: impl AsRef<str>) -> Result<(), LuwenError> {
         } else if let Some(gs) = chip.as_gs() {
             let result = gs
                 .arc_msg(ArcMsgOptions {
-                    msg: luwen_if::ArcMsg::Typed(luwen_if::TypedArcMsg::GetHarvesting),
+                    msg: luwen::api::ArcMsg::Typed(luwen::api::TypedArcMsg::GetHarvesting),
                     ..Default::default()
                 })
                 .unwrap();
             let harvest_mask = match result {
-                luwen_if::ArcMsgOk::Ok { arg, .. } => arg,
-                luwen_if::ArcMsgOk::OkNoWait => unreachable!(),
+                luwen::api::ArcMsgOk::Ok { arg, .. } => arg,
+                luwen::api::ArcMsgOk::OkNoWait => unreachable!(),
             };
 
             let ident = ChipIdent {
@@ -269,7 +269,7 @@ pub fn generate_map(file: impl AsRef<str>) -> Result<(), LuwenError> {
     let file = file.as_ref();
 
     if let Err(_err) = std::fs::write(file, output) {
-        Err(LuwenError::Custom(format!("Failed to write to {file}")))
+        Err(Error::Custom(format!("Failed to write to {file}")))
     } else {
         Ok(())
     }

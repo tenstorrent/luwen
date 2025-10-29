@@ -18,8 +18,8 @@ Limitations:
 */
 
 use clap::Parser;
-use luwen_if::chip::Telemetry;
-use luwen_if::{ChipImpl, DeviceInfo};
+use luwen::api::chip::Telemetry;
+use luwen::api::{ChipImpl, DeviceInfo};
 use prometheus::{register_gauge_vec, GaugeVec, Opts};
 use std::thread;
 use std::time::Duration;
@@ -247,7 +247,7 @@ impl Metrics {
 fn main() {
     let args = CommandLineArguments::parse();
     let interval_ms = args.interval;
-    let chips = luwen_ref::detect_chips().unwrap();
+    let chips = luwen::pcie::detect_chips().unwrap();
 
     let worker = thread::spawn(move || {
         let metrics = Metrics::new();

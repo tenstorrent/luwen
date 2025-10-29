@@ -1,5 +1,5 @@
 use clap::ValueEnum;
-use luwen_if::chip::{Chip, HlComms};
+use luwen::api::chip::{Chip, HlComms};
 
 #[derive(Debug, Clone, ValueEnum)]
 pub enum NocHangMethod {

@@ -10,7 +10,7 @@ pub struct ResetTracker {
 
 impl ResetTracker {
     pub fn init(interface: usize) -> Self {
-        let device = ttkmd_if::PciDevice::open(interface).unwrap();
+        let device = luwen::kmd::PciDevice::open(interface).unwrap();
 
         let info = &device.physical;
         Self {
@@ -31,15 +31,15 @@ impl Reset for ResetTracker {
             .write(true)
             .open(format!("/dev/tenstorrent/{}", self.interface))
             .unwrap();
-        let mut reset_device = ttkmd_if::ioctl::ResetDevice {
-            input: ttkmd_if::ioctl::ResetDeviceIn {
-                flags: ttkmd_if::ioctl::RESET_DEVICE_RESET_CONFIG_WRITE,
+        let mut reset_device = luwen::kmd::ioctl::ResetDevice {
+            input: luwen::kmd::ioctl::ResetDeviceIn {
+                flags: luwen::kmd::ioctl::RESET_DEVICE_RESET_CONFIG_WRITE,
                 ..Default::default()
             },
             ..Default::default()
         };
         unsafe {
-            ttkmd_if::ioctl::reset_device(std::os::fd::AsRawFd::as_raw_fd(&fd), &mut reset_device)
+            luwen::kmd::ioctl::reset_device(std::os::fd::AsRawFd::as_raw_fd(&fd), &mut reset_device)
         }
         .unwrap();
 
@@ -75,15 +75,15 @@ impl Reset for ResetTracker {
             .write(true)
             .open(format!("/dev/tenstorrent/{}", self.interface))
             .unwrap();
-        let mut reset_device = ttkmd_if::ioctl::ResetDevice {
-            input: ttkmd_if::ioctl::ResetDeviceIn {
-                flags: ttkmd_if::ioctl::RESET_DEVICE_RESTORE_STATE,
+        let mut reset_device = luwen::kmd::ioctl::ResetDevice {
+            input: luwen::kmd::ioctl::ResetDeviceIn {
+                flags: luwen::kmd::ioctl::RESET_DEVICE_RESTORE_STATE,
                 ..Default::default()
             },
             ..Default::default()
         };
         unsafe {
-            ttkmd_if::ioctl::reset_device(std::os::fd::AsRawFd::as_raw_fd(&fd), &mut reset_device)
+            luwen::kmd::ioctl::reset_device(std::os::fd::AsRawFd::as_raw_fd(&fd), &mut reset_device)
         }
         .unwrap();
 

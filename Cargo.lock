@@ -191,12 +191,9 @@ name = "check_harvesting"
 version = "0.7.10"
 dependencies = [
  "clap",
- "luwen-core",
- "luwen-if",
- "luwen-ref",
+ "luwen",
  "prometheus",
  "prometheus_exporter",
- "ttkmd-if",
 ]
 
 [[package]]
@@ -278,9 +275,7 @@ name = "create-ethernet-map"
 version = "0.7.10"
 dependencies = [
  "clap",
- "luwen-core",
- "luwen-if",
- "luwen-ref",
+ "luwen",
  "prometheus",
  "prometheus_exporter",
 ]
@@ -351,8 +346,7 @@ name = "drunken-monkey"
 version = "0.7.10"
 dependencies = [
  "clap",
- "luwen-if",
- "luwen-ref",
+ "luwen",
 ]
 
 [[package]]
@@ -1111,9 +1105,7 @@ name = "prometheus-exporter"
 version = "0.7.10"
 dependencies = [
  "clap",
- "luwen-core",
- "luwen-if",
- "luwen-ref",
+ "luwen",
  "prometheus",
  "prometheus_exporter",
 ]
@@ -1362,12 +1354,9 @@ name = "reset"
 version = "0.7.10"
 dependencies = [
  "clap",
- "luwen-core",
- "luwen-if",
- "luwen-ref",
+ "luwen",
  "prometheus",
  "prometheus_exporter",
- "ttkmd-if",
 ]
 
 [[package]]

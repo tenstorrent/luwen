@@ -5,7 +5,7 @@ mod clap;
 fn main() {
     let args = <clap::CliOptions as ::clap::Parser>::parse();
 
-    let chips = luwen_ref::detect_chips().unwrap();
+    let chips = luwen::pcie::detect_chips().unwrap();
 
     match args.ty {
         clap::HangType::Arc { method } => {
@@ -37,7 +37,7 @@ mod test {
     };
 
     fn arc_hang(method: ArcHangMethod) {
-        let chips = luwen_ref::detect_chips().unwrap();
+        let chips = luwen::pcie::detect_chips().unwrap();
 
         let mut expected_chip_count = 0;
         for chip in chips {
@@ -51,7 +51,7 @@ mod test {
             hang_arc(method.clone(), chip).unwrap();
         }
 
-        let chips = luwen_ref::detect_chips_fallible().unwrap();
+        let chips = luwen::pcie::detect_chips_fallible().unwrap();
 
         assert_eq!(
             chips.len(),
@@ -90,7 +90,7 @@ mod test {
     }
 
     fn noc_hang(method: NocHangMethod) {
-        let chips = luwen_ref::detect_chips().unwrap();
+        let chips = luwen::pcie::detect_chips().unwrap();
 
         let mut expected_chip_count = 0;
         for chip in chips {
@@ -104,7 +104,7 @@ mod test {
             hang_noc(method.clone(), chip).unwrap();
         }
 
-        let chips = luwen_ref::detect_chips_fallible().unwrap();
+        let chips = luwen::pcie::detect_chips_fallible().unwrap();
 
         assert_eq!(
             chips.len(),
@@ -137,7 +137,7 @@ mod test {
     }
 
     fn eth_hang(method: EthHangMethod) {
-        let chips = luwen_ref::detect_chips().unwrap();
+        let chips = luwen::pcie::detect_chips().unwrap();
 
         let mut expected_chip_count = 0;
         for chip in chips {
@@ -149,7 +149,7 @@ mod test {
             }
         }
 
-        let chips = luwen_ref::detect_chips_fallible().unwrap();
+        let chips = luwen::pcie::detect_chips_fallible().unwrap();
 
         assert_eq!(
             chips.len(),
