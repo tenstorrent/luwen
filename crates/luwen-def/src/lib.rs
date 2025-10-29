@@ -16,6 +16,7 @@ pub enum Arch {
     /// This is a legacy architecture that is no longer supported. None of the
     /// provided APIs guarantee support for Grayskull, and may only work
     /// incidentally.
+    #[deprecated]
     Grayskull,
     /// Wormhole.
     #[default]
@@ -26,6 +27,8 @@ pub enum Arch {
 
 impl Arch {
     /// Checks if the architecture is [`Arch::Grayskull`].
+    #[deprecated]
+    #[expect(deprecated)]
     pub fn is_grayskull(&self) -> bool {
         matches!(self, Arch::Grayskull)
     }
@@ -46,6 +49,7 @@ impl FromStr for Arch {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
+            #[expect(deprecated)]
             "grayskull" => Ok(Arch::Grayskull),
             "wormhole" => Ok(Arch::Wormhole),
             "blackhole" => Ok(Arch::Blackhole),
