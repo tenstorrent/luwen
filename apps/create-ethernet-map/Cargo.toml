@@ -14,5 +14,3 @@ crate-type = ["staticlib", "rlib"]
 [dependencies]
 clap = { workspace = true }
 luwen = { workspace = true }
-prometheus = { workspace = true }
-prometheus_exporter = { workspace = true }

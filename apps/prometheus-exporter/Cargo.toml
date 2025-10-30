@@ -11,5 +11,5 @@ independent = true
 [dependencies]
 clap = { workspace = true }
 luwen = { workspace = true }
-prometheus = { workspace = true }
-prometheus_exporter = { workspace = true }
+prometheus = { version = "0.13.3", features = ["process"] }
+prometheus_exporter = "0.8.5"

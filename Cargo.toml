@@ -18,7 +18,6 @@ independent = true
 
 [dependencies]
 bincode = { workspace = true }
-clap = { workspace = true }
 luwen-api = { workspace = true }
 luwen-def = { workspace = true }
 luwen-kmd = { workspace = true }
@@ -72,8 +71,6 @@ luwen-api = { path = "crates/luwen-api", version = "0.7.8" }
 luwen-def = { path = "crates/luwen-def", version = "0.2.0" }
 luwen-kmd = { path = "crates/luwen-kmd", version = "0.2.1" }
 luwen-pci = { path = "crates/luwen-pci", version = "0.7.8" }
-prometheus = { version = "0.13.3", features = ["process"] }
-prometheus_exporter = "0.8.5"
 serde = { "version" = "1.0.185", features = ["derive"] }
 thiserror = "1.0.40"
 tracing = "0.1.40"

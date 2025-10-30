@@ -22,4 +22,3 @@ luwen-api = { workspace = true }
 luwen-def = { workspace = true }
 luwen-kmd = { workspace = true }
 thiserror = { workspace = true }
-tracing = { workspace = true }
