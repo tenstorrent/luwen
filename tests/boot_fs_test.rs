@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use luwen_ref::detect_chips;
+use luwen_pcie::detect_chips;
 
 /// Test reading boot fs tables from Blackhole chips
 ///

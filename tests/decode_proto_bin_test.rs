@@ -1,5 +1,5 @@
 #![cfg(test)]
-use luwen_ref::detect_chips;
+use luwen_pcie::detect_chips;
 
 /// Test utilities for verifying boot filesystem protobuf decoding
 ///

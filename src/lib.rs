@@ -4,7 +4,7 @@ pub use luwen_core as core;
 
 /// PCIe communication.
 #[doc(inline)]
-pub use luwen_ref as pcie;
+pub use luwen_pcie as pcie;
 
 /// Generalized driver API.
 ///
