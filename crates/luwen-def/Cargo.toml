@@ -1,7 +1,9 @@
 [package]
 name = "luwen-def"
 version = "0.2.1"
-description = "Common dependencies shared by all crates based on luwen"
+description = """
+Common definitions for luwen
+"""
 edition = "2021"
 license = "Apache-2.0"
 
