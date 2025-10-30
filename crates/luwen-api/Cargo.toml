@@ -1,5 +1,5 @@
 [package]
-name = "luwen-if"
+name = "luwen-api"
 version = "0.7.12"
 description = "Generic interface to Tenstorrent ai accelerators, abstracting the details of communication"
 edition = "2021"

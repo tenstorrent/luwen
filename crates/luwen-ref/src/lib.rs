@@ -7,8 +7,8 @@ use std::{
 };
 
 use error::LuwenError;
+use luwen_api::{FnDriver, FnOptions};
 use luwen_core::Arch;
-use luwen_if::{FnDriver, FnOptions};
 use ttkmd_if::{PciError, PossibleTlbAllocation};
 
 mod detect;
@@ -140,7 +140,7 @@ pub fn comms_callback_inner(
                 let borrow = ud.borrow();
                 if !info.is_null() {
                     unsafe {
-                        *info = Some(luwen_if::DeviceInfo {
+                        *info = Some(luwen_api::DeviceInfo {
                             bus: borrow.device.physical.pci_bus,
                             slot: borrow.device.physical.slot,
                             function: borrow.device.physical.pci_function,
@@ -158,7 +158,7 @@ pub fn comms_callback_inner(
             }
         },
         FnOptions::Axi(op) => match op {
-            luwen_if::FnAxi::Read { addr, data, len } => {
+            luwen_api::FnAxi::Read { addr, data, len } => {
                 if len > 0 {
                     if len <= 4 {
                         let output = ud.borrow_mut().device.read32(addr)?;
@@ -176,7 +176,7 @@ pub fn comms_callback_inner(
                     }
                 }
             }
-            luwen_if::FnAxi::Write { addr, data, len } => {
+            luwen_api::FnAxi::Write { addr, data, len } => {
                 if len > 0 {
                     // Assuming here that u32 is our fundamental unit of transfer
                     if len <= 4 {
@@ -208,7 +208,7 @@ pub fn comms_callback_inner(
             }
         },
         FnOptions::Noc(op) => match op {
-            luwen_if::FnNoc::Read {
+            luwen_api::FnNoc::Read {
                 noc_id,
                 x,
                 y,
@@ -232,7 +232,7 @@ pub fn comms_callback_inner(
                     unsafe { std::slice::from_raw_parts_mut(data, len as usize) },
                 )?;
             }
-            luwen_if::FnNoc::Write {
+            luwen_api::FnNoc::Write {
                 noc_id,
                 x,
                 y,
@@ -256,7 +256,7 @@ pub fn comms_callback_inner(
                     unsafe { std::slice::from_raw_parts(data, len as usize) },
                 )?;
             }
-            luwen_if::FnNoc::Broadcast {
+            luwen_api::FnNoc::Broadcast {
                 noc_id,
                 addr,
                 data,
@@ -286,7 +286,7 @@ pub fn comms_callback_inner(
                     unsafe { std::slice::from_raw_parts(data, len as usize) },
                 )?;
             }
-            luwen_if::FnNoc::Multicast {
+            luwen_api::FnNoc::Multicast {
                 noc_id,
                 start_x,
                 start_y,
@@ -324,7 +324,7 @@ pub fn comms_callback_inner(
             }
         },
         FnOptions::Eth(op) => match op.rw {
-            luwen_if::FnNoc::Read {
+            luwen_api::FnNoc::Read {
                 noc_id,
                 x,
                 y,
@@ -433,7 +433,7 @@ pub fn comms_callback_inner(
                     )?;
                 }
             }
-            luwen_if::FnNoc::Write {
+            luwen_api::FnNoc::Write {
                 noc_id,
                 x,
                 y,
@@ -543,7 +543,7 @@ pub fn comms_callback_inner(
                     )?;
                 }
             }
-            luwen_if::FnNoc::Broadcast {
+            luwen_api::FnNoc::Broadcast {
                 noc_id,
                 addr,
                 data,
@@ -551,7 +551,7 @@ pub fn comms_callback_inner(
             } => {
                 todo!("Tried to do an ethernet broadcast which is not supported, noc_id: {}, addr: {:#x}, data: {:p}, len: {:x}", noc_id, addr, data, len);
             }
-            luwen_if::FnNoc::Multicast {
+            luwen_api::FnNoc::Multicast {
                 noc_id,
                 start_x,
                 start_y,
@@ -569,13 +569,13 @@ pub fn comms_callback_inner(
     Ok(())
 }
 
-pub fn open(interface_id: usize) -> Result<luwen_if::chip::Chip, LuwenError> {
+pub fn open(interface_id: usize) -> Result<luwen_api::chip::Chip, LuwenError> {
     let ud = ExtendedPciDevice::open(interface_id)?;
 
     let arch = ud.borrow().device.arch;
 
-    Ok(luwen_if::chip::Chip::open(
+    Ok(luwen_api::chip::Chip::open(
         arch,
-        luwen_if::CallbackStorage::new(comms_callback, ud.clone()),
+        luwen_api::CallbackStorage::new(comms_callback, ud.clone()),
     )?)
 }

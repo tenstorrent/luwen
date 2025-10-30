@@ -742,8 +742,8 @@ version = "0.7.10"
 dependencies = [
  "cbindgen",
  "cc",
+ "luwen-api",
  "luwen-core",
- "luwen-if",
  "tempfile",
 ]
 
@@ -797,8 +797,8 @@ version = "0.7.14"
 dependencies = [
  "bincode",
  "clap",
+ "luwen-api",
  "luwen-core",
- "luwen-if",
  "luwen-ref",
  "nom",
  "rand",
@@ -810,14 +810,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "luwen-core"
-version = "0.2.1"
-dependencies = [
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "luwen-if"
+name = "luwen-api"
 version = "0.7.12"
 dependencies = [
  "bincode",
@@ -838,12 +831,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "luwen-core"
+version = "0.2.1"
+dependencies = [
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "luwen-ref"
 version = "0.7.11"
 dependencies = [
  "indicatif",
+ "luwen-api",
  "luwen-core",
- "luwen-if",
  "thiserror 1.0.69",
  "tracing",
  "ttkmd-if",
@@ -1193,8 +1193,8 @@ checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
 name = "pyluwen"
 version = "0.7.12"
 dependencies = [
+ "luwen-api",
  "luwen-core",
- "luwen-if",
  "luwen-ref",
  "pyo3",
  "serde_json",

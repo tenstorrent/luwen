@@ -2,7 +2,7 @@
 #% bcond_with check
 
 %global crate luwen
-%global path_luwen_if %{cargo_registry}/luwen-if-%{version_no_tilde}
+%global path_luwen_api %{cargo_registry}/luwen-api-%{version_no_tilde}
 %global path_luwen_ref %{cargo_registry}/luwen-ref-%{version_no_tilde}
 %global path_ttkmd_if %{cargo_registry}/ttkmd-if-%{version_no_tilde}
 
@@ -83,19 +83,19 @@ License:        Apache-2.0
 %{_bindir}/spi-test
 
 ############################
-# rust-luwen-if
+# rust-luwen-api
 ############################
 
-%package     -n rust-luwen-if-devel
+%package     -n rust-luwen-api-devel
 Summary:        Python bindings for the Tenstorrent Luwen library
 
-%description -n rust-luwen-if-devel
+%description -n rust-luwen-api-devel
 
 This package contains library source intended for building other packages which
 use the "internal_metrics" feature of the "%{crate}" crate.
 
-%files       -n rust-luwen-if-devel
-%{cargo_registry}/luwen-if-%{version_no_tilde}
+%files       -n rust-luwen-api-devel
+%{cargo_registry}/luwen-api-%{version_no_tilde}
 
 ############################
 # rust-luwen-ref
@@ -200,26 +200,26 @@ maturin build --release %{?py_setup_args} %{?*}
 
 mkdir -p %{buildroot}%{cargo_registry}
 
-%{__cp} -av crates/luwen-if %{buildroot}%{path_luwen_if}
+%{__cp} -av crates/luwen-api %{buildroot}%{path_luwen_api}
 # Modify the existing Cargo.toml to remove the path for luwen-core as we are moving it out to it's own place on the system
 tomcli \
 	set \
-	%{buildroot}%{path_luwen_if}/Cargo.toml \
+	%{buildroot}%{path_luwen_api}/Cargo.toml \
 	str \
 	dependencies.luwen-core \
 	"$( \
 		tomcli \
 		get \
-		%{buildroot}%{path_luwen_if}/Cargo.toml \
+		%{buildroot}%{path_luwen_api}/Cargo.toml \
 		dependencies.luwen-core.version \
 	)"
-echo "--- luwen-if Cargo.toml ---"
-cat %{buildroot}%{path_luwen_if}/Cargo.toml
-echo "--- /luwen-if Cargo.toml ---"
+echo "--- luwen-api Cargo.toml ---"
+cat %{buildroot}%{path_luwen_api}/Cargo.toml
+echo "--- /luwen-api Cargo.toml ---"
 %{__cp} -av crates/luwen-ref %{buildroot}%{path_luwen_ref}
 # Modify the existing Cargo.toml to remove the path for luwen-core as we are moving it out to it's own place on the system
 
-for x in luwen-core luwen-if ttkmd-if
+for x in luwen-core luwen-api ttkmd-if
 do
 	tomcli \
 		set \

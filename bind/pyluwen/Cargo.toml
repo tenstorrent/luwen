@@ -21,7 +21,7 @@ crate-type = ["cdylib"]
 [dependencies]
 ttkmd-if = { workspace = true }
 luwen-core = { workspace = true }
-luwen-if = { workspace = true }
+luwen-api = { workspace = true }
 luwen-ref = { workspace = true }
 serde_json = "1.0.117"
 
