@@ -1,21 +1,25 @@
 [package]
 name = "luwen-pci"
 version = "0.7.11"
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
 description = """
 PCIe communication implementation
 """
-edition = "2021"
-license = "Apache-2.0"
+readme = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
-[dependencies]
-luwen-kmd = { workspace = true }
-luwen-api = { workspace = true }
-luwen-def = { workspace = true }
-
-thiserror = { workspace = true }
-
-indicatif = "0.17.7"
-tracing = "0.1.40"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [package.metadata.workspaces]
 independent = true
+
+[dependencies]
+indicatif = "0.17.7"
+luwen-api = { workspace = true }
+luwen-def = { workspace = true }
+luwen-kmd = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

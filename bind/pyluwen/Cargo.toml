@@ -1,38 +1,39 @@
 [package]
 name = "pyluwen"
 version = "0.7.12"
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
 description = """
 Python bindings for luwen
 """
-edition = "2021"
-license = "Apache-2.0"
-readme = "../../README.md"
-authors = []
+readme = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 keywords = [
-	"Tenstorrent",
-	"Grayskull",
-	"Wormhole",
-	"Blackhole",
-	"hardware"
+  "Tenstorrent",
+  "Grayskull",
+  "Wormhole",
+  "Blackhole",
 ]
 
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package.metadata.workspaces]
+independent = true
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
-luwen-kmd = { workspace = true }
-luwen-def = { workspace = true }
 luwen-api = { workspace = true }
+luwen-def = { workspace = true }
+luwen-kmd = { workspace = true }
 luwen-pci = { workspace = true }
-serde_json = "1.0.117"
-
 pyo3 = { version = "0.19.2", features = ["extension-module", "multiple-pymethods"] }
+serde_json = "1.0.117"
 
 [features]
 default = []
 # Feature for building with abi3 compatibility for Python 3.11+
 abi3-py311 = ["pyo3/abi3-py311"]
-
-[package.metadata.workspaces]
-independent = true

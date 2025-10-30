@@ -1,25 +1,29 @@
 [package]
 name = "luwen-kmd"
 version = "0.2.4"
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
 description = """
 Low-level PCIe interface to the Tenstorrent kernel-mode driver (KMD)
 """
-edition = "2021"
-license = "Apache-2.0"
+readme = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package.metadata.workspaces]
+independent = true
 
 [dependencies]
+bitfield-struct = { workspace = true }
 luwen-def = { workspace = true }
-
-nix = "0.26.2"
 memmap2 = "0.7.0"
-bitfield-struct = "0.6.0"
-
+nix = "0.26.2"
 thiserror = { workspace = true }
-tracing = "0.1.40"
+tracing = { workspace = true }
 
 [features]
 test_hardware = []
 test_grayskull = []
-
-[package.metadata.workspaces]
-independent = true
