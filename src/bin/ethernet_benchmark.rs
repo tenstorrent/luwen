@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use luwen_api::{chip::HlComms, CallbackStorage, ChipImpl};
-use luwen_ref::error::LuwenError;
+use luwen_pci::error::LuwenError;
 use rand::Rng;
 
 fn read_write_test(
@@ -19,10 +19,10 @@ fn read_write_test(
             .comms_obj()
             .1
             .as_any()
-            .downcast_ref::<CallbackStorage<luwen_ref::ExtendedPciDeviceWrapper>>()
+            .downcast_ref::<CallbackStorage<luwen_pci::ExtendedPciDeviceWrapper>>()
             .unwrap();
 
-        let pci_interface: &mut luwen_ref::ExtendedPciDevice = &mut pci.user_data.borrow_mut();
+        let pci_interface: &mut luwen_pci::ExtendedPciDevice = &mut pci.user_data.borrow_mut();
 
         let dma_request = luwen_api::chip::HlCommsInterface::axi_translate(
             &chip,
@@ -31,7 +31,7 @@ fn read_write_test(
         let arc_misc_cntl =
             luwen_api::chip::HlCommsInterface::axi_translate(&chip, "ARC_RESET.ARC_MISC_CNTL")?;
 
-        pci_interface.device.dma_config = Some(luwen_ref::DmaConfig {
+        pci_interface.device.dma_config = Some(luwen_pci::DmaConfig {
             csm_pcie_ctrl_dma_request_offset: dma_request.addr as u32,
             arc_misc_cntl_addr: arc_misc_cntl.addr as u32,
             dma_host_phys_addr_high: 0,
@@ -81,7 +81,7 @@ fn read_write_test(
 }
 
 pub fn main() -> Result<(), LuwenError> {
-    let chips = luwen_ref::detect_chips()?;
+    let chips = luwen_pci::detect_chips()?;
 
     for (chip_index, chip) in chips.into_iter().enumerate() {
         println!("Running on {chip_index}");

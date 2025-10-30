@@ -33,7 +33,7 @@ mod tests {
         ignore = "Requires real wormhole hardware"
     )]
     fn wormhole_test_chip_telemetry() {
-        let partial_chips = luwen_ref::detect_chips_fallible().unwrap();
+        let partial_chips = luwen_pci::detect_chips_fallible().unwrap();
         assert!(!partial_chips.is_empty(), "Should find at least one chip");
 
         for chip in partial_chips {
@@ -83,7 +83,7 @@ mod tests {
         ignore = "Requires real grayskull hardware"
     )]
     fn grayskull_test_chip_telemetry() {
-        let partial_chips = luwen_ref::detect_chips_fallible().unwrap();
+        let partial_chips = luwen_pci::detect_chips_fallible().unwrap();
         assert!(!partial_chips.is_empty(), "Should find at least one chip");
 
         for chip in partial_chips {
@@ -128,7 +128,7 @@ mod tests {
         ignore = "Requires real blackhole hardware"
     )]
     fn blackhole_test_chip_telemetry() {
-        let partial_chips = luwen_ref::detect_chips_fallible().unwrap();
+        let partial_chips = luwen_pci::detect_chips_fallible().unwrap();
         assert!(!partial_chips.is_empty(), "Should find at least one chip");
 
         for chip in partial_chips {
@@ -156,7 +156,7 @@ mod tests {
                         .map(|v| &v.backing)
                         .and_then(|v| {
                             v.as_any()
-                                .downcast_ref::<luwen_api::CallbackStorage<luwen_ref::ExtendedPciDeviceWrapper>>()
+                                .downcast_ref::<luwen_api::CallbackStorage<luwen_pci::ExtendedPciDeviceWrapper>>()
                         })
                         .map(|v| v.user_data.borrow().device.physical.subsystem_id) {
                         println!("Blackhole subsystem ID: {subsystem:x}");

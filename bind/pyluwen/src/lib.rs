@@ -14,7 +14,7 @@ use luwen_api::chip::{
 use luwen_api::{CallbackStorage, ChipDetectOptions, DeviceInfo, UninitChip};
 use luwen_core::Arch;
 use luwen_kmd::PossibleTlbAllocation;
-use luwen_ref::{DmaConfig, ExtendedPciDeviceWrapper};
+use luwen_pci::{DmaConfig, ExtendedPciDeviceWrapper};
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
@@ -90,7 +90,7 @@ impl DerefMut for PciBlackhole {
 }
 
 #[pyclass]
-pub struct DmaBuffer(luwen_ref::DmaBuffer);
+pub struct DmaBuffer(luwen_pci::DmaBuffer);
 
 #[pymethods]
 impl DmaBuffer {
@@ -705,7 +705,7 @@ impl PciChip {
     pub fn new(pci_interface: Option<usize>) -> PyResult<Self> {
         let pci_interface = pci_interface.unwrap_or(0);
 
-        let chip = luwen_ref::ExtendedPciDevice::open(pci_interface).map_err(|v| {
+        let chip = luwen_pci::ExtendedPciDevice::open(pci_interface).map_err(|v| {
             PyException::new_err(format!(
                 "Could not open chip on pci interface {pci_interface}\n Failed with: {v}"
             ))
@@ -717,7 +717,7 @@ impl PciChip {
             luwen_api::chip::Chip::open(
                 arch,
                 luwen_api::CallbackStorage {
-                    callback: luwen_ref::comms_callback,
+                    callback: luwen_pci::comms_callback,
                     user_data: chip,
                 },
             )
@@ -1643,7 +1643,7 @@ pub fn detect_chips_fallible(
 ) -> PyResult<Vec<UninitPciChip>> {
     let interfaces = interfaces.unwrap_or_default();
 
-    let all_devices = luwen_ref::PciDevice::scan();
+    let all_devices = luwen_pci::PciDevice::scan();
     let interfaces = if interfaces.is_empty() {
         all_devices
     } else {
@@ -1778,7 +1778,7 @@ pub fn detect_chips(
 
 #[pyfunction]
 pub fn pci_scan() -> Vec<usize> {
-    luwen_ref::PciDevice::scan()
+    luwen_pci::PciDevice::scan()
 }
 
 #[pyfunction]

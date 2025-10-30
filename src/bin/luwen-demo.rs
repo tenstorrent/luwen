@@ -5,7 +5,7 @@ use luwen_api::{
     chip::{ArcMsgOptions, Chip, HlComms, HlCommsInterface},
     CallbackStorage, ChipImpl, TypedArcMsg,
 };
-use luwen_ref::{
+use luwen_pci::{
     comms_callback, error::LuwenError, DmaConfig, ExtendedPciDevice, ExtendedPciDeviceWrapper,
     PciDevice, Tlb,
 };

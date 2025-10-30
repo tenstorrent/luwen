@@ -800,7 +800,7 @@ dependencies = [
  "luwen-api",
  "luwen-core",
  "luwen-kmd",
- "luwen-ref",
+ "luwen-pci",
  "nom",
  "rand",
  "serde",
@@ -850,7 +850,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "luwen-ref"
+name = "luwen-pci"
 version = "0.7.11"
 dependencies = [
  "indicatif",
@@ -1208,7 +1208,7 @@ dependencies = [
  "luwen-api",
  "luwen-core",
  "luwen-kmd",
- "luwen-ref",
+ "luwen-pci",
  "pyo3",
  "serde_json",
 ]

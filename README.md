@@ -29,6 +29,6 @@ There are three usecases that I want to support here
    to issue resets.
 1. Low level syseng-only debug capability (via pyluwen)
    - To avoid needing to have multiple in flight stacks you will be able to drop down a level and access the
-     implemented communication apis directly. Practically this means direct access to the types defined in luwen-ref.
+     implemented communication apis directly. Practically this means direct access to the types defined in luwen-pci.
      This means that you can modify pci tlbs and erisc cores being used or cut out the middle man entirely and
      issue raw calls.

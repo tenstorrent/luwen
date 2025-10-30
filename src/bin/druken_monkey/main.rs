@@ -3,7 +3,7 @@ use luwen_api::{
     error::{BtWrapper, PlatformError},
     ArcMsgError, ArcMsgProtocolError, ArcState, ChipImpl,
 };
-use luwen_ref::error::LuwenError;
+use luwen_pci::error::LuwenError;
 use std::any::Any;
 use std::panic;
 use std::process::Command;
@@ -133,7 +133,7 @@ fn hang_eth(
 #[allow(clippy::type_complexity)]
 fn run_detect_test() -> Result<Option<Vec<(bool, Option<InitStatus>)>>, LuwenError> {
     let mut chip_details = Vec::new();
-    let partial_chips = luwen_ref::detect_chips_fallible()?;
+    let partial_chips = luwen_pci::detect_chips_fallible()?;
 
     //warm reset (internal)
     //reset board (external)
@@ -246,7 +246,7 @@ fn main() {
         let option = args.get(1);
         println!("Command: {} Option: {}", command, option.unwrap_or(&"None"));
 
-        let mut chips = luwen_ref::detect_chips().unwrap();
+        let mut chips = luwen_pci::detect_chips().unwrap();
 
         match (command, option) {
             ("arc", Some(opt)) => {

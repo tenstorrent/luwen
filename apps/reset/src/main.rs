@@ -44,7 +44,7 @@ fn link_reset(interface: usize) -> bool {
 fn main() {
     let mut trackers = Vec::new();
     // The interfaces that we expect to be restored post reset...
-    let interfaces = luwen::pcie::PciDevice::scan();
+    let interfaces = luwen::pci::PciDevice::scan();
     println!("Found {} chips to reset", interfaces.len());
     for interface in interfaces.iter().copied() {
         // Just try to reset the link... if it fails then we should still try stuff
@@ -97,7 +97,7 @@ fn main() {
 
     let mut reinit_interfaces = HashSet::new();
 
-    let chips = luwen::pcie::detect_chips_fallible().unwrap();
+    let chips = luwen::pci::detect_chips_fallible().unwrap();
     for chip in chips {
         let chip = chip
             .init(&mut |_| Ok::<(), std::convert::Infallible>(()))

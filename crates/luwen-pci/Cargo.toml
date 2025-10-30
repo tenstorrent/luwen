@@ -1,5 +1,5 @@
 [package]
-name = "luwen-ref"
+name = "luwen-pci"
 version = "0.7.11"
 description = "Reference pci communication implementation"
 edition = "2021"

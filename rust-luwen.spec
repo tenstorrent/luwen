@@ -3,7 +3,7 @@
 
 %global crate luwen
 %global path_luwen_api %{cargo_registry}/luwen-api-%{version_no_tilde}
-%global path_luwen_ref %{cargo_registry}/luwen-ref-%{version_no_tilde}
+%global path_luwen_pci %{cargo_registry}/luwen-pci-%{version_no_tilde}
 %global path_luwen_kmd %{cargo_registry}/luwen-kmd-%{version_no_tilde}
 
 Name:           rust-luwen
@@ -98,19 +98,19 @@ use the "internal_metrics" feature of the "%{crate}" crate.
 %{cargo_registry}/luwen-api-%{version_no_tilde}
 
 ############################
-# rust-luwen-ref
+# rust-luwen-pci
 ############################
 
-%package     -n rust-luwen-ref-devel
+%package     -n rust-luwen-pci-devel
 Summary:        Python bindings for the Tenstorrent Luwen library
 
-%description -n rust-luwen-ref-devel
+%description -n rust-luwen-pci-devel
 
 This package contains library source intended for building other packages which
 use the "internal_metrics" feature of the "%{crate}" crate.
 
-%files       -n rust-luwen-ref-devel
-%{cargo_registry}/luwen-ref-%{version_no_tilde}
+%files       -n rust-luwen-pci-devel
+%{cargo_registry}/luwen-pci-%{version_no_tilde}
 
 ############################
 # rust-luwen-kmd
@@ -216,20 +216,20 @@ tomcli \
 echo "--- luwen-api Cargo.toml ---"
 cat %{buildroot}%{path_luwen_api}/Cargo.toml
 echo "--- /luwen-api Cargo.toml ---"
-%{__cp} -av crates/luwen-ref %{buildroot}%{path_luwen_ref}
+%{__cp} -av crates/luwen-pci %{buildroot}%{path_luwen_pci}
 # Modify the existing Cargo.toml to remove the path for luwen-core as we are moving it out to it's own place on the system
 
 for x in luwen-core luwen-api luwen-kmd
 do
 	tomcli \
 		set \
-		%{buildroot}%{path_luwen_ref}/Cargo.toml \
+		%{buildroot}%{path_luwen_pci}/Cargo.toml \
 		str \
 		dependencies.${x} \
 		"$( \
 			tomcli \
 			get \
-			%{buildroot}%{path_luwen_ref}/Cargo.toml \
+			%{buildroot}%{path_luwen_pci}/Cargo.toml \
 			dependencies.${x}.version \
 		)"
 done

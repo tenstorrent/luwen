@@ -1,14 +1,14 @@
 use luwen::api::ChipImpl;
 
 fn main() {
-    let interfaces = luwen::pcie::PciDevice::scan();
+    let interfaces = luwen::pci::PciDevice::scan();
     eprintln!("Found {} chips to check", interfaces.len());
 
     let mut output = String::new();
     output.push_str("{\n");
     for interface in interfaces.iter().copied() {
         // Just try to reset the link... if it fails then we should still try stuff
-        let chip = luwen::pcie::open(interface);
+        let chip = luwen::pci::open(interface);
         let chip = match chip {
             Ok(chip) => chip,
             Err(err) => {

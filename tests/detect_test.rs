@@ -35,7 +35,7 @@ mod tests {
     fn grayskull_detect_test() {
         assert!(hardware_available(), "Test requires hardware");
 
-        let partial_chips = luwen_ref::detect_chips_fallible().unwrap();
+        let partial_chips = luwen_pci::detect_chips_fallible().unwrap();
         assert!(!partial_chips.is_empty(), "Should find at least one chip");
 
         let mut found_gs = false;
@@ -74,7 +74,7 @@ mod tests {
     fn wormhole_detect_test() {
         assert!(hardware_available(), "Test requires hardware");
 
-        let partial_chips = luwen_ref::detect_chips_fallible().unwrap();
+        let partial_chips = luwen_pci::detect_chips_fallible().unwrap();
         assert!(!partial_chips.is_empty(), "Should find at least one chip");
 
         let mut found_wh = false;
@@ -117,7 +117,7 @@ mod tests {
     fn blackhole_detect_test() {
         assert!(hardware_available(), "Test requires hardware");
 
-        let partial_chips = luwen_ref::detect_chips_fallible().unwrap();
+        let partial_chips = luwen_pci::detect_chips_fallible().unwrap();
         assert!(!partial_chips.is_empty(), "Should find at least one chip");
 
         let mut found_bh = false;
@@ -170,7 +170,7 @@ mod tests {
     fn blackhole_test_enumerate_output() {
         assert!(hardware_available(), "Test requires hardware");
 
-        let partial_chips = luwen_ref::detect_chips_fallible().unwrap();
+        let partial_chips = luwen_pci::detect_chips_fallible().unwrap();
         assert!(!partial_chips.is_empty(), "Should find at least one chip");
 
         let mut found_bh = false;

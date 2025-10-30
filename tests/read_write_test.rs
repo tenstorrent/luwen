@@ -24,7 +24,7 @@ use luwen_kmd::PciDevice;
 #[serial]
 mod tests {
     use luwen_api::chip::HlComms;
-    use luwen_ref::detect_chips_fallible;
+    use luwen_pci::detect_chips_fallible;
 
     use super::*;
 
@@ -44,7 +44,7 @@ mod tests {
                     Err(_) => continue,
                 };
 
-                let device = match luwen_ref::open(id) {
+                let device = match luwen_pci::open(id) {
                     Ok(dev) => dev,
                     Err(_) => continue,
                 };

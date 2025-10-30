@@ -14,7 +14,7 @@ impl ResetTracker {
 
 impl Reset for ResetTracker {
     fn reset(&mut self) {
-        let chip = luwen::pcie::open(self.interface).unwrap();
+        let chip = luwen::pci::open(self.interface).unwrap();
 
         chip.arc_msg(ArcMsgOptions {
             msg: luwen::api::TypedArcMsg::SetArcState {

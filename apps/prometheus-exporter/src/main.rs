@@ -247,7 +247,7 @@ impl Metrics {
 fn main() {
     let args = CommandLineArguments::parse();
     let interval_ms = args.interval;
-    let chips = luwen::pcie::detect_chips().unwrap();
+    let chips = luwen::pci::detect_chips().unwrap();
 
     let worker = thread::spawn(move || {
         let metrics = Metrics::new();

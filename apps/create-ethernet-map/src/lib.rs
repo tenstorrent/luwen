@@ -31,7 +31,7 @@ pub fn generate_map(file: impl AsRef<str>) -> Result<()> {
     let mut mmio_chips = Vec::new();
     let mut connection_map = HashMap::new();
 
-    for chip in luwen::pcie::detect_chips()? {
+    for chip in luwen::pci::detect_chips()? {
         let telemetry = chip.get_telemetry()?;
 
         let (ident, data) = if let Some(wh) = chip.as_wh() {
