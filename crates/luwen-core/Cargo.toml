@@ -17,4 +17,3 @@ license = { workspace = true }
 independent = true
 
 [dependencies]
-thiserror = { workspace = true }
