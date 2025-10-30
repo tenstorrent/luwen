@@ -939,21 +939,21 @@ pub struct PciInterface<'a> {
 }
 
 impl PciInterface<'_> {
-    pub fn from_wh(wh: &PciWormhole) -> Option<PciInterface> {
+    pub fn from_wh(wh: &PciWormhole) -> Option<PciInterface<'_>> {
         wh.0.get_if::<CallbackStorage<ExtendedPciDeviceWrapper>>()
             .map(|v| PciInterface {
                 pci_interface: &v.user_data,
             })
     }
 
-    pub fn from_gs(gs: &PciGrayskull) -> Option<PciInterface> {
+    pub fn from_gs(gs: &PciGrayskull) -> Option<PciInterface<'_>> {
         gs.0.get_if::<CallbackStorage<ExtendedPciDeviceWrapper>>()
             .map(|v| PciInterface {
                 pci_interface: &v.user_data,
             })
     }
 
-    pub fn from_bh(bh: &PciBlackhole) -> Option<PciInterface> {
+    pub fn from_bh(bh: &PciBlackhole) -> Option<PciInterface<'_>> {
         bh.0.get_if::<NocInterface>()
             .map(|v| &v.backing)
             .and_then(|v| {
