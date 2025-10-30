@@ -1,9 +1,9 @@
-use luwen_if::{
+use luwen_api::{
     chip::{Chip, HlComms, HlCommsInterface, InitStatus},
     error::{BtWrapper, PlatformError},
     ArcMsgError, ArcMsgProtocolError, ArcState, ChipImpl,
 };
-use luwen_ref::error::LuwenError;
+use luwen_pcie::error::LuwenError;
 use std::any::Any;
 use std::panic;
 use std::process::Command;
@@ -24,8 +24,8 @@ fn hang_arc(method: ArcHangMethod, chip: Chip) -> Result<(), Box<dyn std::error:
             unimplemented!("Haven't implemented fw overrwrite");
         }
         ArcHangMethod::A5 => {
-            chip.arc_msg(luwen_if::chip::ArcMsgOptions {
-                msg: luwen_if::TypedArcMsg::SetArcState {
+            chip.arc_msg(luwen_api::chip::ArcMsgOptions {
+                msg: luwen_api::TypedArcMsg::SetArcState {
                     state: ArcState::A5,
                 }
                 .into(),
@@ -35,8 +35,8 @@ fn hang_arc(method: ArcHangMethod, chip: Chip) -> Result<(), Box<dyn std::error:
         ArcHangMethod::CoreHault => {
             // Need to go into arc a3 before haulting the core, otherwise we can interrupt
             // communication with the voltage regulator.
-            chip.arc_msg(luwen_if::chip::ArcMsgOptions {
-                msg: luwen_if::TypedArcMsg::SetArcState {
+            chip.arc_msg(luwen_api::chip::ArcMsgOptions {
+                msg: luwen_api::TypedArcMsg::SetArcState {
                     state: ArcState::A3,
                 }
                 .into(),
@@ -133,7 +133,7 @@ fn hang_eth(
 #[allow(clippy::type_complexity)]
 fn run_detect_test() -> Result<Option<Vec<(bool, Option<InitStatus>)>>, LuwenError> {
     let mut chip_details = Vec::new();
-    let partial_chips = luwen_ref::detect_chips_fallible()?;
+    let partial_chips = luwen_pcie::detect_chips_fallible()?;
 
     //warm reset (internal)
     //reset board (external)
@@ -246,7 +246,7 @@ fn main() {
         let option = args.get(1);
         println!("Command: {} Option: {}", command, option.unwrap_or(&"None"));
 
-        let mut chips = luwen_ref::detect_chips().unwrap();
+        let mut chips = luwen_pcie::detect_chips().unwrap();
 
         match (command, option) {
             ("arc", Some(opt)) => {

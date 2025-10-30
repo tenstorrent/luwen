@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use luwen_if::{
+use luwen_api::{
     chip::{ArcMsgOptions, Chip, HlComms, HlCommsInterface},
     CallbackStorage, ChipImpl, TypedArcMsg,
 };
-use luwen_ref::{
+use luwen_pcie::{
     comms_callback, error::LuwenError, DmaConfig, ExtendedPciDevice, ExtendedPciDeviceWrapper,
     PciDevice, Tlb,
 };
@@ -45,7 +45,7 @@ pub fn main() -> Result<(), LuwenError> {
                 });
 
                 let (offset, _size) = pci_interface.device.setup_tlb(
-                    &ttkmd_if::PossibleTlbAllocation::Hardcoded(168),
+                    &luwen_kmd::PossibleTlbAllocation::Hardcoded(168),
                     Tlb {
                         local_offset: 0x0,
                         x_end: 1,
@@ -121,7 +121,7 @@ pub fn main() -> Result<(), LuwenError> {
         chips.push(chip);
     }
 
-    let all_chips = luwen_if::detect_chips_silent(chips, Default::default())?;
+    let all_chips = luwen_api::detect_chips_silent(chips, Default::default())?;
     for (chip_id, chip) in all_chips.into_iter().enumerate() {
         println!("Running on device {chip_id}");
         chip.arc_msg(ArcMsgOptions {

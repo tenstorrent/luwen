@@ -39,7 +39,7 @@ jobs:
       with:
         target: x86_64
         manylinux: 2014
-        args: --release --out dist -m crates/pyluwen/Cargo.toml --interpreter python${{ matrix.python-version }}
+        args: --release --out dist -m bind/pyluwen/Cargo.toml --interpreter python${{ matrix.python-version }}
         before-script-linux: |
           which unzip || apt install unzip || echo "not apt"
           which unzip || yum install unzip || echo "not yum"
@@ -82,7 +82,7 @@ jobs:
       with:
         target: x86_64
         manylinux: 2014
-        args: --release --sdist --out dist -m crates/pyluwen/Cargo.toml --features abi3-py311
+        args: --release --sdist --out dist -m bind/pyluwen/Cargo.toml --features abi3-py311
         before-script-linux: |
           which unzip || apt install unzip || echo "not apt"
           which unzip || yum install unzip || echo "not yum"

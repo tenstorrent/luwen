@@ -4,28 +4,38 @@
 use std::fmt;
 use std::str::FromStr;
 
-#[derive(Clone, Hash, Copy, Debug, PartialEq, Eq)]
+/// Architecture generation.
+///
+/// Model specifier for a Tenstorrent architecture generation.
+#[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Arch {
+    /// Grayskull.
+    ///
+    /// # Note
+    ///
+    /// This is a legacy architecture that is no longer supported. None of the
+    /// provided APIs guarantee support for Grayskull, and may only work
+    /// incidentally.
     Grayskull,
+    /// Wormhole.
+    #[default]
     Wormhole,
+    /// Blackhole.
     Blackhole,
 }
 
-impl Default for Arch {
-    fn default() -> Self {
-        Self::Grayskull
-    }
-}
-
 impl Arch {
-    pub fn is_wormhole(&self) -> bool {
-        matches!(self, Arch::Wormhole)
-    }
-
+    /// Checks if the architecture is [`Arch::Grayskull`].
     pub fn is_grayskull(&self) -> bool {
         matches!(self, Arch::Grayskull)
     }
 
+    /// Checks if the architecture is [`Arch::Wormhole`].
+    pub fn is_wormhole(&self) -> bool {
+        matches!(self, Arch::Wormhole)
+    }
+
+    /// Checks if the architecture is [`Arch::Blackhole`].
     pub fn is_blackhole(&self) -> bool {
         matches!(self, Arch::Blackhole)
     }
@@ -35,7 +45,7 @@ impl FromStr for Arch {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
+        match s.to_lowercase().as_str() {
             "grayskull" => Ok(Arch::Grayskull),
             "wormhole" => Ok(Arch::Wormhole),
             "blackhole" => Ok(Arch::Blackhole),
@@ -46,10 +56,6 @@ impl FromStr for Arch {
 
 impl fmt::Display for Arch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Arch::Grayskull => write!(f, "Grayskull"),
-            Arch::Wormhole => write!(f, "Wormhole"),
-            Arch::Blackhole => write!(f, "Blackhole"),
-        }
+        write!(f, "{self:?}")
     }
 }

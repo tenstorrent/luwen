@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use luwen_ref::detect_chips;
+use luwen_pcie::detect_chips;
 
 /// Test SPI read/write operations on chips
 ///
