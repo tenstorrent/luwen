@@ -12,7 +12,7 @@ use luwen_api::{
     error::PlatformError,
     CallbackStorage, ChipDetectOptions, ChipImpl, UninitChip,
 };
-use ttkmd_if::PciDevice;
+use luwen_kmd::PciDevice;
 
 use crate::{comms_callback, error::LuwenError, ExtendedPciDevice};
 

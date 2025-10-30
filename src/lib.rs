@@ -14,7 +14,7 @@ pub use luwen_api as api;
 
 /// Kernel-mode driver API.
 #[doc(inline)]
-pub use ttkmd_if as kmd;
+pub use luwen_kmd as kmd;
 
 /// Error types.
 #[doc(hidden)]

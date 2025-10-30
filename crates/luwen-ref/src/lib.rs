@@ -9,7 +9,7 @@ use std::{
 use error::LuwenError;
 use luwen_api::{FnDriver, FnOptions};
 use luwen_core::Arch;
-use ttkmd_if::{PciError, PossibleTlbAllocation};
+use luwen_kmd::{PciError, PossibleTlbAllocation};
 
 mod detect;
 pub mod error;
@@ -20,7 +20,7 @@ use wormhole::ethernet::{self, EthCommCoord};
 pub use detect::{
     detect_chips, detect_chips_fallible, detect_chips_silent, detect_local_chips, start_detect,
 };
-pub use ttkmd_if::{DmaBuffer, DmaConfig, PciDevice, Tlb};
+pub use luwen_kmd::{DmaBuffer, DmaConfig, PciDevice, Tlb};
 
 #[derive(Clone)]
 pub struct ExtendedPciDeviceWrapper {
@@ -55,7 +55,7 @@ pub struct ExtendedPciDevice {
 }
 
 impl ExtendedPciDevice {
-    pub fn open(pci_interface: usize) -> Result<ExtendedPciDeviceWrapper, ttkmd_if::PciError> {
+    pub fn open(pci_interface: usize) -> Result<ExtendedPciDeviceWrapper, luwen_kmd::PciError> {
         let device = PciDevice::open(pci_interface)?;
 
         let (grid_size_x, grid_size_y) = match device.arch {

@@ -1,5 +1,5 @@
 [package]
-name = "ttkmd-if"
+name = "luwen-kmd"
 version = "0.2.4"
 description = "Lowest level pci interface to the tenstorrent driver (ttkmd)"
 edition = "2021"

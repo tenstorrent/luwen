@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use luwen_api::{chip::AxiError, error::PlatformError, ArcMsgError};
+use luwen_kmd::{PciError, PciOpenError};
 use thiserror::Error;
-use ttkmd_if::{PciError, PciOpenError};
 
 #[derive(Error, Debug)]
 pub enum LuwenError {

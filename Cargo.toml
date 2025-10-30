@@ -21,7 +21,7 @@ serde_yaml = "0.9.22"
 luwen-core = { workspace = true }
 luwen-api = { workspace = true }
 luwen-ref = { workspace = true }
-ttkmd-if = { workspace = true }
+luwen-kmd = { workspace = true }
 
 [dev-dependencies]
 serial_test = "3.2.0"
@@ -57,4 +57,4 @@ luwen = { path = ".", verison = "0.7.14" }
 luwen-core = { path = "crates/luwen-core", version = "0.2.0" }
 luwen-api = { path = "crates/luwen-api", version = "0.7.8" }
 luwen-ref = { path = "crates/luwen-ref", version = "0.7.8" }
-ttkmd-if = { path = "crates/ttkmd-if", version = "0.2.1" }
+luwen-kmd = { path = "crates/luwen-kmd", version = "0.2.1" }
