@@ -171,8 +171,8 @@ This is Testing and Debug binaries associated with Luwen
 %cargo_generate_buildrequires
 
 %build
-# This builds everything but luwencpp and pyluwen, the former has a bug, the later we build independently
-%cargo_build '--workspace' '--exclude' 'luwencpp' '--exclude' 'pyluwen'
+# This builds everything but libluwen and pyluwen, the former has a bug, the later we build independently
+%cargo_build '--workspace' '--exclude' 'libluwen' '--exclude' 'pyluwen'
 %{cargo_license_summary}
 %{cargo_license} > LICENSE.dependencies
 

@@ -40,12 +40,11 @@ deb:
         echo "Error: cargo-deb is not installed. Please install it using 'cargo install --locked cargo-deb'."; \
         exit 1; \
     fi
-	cargo deb -p luwencpp --target x86_64-unknown-linux-gnu -v
-	# sudo dpkg -i ./target/x86_64-unknown-linux-gnu/debian/luwencpp_0.1.0-1_amd64.deb
+	cargo deb -p libluwen --target x86_64-unknown-linux-gnu -v
 
 .PHONY: rpm
 rpm:
-	$(MAKE) -C bind/luwencpp rpm
+	$(MAKE) -C bind/libluwen rpm
 
 .PHONY: upload-ci-docker
 upload-ci-docker:
