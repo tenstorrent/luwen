@@ -1,7 +1,9 @@
 [package]
 name = "luwen-api"
 version = "0.7.12"
-description = "Generic interface to Tenstorrent ai accelerators, abstracting the details of communication"
+description = """
+High-level interface for Tenstorrent device interactions
+"""
 edition = "2021"
 license = "Apache-2.0"
 

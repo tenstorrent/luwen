@@ -1,7 +1,9 @@
 [package]
 name = "luwen"
 version = "0.7.14"
-description = "A high-level interface for safe and efficient access Tenstorrent AI accelerators"
+description = """
+A high-level interface for Tenstorrent AI accelerators
+"""
 edition = "2021"
 license = "Apache-2.0"
 authors = ["Daniel Rosen <drosen@tenstorrent.com>"]

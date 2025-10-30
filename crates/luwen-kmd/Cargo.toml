@@ -1,7 +1,9 @@
 [package]
 name = "luwen-kmd"
 version = "0.2.4"
-description = "Lowest level pci interface to the tenstorrent driver (ttkmd)"
+description = """
+Low-level PCIe interface to the Tenstorrent kernel-mode driver (KMD)
+"""
 edition = "2021"
 license = "Apache-2.0"
 
