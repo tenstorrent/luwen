@@ -1,5 +1,5 @@
 [package]
-name = "luwencpp"
+name = "libluwen"
 version = "0.7.10"
 edition = "2021"
 license = "Apache-2.0"
@@ -9,11 +9,11 @@ authors = ["Luwen Team <drosen@tenstorrent.com>"]
 [package.metadata.deb]
 assets = [
     ["target/release/luwen.h", "/usr/include/luwen.h", "644"],
-    ["target/release/libluwencpp.so", "/usr/lib/", "644"],
+    ["target/release/libluwen.so", "/usr/lib/", "644"],
 ]
 
 [lib]
-# crate-type = ["staticlib"]
+name = "luwen"
 crate-type = ["cdylib"]
 
 [dependencies]

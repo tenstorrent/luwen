@@ -25,7 +25,7 @@ fn test_header_compiles() {
     // The header should exist since cargo builds the crate before running tests
     if !header_path.exists() {
         panic!(
-            "Could not find generated luwen.h header file at {header_path:?}. Make sure luwencpp is built."
+            "Could not find generated luwen.h header file at {header_path:?}. Make sure libluwen is built."
         );
     }
 
