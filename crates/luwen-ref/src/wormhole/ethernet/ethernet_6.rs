@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use luwen_api::EthAddr;
-use ttkmd_if::PciError;
+use luwen_kmd::PciError;
 
 use crate::error::LuwenError;
 
@@ -219,7 +219,7 @@ pub fn block_read<D>(
     user_data: &mut D,
     mut read32: impl FnMut(&mut D, u64) -> Result<u32, PciError>,
     mut write32: impl FnMut(&mut D, u64, u32) -> Result<(), PciError>,
-    dma_buffer: &mut ttkmd_if::DmaBuffer,
+    dma_buffer: &mut luwen_kmd::DmaBuffer,
     command_q_addr: u32,
     timeout: std::time::Duration,
     fake_it: bool,
@@ -410,7 +410,7 @@ pub fn block_write<D>(
     user_data: &mut D,
     mut read32: impl FnMut(&mut D, u64) -> Result<u32, PciError>,
     mut write32: impl FnMut(&mut D, u64, u32) -> Result<(), PciError>,
-    dma_buffer: &mut ttkmd_if::DmaBuffer,
+    dma_buffer: &mut luwen_kmd::DmaBuffer,
     command_q_addr: u32,
     timeout: std::time::Duration,
     fake_it: bool,

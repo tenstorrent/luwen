@@ -19,7 +19,7 @@ keywords = [
 crate-type = ["cdylib"]
 
 [dependencies]
-ttkmd-if = { workspace = true }
+luwen-kmd = { workspace = true }
 luwen-core = { workspace = true }
 luwen-api = { workspace = true }
 luwen-ref = { workspace = true }

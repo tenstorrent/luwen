@@ -4,7 +4,7 @@
 %global crate luwen
 %global path_luwen_api %{cargo_registry}/luwen-api-%{version_no_tilde}
 %global path_luwen_ref %{cargo_registry}/luwen-ref-%{version_no_tilde}
-%global path_ttkmd_if %{cargo_registry}/ttkmd-if-%{version_no_tilde}
+%global path_luwen_kmd %{cargo_registry}/luwen-kmd-%{version_no_tilde}
 
 Name:           rust-luwen
 Version:        0.4.8
@@ -113,19 +113,19 @@ use the "internal_metrics" feature of the "%{crate}" crate.
 %{cargo_registry}/luwen-ref-%{version_no_tilde}
 
 ############################
-# rust-ttkmd-if
+# rust-luwen-kmd
 ############################
 
-%package     -n rust-ttkmd-if-devel
+%package     -n rust-luwen-kmd-devel
 Summary:        Python bindings for the Tenstorrent Luwen library
 
-%description -n rust-ttkmd-if-devel
+%description -n rust-luwen-kmd-devel
 
 This package contains library source intended for building other packages which
 use the "internal_metrics" feature of the "%{crate}" crate.
 
-%files       -n rust-ttkmd-if-devel
-%{cargo_registry}/ttkmd-if-%{version_no_tilde}
+%files       -n rust-luwen-kmd-devel
+%{cargo_registry}/luwen-kmd-%{version_no_tilde}
 
 ############################
 # PyLuwen
@@ -219,7 +219,7 @@ echo "--- /luwen-api Cargo.toml ---"
 %{__cp} -av crates/luwen-ref %{buildroot}%{path_luwen_ref}
 # Modify the existing Cargo.toml to remove the path for luwen-core as we are moving it out to it's own place on the system
 
-for x in luwen-core luwen-api ttkmd-if
+for x in luwen-core luwen-api luwen-kmd
 do
 	tomcli \
 		set \
@@ -234,19 +234,19 @@ do
 		)"
 done
 
-%{__cp} -av crates/ttkmd-if %{buildroot}%{path_ttkmd_if}
+%{__cp} -av crates/luwen-kmd %{buildroot}%{path_luwen_kmd}
 # Modify the existing Cargo.toml to remove the path for luwen-core as we are moving it out to it's own place on the system
 
 # luwen-core pathfix
 tomcli \
 	set \
-	%{buildroot}%{path_ttkmd_if}/Cargo.toml \
+	%{buildroot}%{path_luwen_kmd}/Cargo.toml \
 	str \
 	dependencies.luwen-core \
 	"$( \
 		tomcli \
 		get \
-		%{buildroot}%{path_ttkmd_if}/Cargo.toml \
+		%{buildroot}%{path_luwen_kmd}/Cargo.toml \
 		dependencies.luwen-core.version \
 	)"
 

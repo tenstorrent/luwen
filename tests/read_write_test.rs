@@ -3,7 +3,7 @@
 use serial_test::serial;
 
 use luwen_api::{chip::ArcMsgOptions, ArcMsg, ArcMsgOk, ChipImpl, TypedArcMsg};
-use ttkmd_if::PciDevice;
+use luwen_kmd::PciDevice;
 
 /// Test utilities for verifying PCI device register read/write operations
 ///

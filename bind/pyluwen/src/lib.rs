@@ -13,13 +13,13 @@ use luwen_api::chip::{
 };
 use luwen_api::{CallbackStorage, ChipDetectOptions, DeviceInfo, UninitChip};
 use luwen_core::Arch;
+use luwen_kmd::PossibleTlbAllocation;
 use luwen_ref::{DmaConfig, ExtendedPciDeviceWrapper};
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use serde_json::Value;
 use std::collections::HashMap;
-use ttkmd_if::PossibleTlbAllocation;
 
 #[pyclass]
 pub struct PciChip(luwen_api::chip::Chip);
@@ -831,8 +831,8 @@ impl PciGrayskull {
         let value = PciInterface::from_gs(self);
 
         if let Some(value) = value {
-            match ttkmd_if::tlb::Ordering::from(ordering) {
-                ttkmd_if::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
+            match luwen_kmd::tlb::Ordering::from(ordering) {
+                luwen_kmd::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
                     "Invalid ordering {ordering}."
                 ))),
                 ordering => value.setup_tlb(
@@ -976,7 +976,7 @@ impl PciInterface<'_> {
         y_end: u8,
         noc_sel: u8,
         mcast: bool,
-        ordering: ttkmd_if::tlb::Ordering,
+        ordering: luwen_kmd::tlb::Ordering,
         linked: bool,
     ) -> PyResult<(u64, u64)> {
         self.pci_interface
@@ -984,7 +984,7 @@ impl PciInterface<'_> {
             .device
             .setup_tlb(
                 &PossibleTlbAllocation::Hardcoded(index),
-                ttkmd_if::Tlb {
+                luwen_kmd::Tlb {
                     local_offset: addr,
                     x_end,
                     y_end,
@@ -1156,8 +1156,8 @@ impl PciWormhole {
         let value = PciInterface::from_wh(self);
 
         if let Some(value) = value {
-            match ttkmd_if::tlb::Ordering::from(ordering) {
-                ttkmd_if::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
+            match luwen_kmd::tlb::Ordering::from(ordering) {
+                luwen_kmd::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
                     "Invalid ordering {ordering}."
                 ))),
                 ordering => value.setup_tlb(
@@ -1361,8 +1361,8 @@ impl PciBlackhole {
         let value = PciInterface::from_bh(self);
 
         if let Some(value) = value {
-            match ttkmd_if::tlb::Ordering::from(ordering) {
-                ttkmd_if::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
+            match luwen_kmd::tlb::Ordering::from(ordering) {
+                luwen_kmd::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
                     "Invalid ordering {ordering}."
                 ))),
                 ordering => value.setup_tlb(

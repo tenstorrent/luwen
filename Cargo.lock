@@ -799,6 +799,7 @@ dependencies = [
  "clap",
  "luwen-api",
  "luwen-core",
+ "luwen-kmd",
  "luwen-ref",
  "nom",
  "rand",
@@ -806,7 +807,6 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "serial_test",
- "ttkmd-if",
 ]
 
 [[package]]
@@ -838,15 +838,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "luwen-kmd"
+version = "0.2.4"
+dependencies = [
+ "bitfield-struct",
+ "luwen-core",
+ "memmap2",
+ "nix",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
 name = "luwen-ref"
 version = "0.7.11"
 dependencies = [
  "indicatif",
  "luwen-api",
  "luwen-core",
+ "luwen-kmd",
  "thiserror 1.0.69",
  "tracing",
- "ttkmd-if",
 ]
 
 [[package]]
@@ -1195,10 +1207,10 @@ version = "0.7.12"
 dependencies = [
  "luwen-api",
  "luwen-core",
+ "luwen-kmd",
  "luwen-ref",
  "pyo3",
  "serde_json",
- "ttkmd-if",
 ]
 
 [[package]]
@@ -1822,18 +1834,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9d12581f227e93f094d3af2ae690a574abb8a2b9b7a96e7cfe9647b2b617678"
 dependencies = [
  "once_cell",
-]
-
-[[package]]
-name = "ttkmd-if"
-version = "0.2.4"
-dependencies = [
- "bitfield-struct",
- "luwen-core",
- "memmap2",
- "nix",
- "thiserror 1.0.69",
- "tracing",
 ]
 
 [[package]]

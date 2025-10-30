@@ -6,7 +6,7 @@ edition = "2021"
 license = "Apache-2.0"
 
 [dependencies]
-ttkmd-if = { workspace = true }
+luwen-kmd = { workspace = true }
 luwen-api = { workspace = true }
 luwen-core = { workspace = true }
 
