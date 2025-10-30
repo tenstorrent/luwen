@@ -2,7 +2,7 @@
 
 use serial_test::serial;
 
-use luwen_if::{chip::HlCommsInterface, ChipImpl};
+use luwen_api::{chip::HlCommsInterface, ChipImpl};
 
 /// Test chip detection
 ///
@@ -134,8 +134,8 @@ mod tests {
 
                     // Test arc message
                     let result = bh
-                        .arc_msg(luwen_if::chip::ArcMsgOptions {
-                            msg: luwen_if::ArcMsg::Raw {
+                        .arc_msg(luwen_api::chip::ArcMsgOptions {
+                            msg: luwen_api::ArcMsg::Raw {
                                 msg: 0x90,
                                 arg0: 106,
                                 arg1: 0,

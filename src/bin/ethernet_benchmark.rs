@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use luwen_if::{chip::HlComms, CallbackStorage, ChipImpl};
+use luwen_api::{chip::HlComms, CallbackStorage, ChipImpl};
 use luwen_ref::error::LuwenError;
 use rand::Rng;
 
@@ -24,10 +24,12 @@ fn read_write_test(
 
         let pci_interface: &mut luwen_ref::ExtendedPciDevice = &mut pci.user_data.borrow_mut();
 
-        let dma_request =
-            luwen_if::chip::HlCommsInterface::axi_translate(&chip, "ARC_CSM.ARC_PCIE_DMA_REQUEST")?;
+        let dma_request = luwen_api::chip::HlCommsInterface::axi_translate(
+            &chip,
+            "ARC_CSM.ARC_PCIE_DMA_REQUEST",
+        )?;
         let arc_misc_cntl =
-            luwen_if::chip::HlCommsInterface::axi_translate(&chip, "ARC_RESET.ARC_MISC_CNTL")?;
+            luwen_api::chip::HlCommsInterface::axi_translate(&chip, "ARC_RESET.ARC_MISC_CNTL")?;
 
         pci_interface.device.dma_config = Some(luwen_ref::DmaConfig {
             csm_pcie_ctrl_dma_request_offset: dma_request.addr as u32,

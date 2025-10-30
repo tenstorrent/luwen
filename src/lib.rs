@@ -10,7 +10,7 @@ pub use luwen_ref as pcie;
 ///
 /// Main user-mode interface exposed by luwen.
 #[doc(inline)]
-pub use luwen_if as api;
+pub use luwen_api as api;
 
 /// Kernel-mode driver API.
 #[doc(inline)]

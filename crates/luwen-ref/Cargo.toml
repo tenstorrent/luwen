@@ -7,7 +7,7 @@ license = "Apache-2.0"
 
 [dependencies]
 ttkmd-if = { workspace = true }
-luwen-if = { workspace = true }
+luwen-api = { workspace = true }
 luwen-core = { workspace = true }
 
 thiserror = { workspace = true }

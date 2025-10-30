@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use luwen_if::EthAddr;
+use luwen_api::EthAddr;
 use ttkmd_if::PciError;
 
 use crate::error::LuwenError;

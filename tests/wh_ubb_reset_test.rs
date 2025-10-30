@@ -2,7 +2,7 @@
 
 use serial_test::serial;
 
-use luwen_if::chip::wh_ubb;
+use luwen_api::chip::wh_ubb;
 
 /// Test utilities for verifying ubb reset ability
 ///

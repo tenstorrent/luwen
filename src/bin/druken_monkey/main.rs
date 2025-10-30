@@ -1,4 +1,4 @@
-use luwen_if::{
+use luwen_api::{
     chip::{Chip, HlComms, HlCommsInterface, InitStatus},
     error::{BtWrapper, PlatformError},
     ArcMsgError, ArcMsgProtocolError, ArcState, ChipImpl,
@@ -24,8 +24,8 @@ fn hang_arc(method: ArcHangMethod, chip: Chip) -> Result<(), Box<dyn std::error:
             unimplemented!("Haven't implemented fw overrwrite");
         }
         ArcHangMethod::A5 => {
-            chip.arc_msg(luwen_if::chip::ArcMsgOptions {
-                msg: luwen_if::TypedArcMsg::SetArcState {
+            chip.arc_msg(luwen_api::chip::ArcMsgOptions {
+                msg: luwen_api::TypedArcMsg::SetArcState {
                     state: ArcState::A5,
                 }
                 .into(),
@@ -35,8 +35,8 @@ fn hang_arc(method: ArcHangMethod, chip: Chip) -> Result<(), Box<dyn std::error:
         ArcHangMethod::CoreHault => {
             // Need to go into arc a3 before haulting the core, otherwise we can interrupt
             // communication with the voltage regulator.
-            chip.arc_msg(luwen_if::chip::ArcMsgOptions {
-                msg: luwen_if::TypedArcMsg::SetArcState {
+            chip.arc_msg(luwen_api::chip::ArcMsgOptions {
+                msg: luwen_api::TypedArcMsg::SetArcState {
                     state: ArcState::A3,
                 }
                 .into(),

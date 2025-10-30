@@ -4,7 +4,7 @@
 use std::{convert::Infallible, io::IsTerminal};
 
 use indicatif::ProgressBar;
-use luwen_if::{
+use luwen_api::{
     chip::{
         Chip, ChipDetectState, CommsStatus, ComponentStatusInfo, HlCommsInterface, InitError,
         InitStatus,
@@ -67,7 +67,7 @@ impl InProgressDetect {
         self,
         mut callback: impl FnMut(ChipDetectState) -> Result<(), E>,
     ) -> Result<Vec<UninitChip>, InitError<E>> {
-        let mut chips = luwen_if::detect_chips(self.chips, &mut callback, self.options);
+        let mut chips = luwen_api::detect_chips(self.chips, &mut callback, self.options);
 
         if let Ok(chips) = &mut chips {
             for (id, chip, err) in self.failed_chips.into_iter() {
@@ -104,15 +104,15 @@ pub fn detect_chips_options_notui(
 
     let init_callback = |status: ChipDetectState| {
         match status.call {
-            luwen_if::chip::CallReason::NotNew => {
+            luwen_api::chip::CallReason::NotNew => {
                 total_chips = total_chips.saturating_sub(1);
                 eprintln!("Ok I was wrong we actually have {total_chips} chips");
             }
-            luwen_if::chip::CallReason::NewChip => {
+            luwen_api::chip::CallReason::NewChip => {
                 total_chips += 1;
                 eprintln!("New chip! We now have {total_chips} chips");
             }
-            luwen_if::chip::CallReason::InitWait(status) => {
+            luwen_api::chip::CallReason::InitWait(status) => {
                 let mut output = String::new();
                 output.push_str(&status.arc_status.to_string());
                 output.push('\n');
@@ -127,7 +127,7 @@ pub fn detect_chips_options_notui(
                     last_output = output;
                 }
             }
-            luwen_if::chip::CallReason::ChipInitCompleted(status) => {
+            luwen_api::chip::CallReason::ChipInitCompleted(status) => {
                 eprintln!("Chip initialization complete (found {last_output})");
 
                 let mut output = String::new();
@@ -153,9 +153,9 @@ pub fn detect_chips_options_notui(
     let chips = match detect.detect(init_callback) {
         Err(InitError::CallbackError(err)) => {
             eprintln!("Ran into error from status callback;\n{err}");
-            return Err(luwen_if::error::PlatformError::Generic(
+            return Err(luwen_api::error::PlatformError::Generic(
                 "Hit error from status callback".to_string(),
-                luwen_if::error::BtWrapper::capture(),
+                luwen_api::error::BtWrapper::capture(),
             ))?;
         }
         Err(InitError::PlatformError(err)) => {
@@ -245,14 +245,14 @@ pub fn detect_chips_options_tui(options: ChipDetectOptions) -> Result<Vec<Uninit
 
     let init_callback = |status: ChipDetectState| {
         match status.call {
-            luwen_if::chip::CallReason::NotNew => {
+            luwen_api::chip::CallReason::NotNew => {
                 chip_detect_bar.set_position(chip_detect_bar.position().saturating_sub(1));
             }
-            luwen_if::chip::CallReason::NewChip => {
+            luwen_api::chip::CallReason::NewChip => {
                 chip_detect_bar.inc(1);
                 chip_init_bar = Some(add_bar(&bars));
             }
-            luwen_if::chip::CallReason::InitWait(status) => {
+            luwen_api::chip::CallReason::InitWait(status) => {
                 update_bar_with_status(&bars, &mut arc_init_bar, &status.arc_status);
                 update_bar_with_status(&bars, &mut dram_init_bar, &status.dram_status);
                 update_bar_with_status(&bars, &mut eth_init_bar, &status.eth_status);
@@ -262,7 +262,7 @@ pub fn detect_chips_options_tui(options: ChipDetectOptions) -> Result<Vec<Uninit
                     bar.set_message("Waiting chip to initialize".to_string());
                 }
             }
-            luwen_if::chip::CallReason::ChipInitCompleted(status) => {
+            luwen_api::chip::CallReason::ChipInitCompleted(status) => {
                 chip_detect_bar.set_message("Chip initialization complete (found {pos})");
 
                 maybe_remove_bar(&bars, &mut arc_init_bar, &status.arc_status);
@@ -288,9 +288,9 @@ pub fn detect_chips_options_tui(options: ChipDetectOptions) -> Result<Vec<Uninit
         Err(InitError::CallbackError(err)) => {
             chip_detect_bar
                 .finish_with_message(format!("Ran into error from status callback;\n{err}"));
-            return Err(luwen_if::error::PlatformError::Generic(
+            return Err(luwen_api::error::PlatformError::Generic(
                 "Hit error from status callback".to_string(),
-                luwen_if::error::BtWrapper::capture(),
+                luwen_api::error::BtWrapper::capture(),
             ))?;
         }
         Err(InitError::PlatformError(err)) => {
@@ -335,7 +335,7 @@ pub fn detect_chips() -> Result<Vec<Chip>, LuwenError> {
     for chip in chips {
         output.push(
             chip.init(&mut |_| Ok::<(), Infallible>(()))
-                .map_err(Into::<luwen_if::error::PlatformError>::into)?,
+                .map_err(Into::<luwen_api::error::PlatformError>::into)?,
         );
     }
 
@@ -352,7 +352,7 @@ pub fn detect_local_chips() -> Result<Vec<Chip>, LuwenError> {
     for chip in chips {
         output.push(
             chip.init(&mut |_| Ok::<(), Infallible>(()))
-                .map_err(Into::<luwen_if::error::PlatformError>::into)?,
+                .map_err(Into::<luwen_api::error::PlatformError>::into)?,
         );
     }
 

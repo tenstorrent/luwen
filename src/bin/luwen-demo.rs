@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use luwen_if::{
+use luwen_api::{
     chip::{ArcMsgOptions, Chip, HlComms, HlCommsInterface},
     CallbackStorage, ChipImpl, TypedArcMsg,
 };
@@ -121,7 +121,7 @@ pub fn main() -> Result<(), LuwenError> {
         chips.push(chip);
     }
 
-    let all_chips = luwen_if::detect_chips_silent(chips, Default::default())?;
+    let all_chips = luwen_api::detect_chips_silent(chips, Default::default())?;
     for (chip_id, chip) in all_chips.into_iter().enumerate() {
         println!("Running on device {chip_id}");
         chip.arc_msg(ArcMsgOptions {

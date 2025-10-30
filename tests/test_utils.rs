@@ -4,7 +4,7 @@
 //! in the luwen project. It includes helper functions for detecting hardware,
 //! checking chip types, and other test setup operations.
 
-use luwen_if::chip::Chip;
+use luwen_api::chip::Chip;
 
 /// Checks if any compatible hardware is available for testing
 ///

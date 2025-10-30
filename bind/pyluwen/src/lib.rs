@@ -7,12 +7,12 @@
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
-use luwen_core::Arch;
-use luwen_if::chip::{
+use luwen_api::chip::{
     ubb_wait_for_driver_load, wait_for_init, wh_ubb_ipmi_reset, ArcMsg, ArcMsgOk, ArcMsgOptions,
     ChipImpl, HlComms, HlCommsInterface, InitError, NocInterface,
 };
-use luwen_if::{CallbackStorage, ChipDetectOptions, DeviceInfo, UninitChip};
+use luwen_api::{CallbackStorage, ChipDetectOptions, DeviceInfo, UninitChip};
+use luwen_core::Arch;
 use luwen_ref::{DmaConfig, ExtendedPciDeviceWrapper};
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
@@ -22,10 +22,10 @@ use std::collections::HashMap;
 use ttkmd_if::PossibleTlbAllocation;
 
 #[pyclass]
-pub struct PciChip(luwen_if::chip::Chip);
+pub struct PciChip(luwen_api::chip::Chip);
 
 impl Deref for PciChip {
-    type Target = luwen_if::chip::Chip;
+    type Target = luwen_api::chip::Chip;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -39,10 +39,10 @@ impl DerefMut for PciChip {
 }
 
 #[pyclass]
-pub struct PciWormhole(luwen_if::chip::Wormhole);
+pub struct PciWormhole(luwen_api::chip::Wormhole);
 
 impl Deref for PciWormhole {
-    type Target = luwen_if::chip::Wormhole;
+    type Target = luwen_api::chip::Wormhole;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -56,10 +56,10 @@ impl DerefMut for PciWormhole {
 }
 
 #[pyclass]
-pub struct PciGrayskull(luwen_if::chip::Grayskull);
+pub struct PciGrayskull(luwen_api::chip::Grayskull);
 
 impl Deref for PciGrayskull {
-    type Target = luwen_if::chip::Grayskull;
+    type Target = luwen_api::chip::Grayskull;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -73,10 +73,10 @@ impl DerefMut for PciGrayskull {
 }
 
 #[pyclass]
-pub struct PciBlackhole(luwen_if::chip::Blackhole);
+pub struct PciBlackhole(luwen_api::chip::Blackhole);
 
 impl Deref for PciBlackhole {
-    type Target = luwen_if::chip::Blackhole;
+    type Target = luwen_api::chip::Blackhole;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -113,8 +113,8 @@ pub struct NeighbouringChip {
     eth_addr: EthAddr,
 }
 
-impl From<luwen_if::chip::NeighbouringChip> for NeighbouringChip {
-    fn from(value: luwen_if::chip::NeighbouringChip) -> Self {
+impl From<luwen_api::chip::NeighbouringChip> for NeighbouringChip {
+    fn from(value: luwen_api::chip::NeighbouringChip) -> Self {
         Self {
             local_noc_addr: value.local_noc_addr,
             remote_noc_addr: value.remote_noc_addr,
@@ -294,8 +294,8 @@ pub struct Telemetry {
     #[pyo3(get)]
     tdp_limit_max: u32,
 }
-impl From<luwen_if::chip::Telemetry> for Telemetry {
-    fn from(value: luwen_if::chip::Telemetry) -> Self {
+impl From<luwen_api::chip::Telemetry> for Telemetry {
+    fn from(value: luwen_api::chip::Telemetry) -> Self {
         Self {
             board_id: value.board_id,
             enum_version: value.enum_version,
@@ -393,8 +393,8 @@ pub struct AxiData {
     size: u64,
 }
 
-impl From<luwen_if::chip::AxiData> for AxiData {
-    fn from(value: luwen_if::chip::AxiData) -> Self {
+impl From<luwen_api::chip::AxiData> for AxiData {
+    fn from(value: luwen_api::chip::AxiData) -> Self {
         Self {
             addr: value.addr,
             size: value.size,
@@ -636,23 +636,23 @@ macro_rules! common_chip_comms_impls {
 }
 
 #[pyclass]
-struct PyChipDetectState(luwen_if::chip::ChipDetectState<'static>);
+struct PyChipDetectState(luwen_api::chip::ChipDetectState<'static>);
 
 #[pymethods]
 impl PyChipDetectState {
     pub fn new_chip(&self) -> bool {
-        matches!(self.0.call, luwen_if::chip::CallReason::NewChip)
+        matches!(self.0.call, luwen_api::chip::CallReason::NewChip)
     }
 
     pub fn correct_down(&self) -> bool {
-        matches!(self.0.call, luwen_if::chip::CallReason::NotNew)
+        matches!(self.0.call, luwen_api::chip::CallReason::NotNew)
     }
 
     pub fn status_string(&self) -> Option<String> {
         match self.0.call {
-            luwen_if::chip::CallReason::NewChip | luwen_if::chip::CallReason::NotNew => None,
-            luwen_if::chip::CallReason::ChipInitCompleted(status)
-            | luwen_if::chip::CallReason::InitWait(status) => Some(format!(
+            luwen_api::chip::CallReason::NewChip | luwen_api::chip::CallReason::NotNew => None,
+            luwen_api::chip::CallReason::ChipInitCompleted(status)
+            | luwen_api::chip::CallReason::InitWait(status) => Some(format!(
                 "{}\n{}\n{}",
                 status.arc_status, status.dram_status, status.eth_status
             )),
@@ -714,9 +714,9 @@ impl PciChip {
         let arch = chip.borrow().device.arch;
 
         Ok(PciChip(
-            luwen_if::chip::Chip::open(
+            luwen_api::chip::Chip::open(
                 arch,
-                luwen_if::CallbackStorage {
+                luwen_api::CallbackStorage {
                     callback: luwen_ref::comms_callback,
                     user_data: chip,
                 },
@@ -729,15 +729,15 @@ impl PciChip {
     pub fn init(&mut self, callback: Option<PyObject>) -> PyResult<()> {
         #[allow(clippy::type_complexity)]
         let mut callback: Box<
-            dyn FnMut(luwen_if::chip::ChipDetectState) -> Result<(), PyErr>,
+            dyn FnMut(luwen_api::chip::ChipDetectState) -> Result<(), PyErr>,
         > = if let Some(callback) = callback {
             Box::new(move |status| {
                 // Safety: This is extremly unsafe, the alternative would be to copy the status for
                 // every invocation.
                 let status = unsafe {
                     std::mem::transmute::<
-                        luwen_if::chip::ChipDetectState<'_>,
-                        luwen_if::chip::ChipDetectState<'_>,
+                        luwen_api::chip::ChipDetectState<'_>,
+                        luwen_api::chip::ChipDetectState<'_>,
                     >(status)
                 };
                 if let Err(err) =
@@ -1112,8 +1112,8 @@ pub struct EthAddr {
     pub rack_y: u8,
 }
 
-impl From<luwen_if::EthAddr> for EthAddr {
-    fn from(value: luwen_if::EthAddr) -> Self {
+impl From<luwen_api::EthAddr> for EthAddr {
+    fn from(value: luwen_api::EthAddr) -> Self {
         Self {
             shelf_x: value.shelf_x,
             shelf_y: value.shelf_y,
@@ -1305,7 +1305,7 @@ impl PciWormhole {
 common_chip_comms_impls!(PciWormhole);
 
 #[pyclass]
-pub struct RemoteWormhole(luwen_if::chip::Wormhole);
+pub struct RemoteWormhole(luwen_api::chip::Wormhole);
 
 common_chip_comms_impls!(RemoteWormhole);
 
@@ -1701,15 +1701,15 @@ pub fn detect_chips_fallible(
     };
 
     #[allow(clippy::type_complexity)]
-    let mut callback: Box<dyn FnMut(luwen_if::chip::ChipDetectState) -> Result<(), PyErr>> =
+    let mut callback: Box<dyn FnMut(luwen_api::chip::ChipDetectState) -> Result<(), PyErr>> =
         if let Some(callback) = callback {
             Box::new(move |status| {
                 // Safety: This is extremly unsafe, the alternative would be to copy the status for
                 // every invocation.
                 let status = unsafe {
                     std::mem::transmute::<
-                        luwen_if::chip::ChipDetectState<'_>,
-                        luwen_if::chip::ChipDetectState<'_>,
+                        luwen_api::chip::ChipDetectState<'_>,
+                        luwen_api::chip::ChipDetectState<'_>,
                     >(status)
                 };
                 if let Err(err) =
@@ -1723,7 +1723,7 @@ pub fn detect_chips_fallible(
         } else {
             Box::new(|_| Python::with_gil(|py| py.check_signals()))
         };
-    let mut chips = match luwen_if::detect_chips(root_chips, &mut callback, options) {
+    let mut chips = match luwen_api::detect_chips(root_chips, &mut callback, options) {
         Ok(chips) => chips,
         Err(InitError::PlatformError(err)) => {
             return Err(PyException::new_err(err.to_string()))?;
@@ -1733,8 +1733,8 @@ pub fn detect_chips_fallible(
         }
     };
     for (id, chip, err) in failed_chips.into_iter() {
-        let mut status = luwen_if::chip::InitStatus::new_unknown();
-        status.comms_status = luwen_if::chip::CommsStatus::CommunicationError(err.to_string());
+        let mut status = luwen_api::chip::InitStatus::new_unknown();
+        status.comms_status = luwen_api::chip::CommsStatus::CommunicationError(err.to_string());
         status.unknown_state = false;
         chips.insert(
             id,

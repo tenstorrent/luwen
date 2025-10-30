@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use luwen_if::chip::{axi_translate, MemorySlice, MemorySlices};
+use luwen_api::chip::{axi_translate, MemorySlice, MemorySlices};
 use nom::{
     branch::alt,
     bytes::complete::tag,

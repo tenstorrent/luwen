@@ -2,7 +2,7 @@
 
 use serial_test::serial;
 
-use luwen_if::ChipImpl;
+use luwen_api::ChipImpl;
 
 /// Functional tests for chip telemetry
 ///
