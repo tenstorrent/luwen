@@ -115,7 +115,7 @@ where
     fields.deserialize_any(DeserializeFieldMap)
 }
 
-fn parse_hexidecimal(i: &str) -> IResult<&str, u64> {
+fn parse_hexadecimal(i: &str) -> IResult<&str, u64> {
     map_res(
         preceded(
             alt((tag("0x"), tag("0X"))),
@@ -169,7 +169,7 @@ where
     // Then use nom to parse the string as an integer, this parser accepts (and ignores) '_' in the
     // value.
     let (_, s) = all_consuming(alt((
-        parse_hexidecimal,
+        parse_hexadecimal,
         parse_decimal,
         parse_binary,
         parse_octal,
@@ -378,7 +378,7 @@ where
         // Then use nom to parse the string as an integer, this parser accepts (and ignores) '_' in the
         // value.
         let (_, s) = all_consuming(alt((
-            parse_hexidecimal,
+            parse_hexadecimal,
             parse_decimal,
             parse_binary,
             parse_octal,
@@ -406,7 +406,7 @@ where
         // Then use nom to parse the string as an integer, this parser accepts (and ignores) '_' in the
         // value.
         let (_, s) = all_consuming(alt((
-            parse_hexidecimal,
+            parse_hexadecimal,
             parse_decimal,
             parse_binary,
             parse_octal,

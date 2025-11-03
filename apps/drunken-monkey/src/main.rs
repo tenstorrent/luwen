@@ -133,7 +133,7 @@ mod test {
     #[test]
     #[ignore = "requires reset dongle"]
     fn invalid_address_noc_hang() {
-        noc_hang(NocHangMethod::AccessNonExistantEndpoint);
+        noc_hang(NocHangMethod::AccessNonExistentEndpoint);
     }
 
     fn eth_hang(method: EthHangMethod) {

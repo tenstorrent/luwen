@@ -137,7 +137,7 @@ pub enum CpuInitError {
 /// This status is not intended to drive the initialization state machine
 /// instead it gives a single high level view of the current status of a single component.
 /// The NotInitialized and InitError types have their own specializations to so the caller only has
-/// to match against the component type if absolutly necessary.
+/// to match against the component type if absolutely necessary.
 #[derive(Debug, Clone)]
 pub enum WaitStatus<P, E> {
     NotPresent,
@@ -147,7 +147,7 @@ pub enum WaitStatus<P, E> {
 
     Done,
     /// This is used in the case where the user has specific that we shouldn't check to see if the
-    /// compnent has actually been intialized.
+    /// component has actually been initialized.
     /// See noc_safe for an example of this enumeration being used.
     NoCheck,
 

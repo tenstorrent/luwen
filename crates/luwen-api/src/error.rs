@@ -43,7 +43,7 @@ pub enum ArcReadyError {
     OutstandingPcieDMA,
     #[error("another message is queued (0x{0:02x})")]
     MessageQueued(u32),
-    #[error("another message is being procesed (0x{0:02x})")]
+    #[error("another message is being processed (0x{0:02x})")]
     HandlingMessage(u32),
     #[error("post code 0x{0:08x} indicates that you are running old fw... or that you aren't running any")]
     OldPostCode(u32),

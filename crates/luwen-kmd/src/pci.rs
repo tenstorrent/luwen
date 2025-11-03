@@ -206,7 +206,7 @@ impl PciDevice {
 
 impl PciDevice {
     // HACK(drosen): Yes user data should be a mut slice,
-    // but I don't really want to refactor the code righ now to make that possible
+    // but I don't really want to refactor the code right now to make that possible
     pub fn pcie_dma_transfer_turbo(
         &mut self,
         chip_addr: u32,
@@ -272,7 +272,7 @@ impl PciDevice {
         let mut arc_misc_cntl_value = 0;
 
         // NOTE: Ideally, we should read the state of this register before writing to it, but that
-        //       casues a lot of delay (reads have huge latencies)
+        //       causes a lot of delay (reads have huge latencies)
         arc_misc_cntl_value |= 1 << 16; // Cause IRQ0 on core 0
         self.write32(dma_config.arc_misc_cntl_addr, arc_misc_cntl_value)?;
 
@@ -294,7 +294,7 @@ impl PciDevice {
 
     pub fn write_block(&mut self, addr: u32, data: &[u8]) -> Result<(), PciError> {
         if let Some(dma_config) = self.dma_config.clone() {
-            #[allow(clippy::collapsible_if)] // I want to make it clear that these are seperate
+            #[allow(clippy::collapsible_if)] // I want to make it clear that these are separate
             // types of checks
             if data.len() > dma_config.write_threshold as usize && dma_config.write_threshold > 0 {
                 if self.allocate_transfer_buffers() {
@@ -344,7 +344,7 @@ impl PciDevice {
 
     pub fn read_block(&mut self, addr: u32, data: &mut [u8]) -> Result<(), PciError> {
         if let Some(dma_config) = self.dma_config.clone() {
-            #[allow(clippy::collapsible_if)] // I want to make it clear that these are seperate
+            #[allow(clippy::collapsible_if)] // I want to make it clear that these are separate
             // types of checks
             if data.len() > dma_config.read_threshold as usize && dma_config.read_threshold > 0 {
                 if self.allocate_transfer_buffers() {

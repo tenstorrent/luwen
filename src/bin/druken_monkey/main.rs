@@ -54,7 +54,7 @@ fn hang_arc(method: ArcHangMethod, chip: Chip) -> Result<(), Box<dyn std::error:
 
 pub enum NocHangMethod {
     AccessCgRow,
-    AccessNonExistantEndpoint,
+    AccessNonExistentEndpoint,
 }
 
 fn hang_noc(method: NocHangMethod, chip: Chip) -> Result<(), Box<dyn std::error::Error>> {
@@ -72,7 +72,7 @@ fn hang_noc(method: NocHangMethod, chip: Chip) -> Result<(), Box<dyn std::error:
                 chip.noc_read32(1, noc_x, noc_y, 0x100)?;
             }
         }
-        NocHangMethod::AccessNonExistantEndpoint => {
+        NocHangMethod::AccessNonExistentEndpoint => {
             // We have some capacity to deal with outstanding transactions
             // but 100 accesses is enough to overcome that capability
             for _ in 0..100 {
@@ -268,7 +268,7 @@ fn main() {
             ("noc", Some(opt)) => {
                 let method = match *opt {
                     "cg" => NocHangMethod::AccessCgRow,
-                    "oob" => NocHangMethod::AccessNonExistantEndpoint,
+                    "oob" => NocHangMethod::AccessNonExistentEndpoint,
                     other => {
                         unimplemented!("Have not implemented support for noc hang method {other}")
                     }
@@ -308,7 +308,7 @@ fn main() {
                     "fw" => EthHangMethod::OverwriteEthFw,
                     other => {
                         unimplemented!(
-                            "Have not yet implementd support for eth hang method {other}"
+                            "Have not yet implemented support for eth hang method {other}"
                         );
                     }
                 };

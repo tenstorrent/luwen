@@ -319,11 +319,11 @@ pub enum ChipInitResult {
 }
 
 /// Defines common functionality for all chips.
-/// This is a convinence interface that allows chip type agnostic code to be written.
+/// This is a convenience interface that allows chip type agnostic code to be written.
 ///
 /// As a general rule the chip should not be accessed without an explicit request from the user.
-/// This means that chip initialization must be explicity called and for example if the user has not
-/// explicity stated that they want to enumerate remote chips, then we won't even start looking at remote readiness.
+/// This means that chip initialization must be explicitly called and for example if the user has not
+/// explicitly stated that they want to enumerate remote chips, then we won't even start looking at remote readiness.
 /// This is to avoid situations where a problematic state is reached and causes an abort even if that capability is not needed.
 pub trait ChipImpl: HlComms + Send + Sync + 'static {
     /// Update the initialization state of the chip.
@@ -353,7 +353,7 @@ pub trait ChipImpl: HlComms + Send + Sync + 'static {
     /// Will return an empty list for gs and up to four chips for wh.
     fn get_neighbouring_chips(&self) -> Result<Vec<NeighbouringChip>, PlatformError>;
 
-    /// Convinence function to downcast to a concrete type.
+    /// Convenience function to downcast to a concrete type.
     fn as_any(&self) -> &dyn std::any::Any;
 
     /// Get information about the underlying chip transport.

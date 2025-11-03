@@ -9,7 +9,7 @@ pub enum CfgFailType {
     #[error("Nix error: {0}")]
     Nix(#[from] nix::Error),
 
-    #[error("Size mismiatch: recieved {0} bytes")]
+    #[error("Size mismatch: received {0} bytes")]
     SizeMismatch(usize),
 }
 

@@ -732,7 +732,7 @@ impl PciChip {
             dyn FnMut(luwen_api::chip::ChipDetectState) -> Result<(), PyErr>,
         > = if let Some(callback) = callback {
             Box::new(move |status| {
-                // Safety: This is extremly unsafe, the alternative would be to copy the status for
+                // Safety: This is extremely unsafe, the alternative would be to copy the status for
                 // every invocation.
                 let status = unsafe {
                     std::mem::transmute::<
@@ -1704,7 +1704,7 @@ pub fn detect_chips_fallible(
     let mut callback: Box<dyn FnMut(luwen_api::chip::ChipDetectState) -> Result<(), PyErr>> =
         if let Some(callback) = callback {
             Box::new(move |status| {
-                // Safety: This is extremly unsafe, the alternative would be to copy the status for
+                // Safety: This is extremely unsafe, the alternative would be to copy the status for
                 // every invocation.
                 let status = unsafe {
                     std::mem::transmute::<

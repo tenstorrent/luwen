@@ -366,7 +366,7 @@ impl Spi {
 
             chip.axi_write32(self.spi_ser, spi_ser_slave_enable(0))?;
 
-            // Add some delay to make sure that the enable above propogates
+            // Add some delay to make sure that the enable above propagates
             loop {
                 let spi_status = chip.axi_read32(self.spi_sr)?;
                 if spi_status & SPI_SR_TFE == SPI_SR_TFE {
@@ -743,7 +743,7 @@ impl ActiveSpi {
     }
 
     /// Write to the spi.
-    /// Unfortunatly writing to the eeprom on the other end of the spi bus is a fairly delicate operation.
+    /// Unfortunately writing to the eeprom on the other end of the spi bus is a fairly delicate operation.
     /// In general we can only write to an erased section, also the
     /// will unlock and then relock the spi. Will
     pub fn write(

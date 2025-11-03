@@ -218,13 +218,13 @@ impl ChipDetectOptions {
 }
 
 /// Find all chips accessible from the given set of root chips.
-/// For the most part this should be a set of chips found via a PCI scan, but it doens't have to be.
+/// For the most part this should be a set of chips found via a PCI scan, but it doesn't have to be.
 ///
 /// The most important part of this algorithm is determining which chips are duplicates of other chips.
 /// In general two boards can be differentiated by their board id, but this is not always the case.
 /// For example the gs or wh X2, in that case we must fallback on the interface id for grayskull or ethernet address for wh.
 /// However this does not cover all cases, if there is a wh X2 that is not in the root_chips list (which could be because it is in a neighbouring hose)
-/// and both chips are in two seperate meshes with the same ethernet address. We will incorrectly detect them as being one chip.
+/// and both chips are in two separate meshes with the same ethernet address. We will incorrectly detect them as being one chip.
 ///
 /// Search steps:
 /// 1. Add all given chips to output list removing duplicates this will ensure that if list indexes are used to
@@ -246,7 +246,7 @@ impl ChipDetectOptions {
 /// 4. Ethernet fw is hung, this usually means that the ethernet is in a bad state.
 ///    a. Not catastrophic, we need to report this, but can continue exploring other chips in the mesh.
 /// 5. 0xffffffff error, this means that the underlying transport is hung.
-///    a. This is catastrophic, we cannot continue searching for chips, because some of the chips in the mesh may no longer be accesible
+///    a. This is catastrophic, we cannot continue searching for chips, because some of the chips in the mesh may no longer be accessible
 ///    b. We could recover from this by rerunning the search, but this is not implemented.
 pub fn detect_chips<E>(
     mut root_chips: Vec<Chip>,

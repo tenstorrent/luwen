@@ -6,7 +6,7 @@ use std::sync::Arc;
 use crate::{DeviceInfo, EthAddr};
 
 /// This trait is used to abstract the interface to the lowest level
-/// chip communication primatives. These primatives are defined to be a chip resource
+/// chip communication primitives. These primitives are defined to be a chip resource
 /// which requires exclusive access to safely use.
 ///
 /// The implementation makes no attempt to use the borrow checker to enforce this exclusive access rule

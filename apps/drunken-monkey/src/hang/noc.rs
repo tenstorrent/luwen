@@ -4,7 +4,7 @@ use luwen::api::chip::{Chip, HlComms};
 #[derive(Debug, Clone, ValueEnum)]
 pub enum NocHangMethod {
     AccessCgRow,
-    AccessNonExistantEndpoint,
+    AccessNonExistentEndpoint,
 }
 
 pub fn hang_noc(method: NocHangMethod, chip: Chip) -> Result<(), Box<dyn std::error::Error>> {
@@ -22,7 +22,7 @@ pub fn hang_noc(method: NocHangMethod, chip: Chip) -> Result<(), Box<dyn std::er
                 chip.noc_read32(1, noc_x, noc_y, 0x100)?;
             }
         }
-        NocHangMethod::AccessNonExistantEndpoint => {
+        NocHangMethod::AccessNonExistentEndpoint => {
             // We have some capacity to deal with outstanding transactions
             // but 100 accesses is enough to overcome that capability
             for _ in 0..100 {

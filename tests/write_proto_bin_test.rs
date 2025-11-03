@@ -5,7 +5,7 @@ use luwen::pci::detect_chips;
 /// Test utilities for verifying boot filesystem protobuf updating
 ///
 /// These tests verify:
-/// - Successfuly update cmfwcfg - asic_fmax to 1000 and aiclk_ppm_en to false
+/// - Successfully update cmfwcfg - asic_fmax to 1000 and aiclk_ppm_en to false
 /// - Update the flashinfo table with a new value
 ///
 /// Note: These tests require physical hardware to run. By default, they are
@@ -44,13 +44,13 @@ mod tests {
                 // Update "asic_fmax" to 1000
                 if let Some(feature_enable) = cmfwcfg.get_mut("chip_limits") {
                     if let Some(asic_fmax) = feature_enable.get_mut("asic_fmax") {
-                        *asic_fmax = json!(1000); // Modify the value anc convert to a serde_json Value
+                        *asic_fmax = json!(1000); // Modify the value and convert to a serde_json Value
                     }
                 }
                 // Update "aiclk_ppm_en" to false
                 if let Some(feature_enable) = cmfwcfg.get_mut("feature_enable") {
                     if let Some(aiclk_ppm_en) = feature_enable.get_mut("aiclk_ppm_en") {
-                        *aiclk_ppm_en = json!(false); // Modify the value anc convert to a serde_json Value
+                        *aiclk_ppm_en = json!(false); // Modify the value and convert to a serde_json Value
                     }
                 }
                 // encode the updated cmfwcfg table
@@ -80,7 +80,7 @@ mod tests {
                 println!("Decoded flshinfo: {flshinfo:#?}");
 
                 if let Some(date_programmed) = flshinfo.get_mut("date_programmed") {
-                    *date_programmed = json!(111111); // Modify the value anc convert to a serde_json Value
+                    *date_programmed = json!(111111); // Modify the value and convert to a serde_json Value
                 }
                 // encode the updated flshinfo table
                 bh.encode_and_write_boot_fs_table(flshinfo.clone(), "flshinfo")

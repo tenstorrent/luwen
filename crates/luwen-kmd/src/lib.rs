@@ -534,7 +534,7 @@ impl PciDevice {
                 };
                 self.configure_tlb(tlb_allocation, config)?;
 
-                // The tlb addr selects the upper bits of the final noc addrress
+                // The tlb addr selects the upper bits of the final noc address
                 // therefore the lower bits are the offset into the tlb itself, selected by the lower bits of our size.
                 let tlb_offset = tlb.local_offset & (tlb_allocation.size - 1);
 

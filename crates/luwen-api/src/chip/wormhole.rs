@@ -669,7 +669,7 @@ impl ChipImpl for Wormhole {
                 const WH_6U_GLX_UPI: u64 = 0x35;
 
                 if board_upi != WH_6U_GLX_UPI {
-                    // Only try to initiliaze the ethernet if we are not in noc_safe mode.
+                    // Only try to initialize the ethernet if we are not in noc_safe mode.
                     if !status.init_options.noc_safe {
                         let status = &mut status.eth_status;
 
@@ -888,7 +888,7 @@ impl ChipImpl for Wormhole {
             // HACK(drosen): It's not currently possible to route galaxy->nb...
             // This is a limitation of the current ethernet firmware routing scheme,
             // but fixing it would require a large-ish firmware update and lots of testing so
-            // for now we are just ignoreing those routes.
+            // for now we are just ignoring those routes.
 
             // Get the neighbour's board type
             let next_board_type = self.noc_read32(
@@ -906,7 +906,7 @@ impl ChipImpl for Wormhole {
                 0x1ec0 + (self.eth_addrs.erisc_local_board_type_offset * 4),
             )?;
 
-            // Check if it's possble to have routing disabled
+            // Check if it's possible to have routing disabled
             let erisc_routing_disabled =
                 self.noc_read32(0, eth_x, eth_y, self.eth_addrs.boot_params + (19 * 4))? == 1;
 

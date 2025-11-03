@@ -5,7 +5,7 @@ use crate::error::PlatformError;
 
 use super::{AxiData, AxiError, ChipComms, ChipInterface};
 
-/// Convinence trait for high-level communication with an arbitrary chip.
+/// Convenience trait for high-level communication with an arbitrary chip.
 pub trait HlComms {
     fn comms_obj(&self) -> (&dyn ChipComms, &dyn ChipInterface);
 

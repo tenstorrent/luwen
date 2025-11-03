@@ -59,8 +59,8 @@ pub fn load_axi_table(file: &str, _version: u32) -> MemorySlices {
     bincode::deserialize(&data.data).unwrap()
 }
 
-/// This is a generic trait which defines the high level chip communication primatives.
-/// It's functions allow for the reading and writing of data to arbirary noc endpoints on any chip
+/// This is a generic trait which defines the high level chip communication primitives.
+/// It's functions allow for the reading and writing of data to arbitrary noc endpoints on any chip
 /// with the details of how the endpoint is accessed abstracted away.
 ///
 /// For the ARC endpoint special functions are defined because unlike most noc endpoints the ARC addresses
