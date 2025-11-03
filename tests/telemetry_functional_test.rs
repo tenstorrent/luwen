@@ -2,7 +2,7 @@
 
 use serial_test::serial;
 
-use luwen_api::ChipImpl;
+use luwen::api::ChipImpl;
 
 /// Functional tests for chip telemetry
 ///
@@ -35,7 +35,7 @@ mod tests {
     fn test_telemetry_heartbeat() {
         let _lock = TEST_LOCK.lock();
 
-        let chip = luwen_pci::open(0).unwrap();
+        let chip = luwen::pci::open(0).unwrap();
         println!("Detected chip; gathering telemetry");
 
         dbg!(chip.get_arch());
@@ -67,7 +67,7 @@ mod tests {
     fn test_voltage_readings() {
         let _lock = TEST_LOCK.lock();
 
-        let chip = luwen_pci::open(0).unwrap();
+        let chip = luwen::pci::open(0).unwrap();
         let telemetry = chip.get_telemetry().unwrap();
 
         drop(_lock);
@@ -86,7 +86,7 @@ mod tests {
     fn test_temperature_readings() {
         let _lock = TEST_LOCK.lock();
 
-        let chip = luwen_pci::open(0).unwrap();
+        let chip = luwen::pci::open(0).unwrap();
         let telemetry = chip.get_telemetry().unwrap();
 
         drop(_lock);
@@ -112,7 +112,7 @@ mod tests {
     #[cfg_attr(not(feature = "test_hardware"), ignore = "Requires real hardware")]
     fn test_telemetry_consistency() {
         let _lock = TEST_LOCK.lock();
-        let chip = luwen_pci::open(0).unwrap();
+        let chip = luwen::pci::open(0).unwrap();
 
         // Take multiple telemetry readings in quick succession
         let telem1 = chip.get_telemetry().unwrap();
