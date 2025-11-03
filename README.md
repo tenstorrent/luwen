@@ -1,34 +1,83 @@
 # Luwen
 
-Named after Antonie van Leeuwenhoek who invented the microsope.
+Named after Antonie van Leeuwenhoek, inventor of the microscope.
 
 ## Official Repository
 
 [https://github.com/tenstorrent/luwen](https://github.com/tenstorrent/luwen)
 
-## Prometheus Exporter
+## About
 
-Luwen includes a Prometheus exporter for hardware telemetry (see [`apps/prometheus-exporter/`](apps/prometheus-exporter/)).
+Luwen is a user-mode abstraction layer for accessing Tenstorrent accelerator
+hardware, designed to be used as a common interface for tooling development
+across hardware generations. It runs on the host system and manages
+communication with lower-level drivers and firmware.
+
+## Design
+
+There are three supported use cases:
+
+1. High-level interface to software tooling allowing all syseng diagnostics
+   collectable via `tt-smi` and `tt-mod` to be read back and interacted with as a
+   library.
+   - Only supports PCIe connections and remote connections via PCI.
+   - Ignores implementation details of using communication channels, such as
+     TLB allocation and core selection.
+1. General chip discovery and initialization, replacing `create-ethernet-map`
+   and `tt-smi`. Will probably also add the ability to issue resets.
+1. Low-level syseng-only debug capability (via Python bindings, as `pyluwen`).
+   - To avoid needing to have multiple in-flight stacks, access the implemented
+     communication APIs directly.
+   - Direct access to the types defined in `luwen-pci`, allowing modification
+     of TLBs and cores being used.
+
+## Organization
+
+Cargo — Rust's package manager — allows for a workspace of several crates to be
+specified within its [manifest](./Cargo.toml). Within this project, workspace
+crates are used with the structure as follows:
+
+```
+./
+├── Cargo.lock       # cargo lockfile
+├── Cargo.toml       # cargo manifest
+├── README.md        # this document
+├── ...
+├── apps/            # use-case applications
+├── bind/            # language bindings
+│   ├── libluwen/    # bindings for C++
+│   └── pyluwen/     # bindings for Python
+├── crates/          # implementation crates
+│   ├── luwen-api/   # core generalized API
+│   ├── luwen-def/   # common definitions
+│   ├── luwen-kmd/   # low-level driver API
+│   └── luwen-pci/   # PCI implementation
+├── examples/        # application examples
+├── src/             # top-level library
+└── tests/           # integration tests
+```
+
+### Apps
+
+#### Prometheus Exporter
+
+Luwen includes a Prometheus exporter for hardware telemetry (see
+[`apps/prometheus-exporter/`](./apps/prometheus-exporter/)).
 
 To start it:
 
 ```bash
-cargo build -p prometheus-exporter --release
-./target/release/prometheus-exporter
+cargo run --release -pprometheus-exporter
 ```
 
 Metrics are exposed at `http://localhost:8080/metrics`.
 
-## Design
+## License
 
-There are three usecases that I want to support here
+This project is licensed under [Apache License 2.0](./LICENSE). You have
+permission to use this code under the conditions of the license pursuant to the
+rights it grants.
 
-1. High level interface to software tooling allowing all syseng diagnostics collectable via tt-smi and tt-mod to be
-   readback and interacted with as a library. - This will only be a high level interface so it will only support pci connections and remote connections via pci - Will ignore all details of using communication channels such as which pci tlb or which erisc core to use.
-1. General chip discovery and init, replacing create-ethernet-map and tt-smi wait. We'll probably also add the ability
-   to issue resets.
-1. Low level syseng-only debug capability (via pyluwen)
-   - To avoid needing to have multiple in flight stacks you will be able to drop down a level and access the
-     implemented communication apis directly. Practically this means direct access to the types defined in luwen-pci.
-     This means that you can modify pci tlbs and erisc cores being used or cut out the middle man entirely and
-     issue raw calls.
+This software assists in programming Tenstorrent products. Making, using, or
+selling hardware, models, or IP may require the license of rights (such as
+patent rights) from Tenstorrent or others.
