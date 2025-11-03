@@ -832,8 +832,8 @@ impl ChipImpl for Wormhole {
         Ok(ChipInitResult::NoError)
     }
 
-    fn get_arch(&self) -> luwen_core::Arch {
-        luwen_core::Arch::Wormhole
+    fn get_arch(&self) -> luwen_def::Arch {
+        luwen_def::Arch::Wormhole
     }
 
     fn arc_msg(&self, msg: ArcMsgOptions) -> Result<ArcMsgOk, PlatformError> {

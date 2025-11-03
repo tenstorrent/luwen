@@ -668,8 +668,8 @@ impl ChipImpl for Blackhole {
         Ok(ChipInitResult::NoError)
     }
 
-    fn get_arch(&self) -> luwen_core::Arch {
-        luwen_core::Arch::Blackhole
+    fn get_arch(&self) -> luwen_def::Arch {
+        luwen_def::Arch::Blackhole
     }
 
     fn arc_msg(&self, msg: ArcMsgOptions) -> Result<ArcMsgOk, PlatformError> {

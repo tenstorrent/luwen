@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 
-use luwen_core::Arch;
+use luwen_def::Arch;
 
 use crate::{
     chip::{wait_for_init, Chip, InitError, InitStatus},

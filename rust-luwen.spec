@@ -201,25 +201,25 @@ maturin build --release %{?py_setup_args} %{?*}
 mkdir -p %{buildroot}%{cargo_registry}
 
 %{__cp} -av crates/luwen-api %{buildroot}%{path_luwen_api}
-# Modify the existing Cargo.toml to remove the path for luwen-core as we are moving it out to it's own place on the system
+# Modify the existing Cargo.toml to remove the path for luwen-def as we are moving it out to it's own place on the system
 tomcli \
 	set \
 	%{buildroot}%{path_luwen_api}/Cargo.toml \
 	str \
-	dependencies.luwen-core \
+	dependencies.luwen-def \
 	"$( \
 		tomcli \
 		get \
 		%{buildroot}%{path_luwen_api}/Cargo.toml \
-		dependencies.luwen-core.version \
+		dependencies.luwen-def.version \
 	)"
 echo "--- luwen-api Cargo.toml ---"
 cat %{buildroot}%{path_luwen_api}/Cargo.toml
 echo "--- /luwen-api Cargo.toml ---"
 %{__cp} -av crates/luwen-pci %{buildroot}%{path_luwen_pci}
-# Modify the existing Cargo.toml to remove the path for luwen-core as we are moving it out to it's own place on the system
+# Modify the existing Cargo.toml to remove the path for luwen-def as we are moving it out to it's own place on the system
 
-for x in luwen-core luwen-api luwen-kmd
+for x in luwen-def luwen-api luwen-kmd
 do
 	tomcli \
 		set \
@@ -235,19 +235,19 @@ do
 done
 
 %{__cp} -av crates/luwen-kmd %{buildroot}%{path_luwen_kmd}
-# Modify the existing Cargo.toml to remove the path for luwen-core as we are moving it out to it's own place on the system
+# Modify the existing Cargo.toml to remove the path for luwen-def as we are moving it out to it's own place on the system
 
-# luwen-core pathfix
+# luwen-def pathfix
 tomcli \
 	set \
 	%{buildroot}%{path_luwen_kmd}/Cargo.toml \
 	str \
-	dependencies.luwen-core \
+	dependencies.luwen-def \
 	"$( \
 		tomcli \
 		get \
 		%{buildroot}%{path_luwen_kmd}/Cargo.toml \
-		dependencies.luwen-core.version \
+		dependencies.luwen-def.version \
 	)"
 
 %if %{with check}

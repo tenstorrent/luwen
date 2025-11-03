@@ -8,7 +8,7 @@ license = "Apache-2.0"
 [dependencies]
 luwen-kmd = { workspace = true }
 luwen-api = { workspace = true }
-luwen-core = { workspace = true }
+luwen-def = { workspace = true }
 
 thiserror = { workspace = true }
 

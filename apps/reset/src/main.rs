@@ -51,11 +51,11 @@ fn main() {
         link_reset(interface);
         if let Ok(device) = luwen::kmd::PciDevice::open(interface) {
             let tracker = match device.arch {
-                luwen::core::Arch::Grayskull => continue,
-                luwen::core::Arch::Wormhole => {
+                luwen::def::Arch::Grayskull => continue,
+                luwen::def::Arch::Wormhole => {
                     Box::new(wormhole::ResetTracker::init(interface)) as Box<dyn Reset>
                 }
-                luwen::core::Arch::Blackhole => {
+                luwen::def::Arch::Blackhole => {
                     Box::new(blackhole::ResetTracker::init(interface)) as Box<dyn Reset>
                 }
             };

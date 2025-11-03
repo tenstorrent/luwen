@@ -8,7 +8,7 @@ use std::{
 
 use error::LuwenError;
 use luwen_api::{FnDriver, FnOptions};
-use luwen_core::Arch;
+use luwen_def::Arch;
 use luwen_kmd::{PciError, PossibleTlbAllocation};
 
 mod detect;
@@ -59,9 +59,9 @@ impl ExtendedPciDevice {
         let device = PciDevice::open(pci_interface)?;
 
         let (grid_size_x, grid_size_y) = match device.arch {
-            luwen_core::Arch::Grayskull => (13, 12),
-            luwen_core::Arch::Wormhole => (10, 12),
-            luwen_core::Arch::Blackhole => (17, 12),
+            luwen_def::Arch::Grayskull => (13, 12),
+            luwen_def::Arch::Wormhole => (10, 12),
+            luwen_def::Arch::Blackhole => (17, 12),
         };
 
         let default_tlb;
@@ -90,8 +90,8 @@ impl ExtendedPciDevice {
         } else {
             // Otherwise fallback to default behaviour of just taking a constant one
             default_tlb = PossibleTlbAllocation::Hardcoded(match device.arch {
-                luwen_core::Arch::Grayskull | luwen_core::Arch::Wormhole => 184,
-                luwen_core::Arch::Blackhole => 190,
+                luwen_def::Arch::Grayskull | luwen_def::Arch::Wormhole => 184,
+                luwen_def::Arch::Blackhole => 190,
             });
         }
 
@@ -266,9 +266,9 @@ pub fn comms_callback_inner(
                 let writer: &mut ExtendedPciDevice = &mut writer;
 
                 let (x_start, y_start) = match writer.device.arch {
-                    luwen_core::Arch::Grayskull => (0, 0),
-                    luwen_core::Arch::Wormhole => (1, 0),
-                    luwen_core::Arch::Blackhole => (0, 1),
+                    luwen_def::Arch::Grayskull => (0, 0),
+                    luwen_def::Arch::Wormhole => (1, 0),
+                    luwen_def::Arch::Blackhole => (0, 1),
                 };
 
                 writer.device.noc_write(
@@ -300,9 +300,9 @@ pub fn comms_callback_inner(
                 let writer: &mut ExtendedPciDevice = &mut writer;
 
                 let (min_start_x, min_start_y) = match writer.device.arch {
-                    luwen_core::Arch::Grayskull => (0, 0),
-                    luwen_core::Arch::Wormhole => (1, 0),
-                    luwen_core::Arch::Blackhole => (0, 1),
+                    luwen_def::Arch::Grayskull => (0, 0),
+                    luwen_def::Arch::Wormhole => (1, 0),
+                    luwen_def::Arch::Blackhole => (0, 1),
                 };
 
                 let (start_x, start_y) = (start_x.max(min_start_x), start_y.max(min_start_y));

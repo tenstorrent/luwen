@@ -1,5 +1,5 @@
 [package]
-name = "luwen-core"
+name = "luwen-def"
 version = "0.2.1"
 description = "Common dependencies shared by all crates based on luwen"
 edition = "2021"

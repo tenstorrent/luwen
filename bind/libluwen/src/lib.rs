@@ -361,8 +361,8 @@ pub fn callback_glue(
 #[no_mangle]
 pub extern "C" fn luwen_open(arch: Arch, glue: LuwenGlue) -> *mut Chip {
     let arch = match arch {
-        Arch::GRAYSKULL => luwen_core::Arch::Grayskull,
-        Arch::WORMHOLE => luwen_core::Arch::Wormhole,
+        Arch::GRAYSKULL => luwen_def::Arch::Grayskull,
+        Arch::WORMHOLE => luwen_def::Arch::Wormhole,
     };
 
     if let Ok(chip) = luwen_api::chip::Chip::open(

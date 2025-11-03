@@ -26,7 +26,7 @@ pub use init::{
     status::{CommsStatus, ComponentStatusInfo},
     wait_for_init, CallReason, ChipDetectState, InitError,
 };
-use luwen_core::Arch;
+use luwen_def::Arch;
 pub use wormhole::Wormhole;
 
 use crate::arc_msg::TypedArcMsg;

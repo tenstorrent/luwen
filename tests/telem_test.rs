@@ -3,7 +3,7 @@
 use serial_test::serial;
 
 use luwen_api::{chip::HlCommsInterface, ChipImpl};
-use luwen_core::Arch;
+use luwen_def::Arch;
 
 /// Test utilities for verifying telemetry functionality
 ///

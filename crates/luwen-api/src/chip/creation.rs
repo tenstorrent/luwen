@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use luwen_core::Arch;
+use luwen_def::Arch;
 
 use crate::{
     arc_msg::ArcMsgAddr,

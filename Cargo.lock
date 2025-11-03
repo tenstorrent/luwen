@@ -743,7 +743,7 @@ dependencies = [
  "cbindgen",
  "cc",
  "luwen-api",
- "luwen-core",
+ "luwen-def",
  "tempfile",
 ]
 
@@ -798,7 +798,7 @@ dependencies = [
  "bincode",
  "clap",
  "luwen-api",
- "luwen-core",
+ "luwen-def",
  "luwen-kmd",
  "luwen-pci",
  "nom",
@@ -817,7 +817,7 @@ dependencies = [
  "bitfield-struct",
  "bytemuck",
  "home",
- "luwen-core",
+ "luwen-def",
  "num-derive",
  "num-traits",
  "once_cell",
@@ -831,7 +831,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "luwen-core"
+name = "luwen-def"
 version = "0.2.1"
 dependencies = [
  "thiserror 1.0.69",
@@ -842,7 +842,7 @@ name = "luwen-kmd"
 version = "0.2.4"
 dependencies = [
  "bitfield-struct",
- "luwen-core",
+ "luwen-def",
  "memmap2",
  "nix",
  "thiserror 1.0.69",
@@ -855,7 +855,7 @@ version = "0.7.11"
 dependencies = [
  "indicatif",
  "luwen-api",
- "luwen-core",
+ "luwen-def",
  "luwen-kmd",
  "thiserror 1.0.69",
  "tracing",
@@ -1206,7 +1206,7 @@ name = "pyluwen"
 version = "0.7.12"
 dependencies = [
  "luwen-api",
- "luwen-core",
+ "luwen-def",
  "luwen-kmd",
  "luwen-pci",
  "pyo3",

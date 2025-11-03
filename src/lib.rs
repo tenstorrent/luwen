@@ -1,6 +1,6 @@
 /// Common dependencies.
 #[doc(inline)]
-pub use luwen_core as core;
+pub use luwen_def as def;
 
 /// PCIe communication.
 #[doc(inline)]

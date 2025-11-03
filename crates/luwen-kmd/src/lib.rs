@@ -19,7 +19,7 @@ pub use error::{PciError, PciOpenError};
 use ioctl::{
     query_mappings, AllocateDmaBuffer, GetDeviceInfo, GetDeviceInfoOut, Mapping, QueryMappings,
 };
-use luwen_core::Arch;
+use luwen_def::Arch;
 pub use tlb::{DeviceTlbInfo, Tlb};
 
 impl TryFrom<&GetDeviceInfoOut> for Arch {

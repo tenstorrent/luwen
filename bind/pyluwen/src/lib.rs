@@ -12,7 +12,7 @@ use luwen_api::chip::{
     ChipImpl, HlComms, HlCommsInterface, InitError, NocInterface,
 };
 use luwen_api::{CallbackStorage, ChipDetectOptions, DeviceInfo, UninitChip};
-use luwen_core::Arch;
+use luwen_def::Arch;
 use luwen_kmd::PossibleTlbAllocation;
 use luwen_pci::{DmaConfig, ExtendedPciDeviceWrapper};
 use pyo3::exceptions::PyException;

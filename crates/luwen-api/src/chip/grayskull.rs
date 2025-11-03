@@ -3,7 +3,7 @@
 
 use std::{backtrace, sync::Arc};
 
-use luwen_core::Arch;
+use luwen_def::Arch;
 
 use crate::{
     arc_msg::{ArcMsgAddr, ArcMsgOk, ArcMsgProtocolError, TypedArcMsg},
@@ -577,7 +577,7 @@ impl ChipImpl for Grayskull {
         Ok(ChipInitResult::NoError)
     }
 
-    fn get_arch(&self) -> luwen_core::Arch {
+    fn get_arch(&self) -> luwen_def::Arch {
         Arch::Grayskull
     }
 

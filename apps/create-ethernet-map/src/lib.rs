@@ -7,7 +7,7 @@ use luwen::api::{
     chip::{ArcMsgOptions, HlComms, NeighbouringChip},
     ChipImpl, EthAddr,
 };
-use luwen::core::Arch;
+use luwen::def::Arch;
 use luwen::{Error, Result};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]

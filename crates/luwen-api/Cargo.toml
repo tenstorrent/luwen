@@ -6,7 +6,7 @@ edition = "2021"
 license = "Apache-2.0"
 
 [dependencies]
-luwen-core = { workspace = true }
+luwen-def = { workspace = true }
 thiserror = { workspace = true }
 
 serde = {version = "1.0.185", features = ["derive"]}

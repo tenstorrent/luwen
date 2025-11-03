@@ -18,7 +18,7 @@ serde = { "version" = "1.0.164", features = ["derive"] }
 serde_json = "1.0.117"
 serde_yaml = "0.9.22"
 # luwen
-luwen-core = { workspace = true }
+luwen-def = { workspace = true }
 luwen-api = { workspace = true }
 luwen-pci = { workspace = true }
 luwen-kmd = { workspace = true }
@@ -54,7 +54,7 @@ members = [
 thiserror = "1.0.40"
 # luwen
 luwen = { path = ".", verison = "0.7.14" }
-luwen-core = { path = "crates/luwen-core", version = "0.2.0" }
+luwen-def = { path = "crates/luwen-def", version = "0.2.0" }
 luwen-api = { path = "crates/luwen-api", version = "0.7.8" }
 luwen-pci = { path = "crates/luwen-pci", version = "0.7.8" }
 luwen-kmd = { path = "crates/luwen-kmd", version = "0.2.1" }

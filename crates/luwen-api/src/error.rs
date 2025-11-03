@@ -3,7 +3,7 @@
 
 use std::fmt::Display;
 
-use luwen_core::Arch;
+use luwen_def::Arch;
 use thiserror::Error;
 
 use crate::arc_msg::ArcMsgError;
