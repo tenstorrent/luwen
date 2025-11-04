@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use luwen_api::{
+use luwen::api::{
     chip::ArcMsgOptions, error::PlatformError, ArcMsg, ArcMsgError, ArcMsgProtocolError,
     CallbackStorage, ChipImpl, FnOptions,
 };
@@ -14,9 +14,9 @@ pub struct EthAddr {
     rack_y: u8,
 }
 
-impl From<EthAddr> for luwen_api::EthAddr {
+impl From<EthAddr> for luwen::api::EthAddr {
     fn from(value: EthAddr) -> Self {
-        luwen_api::EthAddr {
+        luwen::api::EthAddr {
             shelf_x: value.shelf_x,
             shelf_y: value.shelf_y,
             rack_x: value.rack_x,
@@ -45,9 +45,9 @@ pub struct DeviceInfo {
     pub board_id: u16,
 }
 
-impl From<DeviceInfo> for luwen_api::DeviceInfo {
+impl From<DeviceInfo> for luwen::api::DeviceInfo {
     fn from(value: DeviceInfo) -> Self {
-        luwen_api::DeviceInfo {
+        luwen::api::DeviceInfo {
             interface_id: value.interface_id,
             domain: value.domain,
             bus: value.bus,
@@ -156,11 +156,11 @@ pub struct LuwenGlue {
     ),
 }
 
-/// Newtype wrapper for luwen_api::chip::Chip
-pub struct Chip(luwen_api::chip::Chip);
+/// Newtype wrapper for [`luwen::api::chip::Chip`]
+pub struct Chip(luwen::api::chip::Chip);
 
 impl std::ops::Deref for Chip {
-    type Target = luwen_api::chip::Chip;
+    type Target = luwen::api::chip::Chip;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -179,7 +179,7 @@ pub fn callback_glue(
 ) -> Result<(), Box<dyn std::error::Error>> {
     match options {
         FnOptions::Driver(op) => match op {
-            luwen_api::FnDriver::DeviceInfo(info) => {
+            luwen::api::FnDriver::DeviceInfo(info) => {
                 let option = (glue_data.device_info)(glue_data.user_data);
                 unsafe {
                     *info = Some(option.into());
@@ -188,17 +188,17 @@ pub fn callback_glue(
             }
         },
         FnOptions::Axi(op) => match op {
-            luwen_api::FnAxi::Read { addr, data, len } => {
+            luwen::api::FnAxi::Read { addr, data, len } => {
                 (glue_data.axi_read)(addr, data, len, glue_data.user_data);
                 Ok(())
             }
-            luwen_api::FnAxi::Write { addr, data, len } => {
+            luwen::api::FnAxi::Write { addr, data, len } => {
                 (glue_data.axi_write)(addr, data, len, glue_data.user_data);
                 Ok(())
             }
         },
         FnOptions::Noc(op) => match op {
-            luwen_api::FnNoc::Read {
+            luwen::api::FnNoc::Read {
                 noc_id,
                 x,
                 y,
@@ -209,7 +209,7 @@ pub fn callback_glue(
                 (glue_data.noc_read)(noc_id, x, y, addr, data, len, glue_data.user_data);
                 Ok(())
             }
-            luwen_api::FnNoc::Write {
+            luwen::api::FnNoc::Write {
                 noc_id,
                 x,
                 y,
@@ -220,7 +220,7 @@ pub fn callback_glue(
                 (glue_data.noc_write)(noc_id, x, y, addr, data, len, glue_data.user_data);
                 Ok(())
             }
-            luwen_api::FnNoc::Broadcast {
+            luwen::api::FnNoc::Broadcast {
                 noc_id,
                 addr,
                 data,
@@ -229,7 +229,7 @@ pub fn callback_glue(
                 (glue_data.noc_broadcast)(noc_id, addr, data, len, glue_data.user_data);
                 Ok(())
             }
-            luwen_api::FnNoc::Multicast {
+            luwen::api::FnNoc::Multicast {
                 noc_id,
                 start_x,
                 start_y,
@@ -254,7 +254,7 @@ pub fn callback_glue(
             }
         },
         FnOptions::Eth(op) => match op.rw {
-            luwen_api::FnNoc::Read {
+            luwen::api::FnNoc::Read {
                 noc_id,
                 x,
                 y,
@@ -279,7 +279,7 @@ pub fn callback_glue(
                 );
                 Ok(())
             }
-            luwen_api::FnNoc::Write {
+            luwen::api::FnNoc::Write {
                 noc_id,
                 x,
                 y,
@@ -304,7 +304,7 @@ pub fn callback_glue(
                 );
                 Ok(())
             }
-            luwen_api::FnNoc::Broadcast {
+            luwen::api::FnNoc::Broadcast {
                 noc_id,
                 addr,
                 data,
@@ -325,7 +325,7 @@ pub fn callback_glue(
                 );
                 Ok(())
             }
-            luwen_api::FnNoc::Multicast {
+            luwen::api::FnNoc::Multicast {
                 noc_id,
                 start_x,
                 start_y,
@@ -361,11 +361,11 @@ pub fn callback_glue(
 #[no_mangle]
 pub extern "C" fn luwen_open(arch: Arch, glue: LuwenGlue) -> *mut Chip {
     let arch = match arch {
-        Arch::GRAYSKULL => luwen_def::Arch::Grayskull,
-        Arch::WORMHOLE => luwen_def::Arch::Wormhole,
+        Arch::GRAYSKULL => luwen::def::Arch::Grayskull,
+        Arch::WORMHOLE => luwen::def::Arch::Wormhole,
     };
 
-    if let Ok(chip) = luwen_api::chip::Chip::open(
+    if let Ok(chip) = luwen::api::chip::Chip::open(
         arch,
         CallbackStorage {
             callback: callback_glue,
@@ -386,8 +386,8 @@ pub unsafe extern "C" fn luwen_open_remote(local_chip: *mut Chip, addr: EthAddr)
     let local_chip = unsafe { &*local_chip };
 
     if let Some(wh) = local_chip.as_wh() {
-        let remote = wh.open_remote(luwen_api::EthAddr::from(addr)).unwrap();
-        Box::leak(Box::new(Chip(luwen_api::chip::Chip::from(
+        let remote = wh.open_remote(luwen::api::EthAddr::from(addr)).unwrap();
+        Box::leak(Box::new(Chip(luwen::api::chip::Chip::from(
             Box::new(remote) as Box<dyn ChipImpl>,
         ))))
     } else {
@@ -454,7 +454,7 @@ pub extern "C" fn chip_arc_msg(
         ..Default::default()
     }) {
         Ok(value) => match value {
-            luwen_api::ArcMsgOk::Ok { rc, arg } => {
+            luwen::api::ArcMsgOk::Ok { rc, arg } => {
                 if !return_3.is_null() {
                     unsafe {
                         *return_3 = arg;
@@ -462,7 +462,7 @@ pub extern "C" fn chip_arc_msg(
                 }
                 CResult::ok(rc)
             }
-            luwen_api::ArcMsgOk::OkNoWait => CResult::ok(0),
+            luwen::api::ArcMsgOk::OkNoWait => CResult::ok(0),
         },
         Err(err) => {
             if let PlatformError::ArcMsgError(ArcMsgError::ProtocolError {
@@ -483,8 +483,8 @@ pub struct Telemetry {
     board_id: u64,
 }
 
-impl From<luwen_api::chip::Telemetry> for Telemetry {
-    fn from(value: luwen_api::chip::Telemetry) -> Self {
+impl From<luwen::api::chip::Telemetry> for Telemetry {
+    fn from(value: luwen::api::chip::Telemetry) -> Self {
         Telemetry {
             board_id: value.board_id,
         }

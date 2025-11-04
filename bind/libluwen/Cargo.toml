@@ -27,8 +27,7 @@ name = "luwen"
 crate-type = ["cdylib"]
 
 [dependencies]
-luwen-api = { workspace = true }
-luwen-def = { workspace = true }
+luwen = { workspace = true }
 
 [dev-dependencies]
 cc = "1.2.24"

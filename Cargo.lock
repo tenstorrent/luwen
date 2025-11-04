@@ -769,8 +769,7 @@ version = "0.7.10"
 dependencies = [
  "cbindgen",
  "cc",
- "luwen-api",
- "luwen-def",
+ "luwen",
  "tempfile",
 ]
 
