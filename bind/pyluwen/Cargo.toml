@@ -26,10 +26,7 @@ independent = true
 crate-type = ["cdylib"]
 
 [dependencies]
-luwen-api = { workspace = true }
-luwen-def = { workspace = true }
-luwen-kmd = { workspace = true }
-luwen-pci = { workspace = true }
+luwen = { workspace = true }
 pyo3 = { version = "0.19.2", features = ["extension-module", "multiple-pymethods"] }
 serde_json = "1.0.117"
 

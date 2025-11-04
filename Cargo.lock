@@ -1217,10 +1217,7 @@ checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
 name = "pyluwen"
 version = "0.7.12"
 dependencies = [
- "luwen-api",
- "luwen-def",
- "luwen-kmd",
- "luwen-pci",
+ "luwen",
  "pyo3",
  "serde_json",
 ]

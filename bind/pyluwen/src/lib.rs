@@ -7,14 +7,14 @@
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
-use luwen_api::chip::{
+use luwen::api::chip::{
     ubb_wait_for_driver_load, wait_for_init, wh_ubb_ipmi_reset, ArcMsg, ArcMsgOk, ArcMsgOptions,
     ChipImpl, HlComms, HlCommsInterface, InitError, NocInterface,
 };
-use luwen_api::{CallbackStorage, ChipDetectOptions, DeviceInfo, UninitChip};
-use luwen_def::Arch;
-use luwen_kmd::PossibleTlbAllocation;
-use luwen_pci::{DmaConfig, ExtendedPciDeviceWrapper};
+use luwen::api::{CallbackStorage, ChipDetectOptions, DeviceInfo, UninitChip};
+use luwen::def::Arch;
+use luwen::kmd::PossibleTlbAllocation;
+use luwen::pci::{DmaConfig, ExtendedPciDeviceWrapper};
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
@@ -22,10 +22,10 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 #[pyclass]
-pub struct PciChip(luwen_api::chip::Chip);
+pub struct PciChip(luwen::api::chip::Chip);
 
 impl Deref for PciChip {
-    type Target = luwen_api::chip::Chip;
+    type Target = luwen::api::chip::Chip;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -39,10 +39,10 @@ impl DerefMut for PciChip {
 }
 
 #[pyclass]
-pub struct PciWormhole(luwen_api::chip::Wormhole);
+pub struct PciWormhole(luwen::api::chip::Wormhole);
 
 impl Deref for PciWormhole {
-    type Target = luwen_api::chip::Wormhole;
+    type Target = luwen::api::chip::Wormhole;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -56,10 +56,10 @@ impl DerefMut for PciWormhole {
 }
 
 #[pyclass]
-pub struct PciGrayskull(luwen_api::chip::Grayskull);
+pub struct PciGrayskull(luwen::api::chip::Grayskull);
 
 impl Deref for PciGrayskull {
-    type Target = luwen_api::chip::Grayskull;
+    type Target = luwen::api::chip::Grayskull;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -73,10 +73,10 @@ impl DerefMut for PciGrayskull {
 }
 
 #[pyclass]
-pub struct PciBlackhole(luwen_api::chip::Blackhole);
+pub struct PciBlackhole(luwen::api::chip::Blackhole);
 
 impl Deref for PciBlackhole {
-    type Target = luwen_api::chip::Blackhole;
+    type Target = luwen::api::chip::Blackhole;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -90,7 +90,7 @@ impl DerefMut for PciBlackhole {
 }
 
 #[pyclass]
-pub struct DmaBuffer(luwen_pci::DmaBuffer);
+pub struct DmaBuffer(luwen::pci::DmaBuffer);
 
 #[pymethods]
 impl DmaBuffer {
@@ -113,8 +113,8 @@ pub struct NeighbouringChip {
     eth_addr: EthAddr,
 }
 
-impl From<luwen_api::chip::NeighbouringChip> for NeighbouringChip {
-    fn from(value: luwen_api::chip::NeighbouringChip) -> Self {
+impl From<luwen::api::chip::NeighbouringChip> for NeighbouringChip {
+    fn from(value: luwen::api::chip::NeighbouringChip) -> Self {
         Self {
             local_noc_addr: value.local_noc_addr,
             remote_noc_addr: value.remote_noc_addr,
@@ -294,8 +294,8 @@ pub struct Telemetry {
     #[pyo3(get)]
     tdp_limit_max: u32,
 }
-impl From<luwen_api::chip::Telemetry> for Telemetry {
-    fn from(value: luwen_api::chip::Telemetry) -> Self {
+impl From<luwen::api::chip::Telemetry> for Telemetry {
+    fn from(value: luwen::api::chip::Telemetry) -> Self {
         Self {
             board_id: value.board_id,
             enum_version: value.enum_version,
@@ -393,8 +393,8 @@ pub struct AxiData {
     size: u64,
 }
 
-impl From<luwen_api::chip::AxiData> for AxiData {
-    fn from(value: luwen_api::chip::AxiData) -> Self {
+impl From<luwen::api::chip::AxiData> for AxiData {
+    fn from(value: luwen::api::chip::AxiData) -> Self {
         Self {
             addr: value.addr,
             size: value.size,
@@ -636,23 +636,23 @@ macro_rules! common_chip_comms_impls {
 }
 
 #[pyclass]
-struct PyChipDetectState(luwen_api::chip::ChipDetectState<'static>);
+struct PyChipDetectState(luwen::api::chip::ChipDetectState<'static>);
 
 #[pymethods]
 impl PyChipDetectState {
     pub fn new_chip(&self) -> bool {
-        matches!(self.0.call, luwen_api::chip::CallReason::NewChip)
+        matches!(self.0.call, luwen::api::chip::CallReason::NewChip)
     }
 
     pub fn correct_down(&self) -> bool {
-        matches!(self.0.call, luwen_api::chip::CallReason::NotNew)
+        matches!(self.0.call, luwen::api::chip::CallReason::NotNew)
     }
 
     pub fn status_string(&self) -> Option<String> {
         match self.0.call {
-            luwen_api::chip::CallReason::NewChip | luwen_api::chip::CallReason::NotNew => None,
-            luwen_api::chip::CallReason::ChipInitCompleted(status)
-            | luwen_api::chip::CallReason::InitWait(status) => Some(format!(
+            luwen::api::chip::CallReason::NewChip | luwen::api::chip::CallReason::NotNew => None,
+            luwen::api::chip::CallReason::ChipInitCompleted(status)
+            | luwen::api::chip::CallReason::InitWait(status) => Some(format!(
                 "{}\n{}\n{}",
                 status.arc_status, status.dram_status, status.eth_status
             )),
@@ -705,7 +705,7 @@ impl PciChip {
     pub fn new(pci_interface: Option<usize>) -> PyResult<Self> {
         let pci_interface = pci_interface.unwrap_or(0);
 
-        let chip = luwen_pci::ExtendedPciDevice::open(pci_interface).map_err(|v| {
+        let chip = luwen::pci::ExtendedPciDevice::open(pci_interface).map_err(|v| {
             PyException::new_err(format!(
                 "Could not open chip on pci interface {pci_interface}\n Failed with: {v}"
             ))
@@ -714,10 +714,10 @@ impl PciChip {
         let arch = chip.borrow().device.arch;
 
         Ok(PciChip(
-            luwen_api::chip::Chip::open(
+            luwen::api::chip::Chip::open(
                 arch,
-                luwen_api::CallbackStorage {
-                    callback: luwen_pci::comms_callback,
+                luwen::api::CallbackStorage {
+                    callback: luwen::pci::comms_callback,
                     user_data: chip,
                 },
             )
@@ -729,15 +729,15 @@ impl PciChip {
     pub fn init(&mut self, callback: Option<PyObject>) -> PyResult<()> {
         #[allow(clippy::type_complexity)]
         let mut callback: Box<
-            dyn FnMut(luwen_api::chip::ChipDetectState) -> Result<(), PyErr>,
+            dyn FnMut(luwen::api::chip::ChipDetectState) -> Result<(), PyErr>,
         > = if let Some(callback) = callback {
             Box::new(move |status| {
                 // Safety: This is extremely unsafe, the alternative would be to copy the status for
                 // every invocation.
                 let status = unsafe {
                     std::mem::transmute::<
-                        luwen_api::chip::ChipDetectState<'_>,
-                        luwen_api::chip::ChipDetectState<'_>,
+                        luwen::api::chip::ChipDetectState<'_>,
+                        luwen::api::chip::ChipDetectState<'_>,
                     >(status)
                 };
                 if let Err(err) =
@@ -831,8 +831,8 @@ impl PciGrayskull {
         let value = PciInterface::from_gs(self);
 
         if let Some(value) = value {
-            match luwen_kmd::tlb::Ordering::from(ordering) {
-                luwen_kmd::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
+            match luwen::kmd::tlb::Ordering::from(ordering) {
+                luwen::kmd::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
                     "Invalid ordering {ordering}."
                 ))),
                 ordering => value.setup_tlb(
@@ -976,7 +976,7 @@ impl PciInterface<'_> {
         y_end: u8,
         noc_sel: u8,
         mcast: bool,
-        ordering: luwen_kmd::tlb::Ordering,
+        ordering: luwen::kmd::tlb::Ordering,
         linked: bool,
     ) -> PyResult<(u64, u64)> {
         self.pci_interface
@@ -984,7 +984,7 @@ impl PciInterface<'_> {
             .device
             .setup_tlb(
                 &PossibleTlbAllocation::Hardcoded(index),
-                luwen_kmd::Tlb {
+                luwen::kmd::Tlb {
                     local_offset: addr,
                     x_end,
                     y_end,
@@ -1112,8 +1112,8 @@ pub struct EthAddr {
     pub rack_y: u8,
 }
 
-impl From<luwen_api::EthAddr> for EthAddr {
-    fn from(value: luwen_api::EthAddr) -> Self {
+impl From<luwen::api::EthAddr> for EthAddr {
+    fn from(value: luwen::api::EthAddr) -> Self {
         Self {
             shelf_x: value.shelf_x,
             shelf_y: value.shelf_y,
@@ -1156,8 +1156,8 @@ impl PciWormhole {
         let value = PciInterface::from_wh(self);
 
         if let Some(value) = value {
-            match luwen_kmd::tlb::Ordering::from(ordering) {
-                luwen_kmd::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
+            match luwen::kmd::tlb::Ordering::from(ordering) {
+                luwen::kmd::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
                     "Invalid ordering {ordering}."
                 ))),
                 ordering => value.setup_tlb(
@@ -1305,7 +1305,7 @@ impl PciWormhole {
 common_chip_comms_impls!(PciWormhole);
 
 #[pyclass]
-pub struct RemoteWormhole(luwen_api::chip::Wormhole);
+pub struct RemoteWormhole(luwen::api::chip::Wormhole);
 
 common_chip_comms_impls!(RemoteWormhole);
 
@@ -1361,8 +1361,8 @@ impl PciBlackhole {
         let value = PciInterface::from_bh(self);
 
         if let Some(value) = value {
-            match luwen_kmd::tlb::Ordering::from(ordering) {
-                luwen_kmd::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
+            match luwen::kmd::tlb::Ordering::from(ordering) {
+                luwen::kmd::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
                     "Invalid ordering {ordering}."
                 ))),
                 ordering => value.setup_tlb(
@@ -1643,7 +1643,7 @@ pub fn detect_chips_fallible(
 ) -> PyResult<Vec<UninitPciChip>> {
     let interfaces = interfaces.unwrap_or_default();
 
-    let all_devices = luwen_pci::PciDevice::scan();
+    let all_devices = luwen::pci::PciDevice::scan();
     let interfaces = if interfaces.is_empty() {
         all_devices
     } else {
@@ -1701,15 +1701,15 @@ pub fn detect_chips_fallible(
     };
 
     #[allow(clippy::type_complexity)]
-    let mut callback: Box<dyn FnMut(luwen_api::chip::ChipDetectState) -> Result<(), PyErr>> =
+    let mut callback: Box<dyn FnMut(luwen::api::chip::ChipDetectState) -> Result<(), PyErr>> =
         if let Some(callback) = callback {
             Box::new(move |status| {
                 // Safety: This is extremely unsafe, the alternative would be to copy the status for
                 // every invocation.
                 let status = unsafe {
                     std::mem::transmute::<
-                        luwen_api::chip::ChipDetectState<'_>,
-                        luwen_api::chip::ChipDetectState<'_>,
+                        luwen::api::chip::ChipDetectState<'_>,
+                        luwen::api::chip::ChipDetectState<'_>,
                     >(status)
                 };
                 if let Err(err) =
@@ -1723,7 +1723,7 @@ pub fn detect_chips_fallible(
         } else {
             Box::new(|_| Python::with_gil(|py| py.check_signals()))
         };
-    let mut chips = match luwen_api::detect_chips(root_chips, &mut callback, options) {
+    let mut chips = match luwen::api::detect_chips(root_chips, &mut callback, options) {
         Ok(chips) => chips,
         Err(InitError::PlatformError(err)) => {
             return Err(PyException::new_err(err.to_string()))?;
@@ -1733,8 +1733,8 @@ pub fn detect_chips_fallible(
         }
     };
     for (id, chip, err) in failed_chips.into_iter() {
-        let mut status = luwen_api::chip::InitStatus::new_unknown();
-        status.comms_status = luwen_api::chip::CommsStatus::CommunicationError(err.to_string());
+        let mut status = luwen::api::chip::InitStatus::new_unknown();
+        status.comms_status = luwen::api::chip::CommsStatus::CommunicationError(err.to_string());
         status.unknown_state = false;
         chips.insert(
             id,
@@ -1778,7 +1778,7 @@ pub fn detect_chips(
 
 #[pyfunction]
 pub fn pci_scan() -> Vec<usize> {
-    luwen_pci::PciDevice::scan()
+    luwen::pci::PciDevice::scan()
 }
 
 #[pyfunction]
