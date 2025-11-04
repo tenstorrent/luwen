@@ -6,6 +6,17 @@
   Named after Antonie van Leeuwenhoek, inventor of the microscope.
 </p>
 
+[![documentation][docs.badge]][docs.hyper]
+[![crates.io pkg][rust.badge]][rust.hyper]
+[![pypi bindings][pypi.badge]][pypi.hyper]
+
+[docs.badge]: https://img.shields.io/docsrs/luwen
+[docs.hyper]: https://docs.rs/crate/luwen
+[pypi.badge]: https://img.shields.io/pypi/v/pyluwen
+[pypi.hyper]: https://pypi.org/project/pyluwen
+[rust.badge]: https://img.shields.io/crates/v/luwen
+[rust.hyper]: https://crates.io/crates/luwen
+
 ## About
 
 Luwen is a user-mode abstraction layer for accessing Tenstorrent accelerator
