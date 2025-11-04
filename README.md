@@ -42,6 +42,11 @@ There are three supported use cases:
    - Direct access to the types defined in `luwen-pci`, allowing modification
      of TLBs and cores being used.
 
+## Installation
+
+See the included [`INSTALL.md`](./INSTALL.md) for detailed instructions on how
+to build and install Luwen.
+
 ## Organization
 
 Cargo — Rust's package manager — allows for a workspace of several crates to be
