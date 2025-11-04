@@ -1,10 +1,10 @@
-# Luwen
+<h1 align="center">
+  <p>Luwen</p>
+</h1>
 
-Named after Antonie van Leeuwenhoek, inventor of the microscope.
-
-## Official Repository
-
-[https://github.com/tenstorrent/luwen](https://github.com/tenstorrent/luwen)
+<p align="center">
+  Named after Antonie van Leeuwenhoek, inventor of the microscope.
+</p>
 
 ## About
 
