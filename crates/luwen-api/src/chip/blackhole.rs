@@ -13,7 +13,7 @@ use crate::{
         hl_comms::HlCommsInterface,
     },
     error::{BtWrapper, PlatformError},
-    ChipImpl,
+    ArcMsg, ChipImpl,
 };
 
 use super::{
@@ -674,17 +674,29 @@ impl ChipImpl for Blackhole {
 
     fn arc_msg(&self, msg: ArcMsgOptions) -> Result<ArcMsgOk, PlatformError> {
         let code = msg.msg.msg_code();
-        let args = msg.msg.args();
+        let data = if let ArcMsg::Buf(msg) = msg.msg {
+            &msg.clone()[1..]
+        } else {
+            let args = msg.msg.args();
+            &[args.0 as u32 | ((args.1 as u32) << 16)]
+        };
 
-        let (_status, rc, response) = self.bh_arc_msg(
-            code as u8,
-            None,
-            &[args.0 as u32 | ((args.1 as u32) << 16)],
-            Some(msg.timeout),
-        )?;
-        Ok(ArcMsgOk::Ok {
-            rc: rc as u32,
-            arg: response[0],
+        let (_status, rc, response) = self.bh_arc_msg(code as u8, None, data, Some(msg.timeout))?;
+        Ok(match msg.msg {
+            ArcMsg::Buf(_) => ArcMsgOk::OkBuf([
+                u32::from(rc),
+                response[0],
+                response[1],
+                response[2],
+                response[3],
+                response[4],
+                response[5],
+                response[6],
+            ]),
+            _ => ArcMsgOk::Ok {
+                rc: rc as u32,
+                arg: response[0],
+            },
         })
     }
 

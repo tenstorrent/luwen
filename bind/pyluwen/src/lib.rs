@@ -594,6 +594,7 @@ macro_rules! common_chip_comms_impls {
                         Ok(ArcMsgOk::Ok {rc, arg}) => {
                             Ok(Some((arg, rc)))
                         }
+                        Ok(ArcMsgOk::OkBuf(_)) => unreachable!(),
                         Ok(ArcMsgOk::OkNoWait) => {
                             Ok(None)
                         }
@@ -1429,6 +1430,42 @@ impl PciBlackhole {
 }
 
 common_chip_comms_impls!(PciBlackhole);
+
+#[pymethods]
+impl PciBlackhole {
+    #[pyo3(signature = (buf, wait_for_done = true, use_second_mailbox = false, timeout = 1.0))]
+    #[expect(unused)]
+    pub fn arc_msg_buf(
+        &self,
+        buf: Vec<u32>,
+        wait_for_done: bool,
+        use_second_mailbox: bool,
+        timeout: f64,
+    ) -> PyResult<Option<[u32; 8]>> {
+        let len = buf.len();
+        let buf = match <[u32; 8]>::try_from(buf) {
+            Ok(buf) => buf,
+            Err(e) => {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
+                    "incorrect buffer size: expected 8, found: {len}"
+                )))
+            }
+        };
+
+        match self.0.arc_msg(ArcMsgOptions {
+            addrs: None,
+            msg: ArcMsg::Buf(buf),
+            wait_for_done,
+            use_second_mailbox,
+            timeout: std::time::Duration::from_secs_f64(timeout),
+        }) {
+            Ok(ArcMsgOk::Ok { .. }) => unreachable!(),
+            Ok(ArcMsgOk::OkBuf(buf)) => Ok(Some(buf)),
+            Ok(ArcMsgOk::OkNoWait) => Ok(None),
+            Err(err) => Err(PyException::new_err(err.to_string())),
+        }
+    }
+}
 
 #[pyclass]
 pub struct UninitPciChip {
