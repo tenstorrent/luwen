@@ -188,8 +188,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9555578bc9e57714c812a1f84e4fc5b4d21fcb063490c624de019f7464c91268"
 
 [[package]]
-name = "check_harvesting"
-version = "0.7.10"
+name = "check-harvesting"
+version = "0.1.0"
 dependencies = [
  "luwen",
 ]
@@ -270,7 +270,7 @@ dependencies = [
 
 [[package]]
 name = "create-ethernet-map"
-version = "0.7.10"
+version = "0.1.0"
 dependencies = [
  "clap",
  "luwen",
@@ -339,7 +339,7 @@ dependencies = [
 
 [[package]]
 name = "drunken-monkey"
-version = "0.7.10"
+version = "0.1.0"
 dependencies = [
  "clap",
  "luwen",
@@ -371,6 +371,14 @@ checksum = "778e2ac28f6c47af28e4907f13ffd1e1ddbd400980a9abd7c8df189bf578a5ad"
 dependencies = [
  "libc",
  "windows-sys 0.60.2",
+]
+
+[[package]]
+name = "ethernet-benchmark"
+version = "0.1.0"
+dependencies = [
+ "luwen",
+ "rand",
 ]
 
 [[package]]
@@ -481,6 +489,18 @@ dependencies = [
  "pin-project-lite",
  "pin-utils",
  "slab",
+]
+
+[[package]]
+name = "generate-names"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "luwen",
+ "nom",
+ "serde",
+ "serde_json",
+ "serde_yaml",
 ]
 
 [[package]]
@@ -821,16 +841,11 @@ checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 name = "luwen"
 version = "0.7.14"
 dependencies = [
- "bincode",
  "luwen-api",
  "luwen-def",
  "luwen-kmd",
  "luwen-pci",
- "nom",
- "rand",
- "serde",
  "serde_json",
- "serde_yaml",
  "serial_test",
 ]
 
@@ -1132,7 +1147,7 @@ dependencies = [
 
 [[package]]
 name = "prometheus-exporter"
-version = "0.7.10"
+version = "0.1.0"
 dependencies = [
  "clap",
  "luwen",
@@ -1378,7 +1393,7 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
 name = "reset"
-version = "0.7.10"
+version = "0.1.0"
 dependencies = [
  "luwen",
 ]

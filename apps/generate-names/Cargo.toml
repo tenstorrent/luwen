@@ -1,6 +1,6 @@
 [package]
-name = "check_harvesting"
-version = "0.7.10"
+name = "generate-names"
+version = "0.1.0"
 edition = { workspace = true }
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -9,4 +9,9 @@ edition = { workspace = true }
 independent = true
 
 [dependencies]
+bincode = { workspace = true }
 luwen = { workspace = true }
+nom = "7.1.3"
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = "0.9.22"

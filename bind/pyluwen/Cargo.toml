@@ -28,7 +28,7 @@ crate-type = ["cdylib"]
 [dependencies]
 luwen = { workspace = true }
 pyo3 = { version = "0.19.2", features = ["extension-module", "multiple-pymethods"] }
-serde_json = "1.0.117"
+serde_json = { workspace = true }
 
 [features]
 default = []

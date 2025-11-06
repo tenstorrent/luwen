@@ -1,5 +1,5 @@
 [package]
-name = "create-ethernet-map"
+name = "check-harvesting"
 version = "0.1.0"
 edition = { workspace = true }
 
@@ -8,9 +8,5 @@ edition = { workspace = true }
 [package.metadata.workspaces]
 independent = true
 
-[lib]
-crate-type = ["staticlib", "rlib"]
-
 [dependencies]
-clap = { workspace = true }
 luwen = { workspace = true }
