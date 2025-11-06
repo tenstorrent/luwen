@@ -73,21 +73,6 @@ crates are used with the structure as follows:
 └── tests/           # integration tests
 ```
 
-### Apps
-
-#### Prometheus Exporter
-
-Luwen includes a Prometheus exporter for hardware telemetry (see
-[`apps/prometheus-exporter/`](./apps/prometheus-exporter/)).
-
-To start it:
-
-```bash
-cargo run --release -pprometheus-exporter
-```
-
-Metrics are exposed at `http://localhost:8080/metrics`.
-
 ## License
 
 This project is licensed under [Apache License 2.0](./LICENSE). You have
