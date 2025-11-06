@@ -1,7 +1,7 @@
 # Install
 
-This document provides instructions for building and installing various
-distributions.
+This document provides development instructions for building and installing
+various distributions.
 
 ## Dependencies
 
