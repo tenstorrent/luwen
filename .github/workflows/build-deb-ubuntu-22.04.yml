@@ -116,18 +116,18 @@ jobs:
             .cargo/config.toml
       - run: |
           ( \
-            cd crates/pyluwen \
+            cd bind/pyluwen \
             && \
             cargo vendor \
             && \
             cd ../../ \
           )
       - run: |
-          mkdir crates/pyluwen/.cargo \
+          mkdir bind/pyluwen/.cargo \
           && \
           cp \
             debian/cargo.toml-vendored \
-            crates/pyluwen/.cargo/config.toml
+            bind/pyluwen/.cargo/config.toml
       # Ok this needs to get up leveled somewhere so that it can be shared across Debian and Ubuntu obviously
       - run: ls -lah
       - run: |

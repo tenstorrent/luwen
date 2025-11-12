@@ -1,0 +1,16 @@
+[package]
+name = "create-ethernet-map"
+version = "0.1.0"
+edition = { workspace = true }
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package.metadata.workspaces]
+independent = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+clap = { workspace = true }
+luwen = { workspace = true }

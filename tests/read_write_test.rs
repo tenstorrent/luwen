@@ -2,8 +2,8 @@
 
 use serial_test::serial;
 
-use luwen_if::{chip::ArcMsgOptions, ArcMsg, ArcMsgOk, ChipImpl, TypedArcMsg};
-use ttkmd_if::PciDevice;
+use luwen::api::{chip::ArcMsgOptions, ArcMsg, ArcMsgOk, ChipImpl, TypedArcMsg};
+use luwen::kmd::PciDevice;
 
 /// Test utilities for verifying PCI device register read/write operations
 ///
@@ -23,8 +23,8 @@ use ttkmd_if::PciDevice;
 /// if hardware is not found, the test will be skipped.
 #[serial]
 mod tests {
-    use luwen_if::chip::HlComms;
-    use luwen_ref::detect_chips_fallible;
+    use luwen::api::chip::HlComms;
+    use luwen::pci::detect_chips_fallible;
 
     use super::*;
 
@@ -44,7 +44,7 @@ mod tests {
                     Err(_) => continue,
                 };
 
-                let device = match luwen_ref::open(id) {
+                let device = match luwen::pci::open(id) {
                     Ok(dev) => dev,
                     Err(_) => continue,
                 };

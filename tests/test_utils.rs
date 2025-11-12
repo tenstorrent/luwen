@@ -4,14 +4,14 @@
 //! in the luwen project. It includes helper functions for detecting hardware,
 //! checking chip types, and other test setup operations.
 
-use luwen_if::chip::Chip;
+use luwen::api::chip::Chip;
 
 /// Checks if any compatible hardware is available for testing
 ///
 /// Returns false and prints a message if no devices are found or there's an error.
 #[allow(dead_code)]
 pub fn hardware_available() -> bool {
-    match luwen_ref::detect_chips_fallible() {
+    match luwen::pci::detect_chips_fallible() {
         Ok(chips) => {
             if chips.is_empty() {
                 println!("Test SKIPPED: No devices found");
@@ -44,7 +44,7 @@ pub fn has_chip_type<F>(chip_type_check: F) -> bool
 where
     F: Fn(&Chip) -> bool,
 {
-    match luwen_ref::detect_chips_fallible() {
+    match luwen::pci::detect_chips_fallible() {
         Ok(chips) => {
             let has_type = chips.iter().any(|chip| {
                 if let Some(upgraded) = chip.try_upgrade() {

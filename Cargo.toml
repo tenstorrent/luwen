@@ -1,47 +1,72 @@
 [package]
 name = "luwen"
 version = "0.7.14"
-description = "A high-level interface for safe and efficient access Tenstorrent AI accelerators"
-edition = "2021"
-license = "Apache-2.0"
-authors = ["Daniel Rosen <drosen@tenstorrent.com>"]
-rust-version = "1.75.0"
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+description = """
+A high-level interface for Tenstorrent AI accelerators
+"""
+readme = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-luwen-core = { path = "crates/luwen-core", version = "0.2.0" }
-luwen-if = { path = "crates/luwen-if", version = "0.7.8" }
-luwen-ref = { path = "crates/luwen-ref", version = "0.7.8" }
-ttkmd-if = { path = "crates/ttkmd-if", version = "0.2.1" }
-
-serde = { "version" = "1.0.164", features = ["derive"] }
-serde_yaml = "0.9.22"
-serde_json = "1.0.117"
-bincode = "1.3.3"
-rand = "0.8.5"
-nom = "7.1.3"
-clap = { version = "4.4.14", features = ["derive"] }
-
-[dev-dependencies]
-serial_test = "3.2.0"
 
 [package.metadata.workspaces]
 independent = true
 
+[dependencies]
+luwen-api = { workspace = true }
+luwen-def = { workspace = true }
+luwen-kmd = { workspace = true }
+luwen-pci = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+serial_test = "3.2.0"
+
 [features]
 test_hardware = []
 test_grayskull = []
-
+# wormhole
 test_wormhole = []
 test_wh_ubb = []
 test_n150 = []
 test_n300 = []
-
+# blackhole
 test_blackhole = []
 test_p100a = []
 test_p150 = []
 test_p300 = []
 
 [workspace]
-members = ["crates/*", "app/*"]
+members = [
+  "apps/*",
+  "bind/*",
+  "crates/*",
+]
+
+[workspace.package]
+authors = [
+  "Daniel Rosen <drosen@tenstorrent.com>",
+]
+edition = "2021"
+rust-version = "1.75.0"
+readme = "README.md"
+repository = "https://github.com/tenstorrent/luwen"
+license = "Apache-2.0"
+
+[workspace.dependencies]
+bincode = "1.3.3"
+bitfield-struct = "0.6.0"
+clap = { version = "4.4.14", features = ["derive"] }
+luwen = { path = "." }
+luwen-api = { path = "crates/luwen-api", version = "0.7.8" }
+luwen-def = { path = "crates/luwen-def", version = "0.2.0" }
+luwen-kmd = { path = "crates/luwen-kmd", version = "0.2.1" }
+luwen-pci = { path = "crates/luwen-pci", version = "0.7.8" }
+serde = { "version" = "1.0.185", features = ["derive"] }
+serde_json = "1.0.117"
+thiserror = "1.0.40"
+tracing = "0.1.40"

@@ -1,0 +1,19 @@
+[package]
+name = "luwen-def"
+version = "0.2.1"
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+description = """
+Common definitions for luwen
+"""
+readme = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package.metadata.workspaces]
+independent = true
+
+[dependencies]

@@ -2,8 +2,8 @@
 
 use serial_test::serial;
 
-use luwen_core::Arch;
-use luwen_if::{chip::HlCommsInterface, ChipImpl};
+use luwen::api::{chip::HlCommsInterface, ChipImpl};
+use luwen::def::Arch;
 
 /// Test utilities for verifying telemetry functionality
 ///
@@ -33,7 +33,7 @@ mod tests {
         ignore = "Requires real wormhole hardware"
     )]
     fn wormhole_test_chip_telemetry() {
-        let partial_chips = luwen_ref::detect_chips_fallible().unwrap();
+        let partial_chips = luwen::pci::detect_chips_fallible().unwrap();
         assert!(!partial_chips.is_empty(), "Should find at least one chip");
 
         for chip in partial_chips {
@@ -83,7 +83,7 @@ mod tests {
         ignore = "Requires real grayskull hardware"
     )]
     fn grayskull_test_chip_telemetry() {
-        let partial_chips = luwen_ref::detect_chips_fallible().unwrap();
+        let partial_chips = luwen::pci::detect_chips_fallible().unwrap();
         assert!(!partial_chips.is_empty(), "Should find at least one chip");
 
         for chip in partial_chips {
@@ -128,7 +128,7 @@ mod tests {
         ignore = "Requires real blackhole hardware"
     )]
     fn blackhole_test_chip_telemetry() {
-        let partial_chips = luwen_ref::detect_chips_fallible().unwrap();
+        let partial_chips = luwen::pci::detect_chips_fallible().unwrap();
         assert!(!partial_chips.is_empty(), "Should find at least one chip");
 
         for chip in partial_chips {
@@ -152,13 +152,16 @@ mod tests {
                     println!("Blackhole telemetry: {telemetry2:?}");
 
                     // Get subsystem ID
-                    if let Some(subsystem) = bh.get_if::<luwen_if::chip::NocInterface>()
+                    if let Some(subsystem) = bh
+                        .get_if::<luwen::api::chip::NocInterface>()
                         .map(|v| &v.backing)
                         .and_then(|v| {
-                            v.as_any()
-                                .downcast_ref::<luwen_if::CallbackStorage<luwen_ref::ExtendedPciDeviceWrapper>>()
+                            v.as_any().downcast_ref::<luwen::api::CallbackStorage<
+                                    luwen::pci::ExtendedPciDeviceWrapper,
+                                >>()
                         })
-                        .map(|v| v.user_data.borrow().device.physical.subsystem_id) {
+                        .map(|v| v.user_data.borrow().device.physical.subsystem_id)
+                    {
                         println!("Blackhole subsystem ID: {subsystem:x}");
                         assert_ne!(subsystem, 0, "Subsystem ID should be non-zero");
                     }

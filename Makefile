@@ -1,6 +1,6 @@
 .PHONY: whl
 justbuild:
-	$(MAKE) -C crates/pyluwen whl
+	$(MAKE) -C bind/pyluwen whl
 
 whl: justbuild
 ifndef DEST_DIR
@@ -13,7 +13,7 @@ dev-whl:
 ifndef DEST_DIR
 	$(error DEST_DIR is undefined)
 endif
-	$(MAKE) -C crates/pyluwen dev-whl
+	$(MAKE) -C bind/pyluwen dev-whl
 	ls target/wheels/pyluwen*.whl | xargs -I {} cp {} $(DEST_DIR)
 
 .PHONY: syseng-release
@@ -40,12 +40,11 @@ deb:
         echo "Error: cargo-deb is not installed. Please install it using 'cargo install --locked cargo-deb'."; \
         exit 1; \
     fi
-	cargo deb -p luwencpp --target x86_64-unknown-linux-gnu -v
-	# sudo dpkg -i ./target/x86_64-unknown-linux-gnu/debian/luwencpp_0.1.0-1_amd64.deb
+	cargo deb -p libluwen --target x86_64-unknown-linux-gnu -v
 
 .PHONY: rpm
 rpm:
-	$(MAKE) -C crates/luwencpp rpm
+	$(MAKE) -C bind/libluwen rpm
 
 .PHONY: upload-ci-docker
 upload-ci-docker:
@@ -60,4 +59,4 @@ clean:
 
 .PHONY: pyluwen-pyi
 pyluwen-pyi:
-	$(MAKE) -C crates/pyluwen build-pyi
+	$(MAKE) -C bind/pyluwen build-pyi
