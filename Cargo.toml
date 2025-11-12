@@ -28,7 +28,6 @@ serial_test = "3.2.0"
 
 [features]
 test_hardware = []
-test_grayskull = []
 # wormhole
 test_wormhole = []
 test_wh_ubb = []

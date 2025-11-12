@@ -6,46 +6,16 @@ use std::sync::Arc;
 use luwen_def::Arch;
 
 use crate::{
-    arc_msg::ArcMsgAddr,
     error::{BtWrapper, PlatformError},
     CallbackStorage,
 };
 
 use super::{
     communication::chip_comms::load_axi_table, ArcIf, Blackhole, Chip, ChipComms, ChipInterface,
-    Grayskull, Wormhole,
+    Wormhole,
 };
 
 impl Chip {
-    pub fn gs_open<T: Clone + Send + Sync + 'static>(
-        arch: Arch,
-        backend: CallbackStorage<T>,
-    ) -> Result<Grayskull, PlatformError> {
-        if let Arch::Grayskull = arch {
-            let version = [0u8; 4];
-            let version = u32::from_le_bytes(version);
-
-            let arc_if = Arc::new(ArcIf {
-                axi_data: load_axi_table("grayskull-axi-pci.bin", version),
-            });
-
-            Ok(Grayskull::create(
-                Arc::new(backend),
-                arc_if.clone(),
-                ArcMsgAddr {
-                    scratch_base: arc_if.axi_translate("ARC_RESET.SCRATCH[0]")?.addr,
-                    arc_misc_cntl: arc_if.axi_translate("ARC_RESET.ARC_MISC_CNTL")?.addr,
-                },
-            ))
-        } else {
-            Err(PlatformError::WrongChipArch {
-                actual: arch,
-                expected: Arch::Grayskull,
-                backtrace: BtWrapper::capture(),
-            })
-        }
-    }
-
     pub fn wh_open<T: Clone + Send + Sync + 'static>(
         arch: Arch,
         backend: CallbackStorage<T>,
@@ -112,7 +82,8 @@ impl Chip {
     ) -> Result<Chip, PlatformError> {
         Ok(Chip {
             inner: match arch {
-                Arch::Grayskull => Box::new(Self::gs_open(arch, backend)?),
+                #[expect(deprecated)]
+                Arch::Grayskull => unimplemented!("grayskull support has been sunset"),
                 Arch::Wormhole => Box::new(Self::wh_open(arch, backend)?),
                 Arch::Blackhole => Box::new(Self::bh_open(arch, backend)?),
             },

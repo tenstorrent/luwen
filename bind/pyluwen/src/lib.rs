@@ -56,23 +56,6 @@ impl DerefMut for PciWormhole {
 }
 
 #[pyclass]
-pub struct PciGrayskull(luwen::api::chip::Grayskull);
-
-impl Deref for PciGrayskull {
-    type Target = luwen::api::chip::Grayskull;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for PciGrayskull {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-#[pyclass]
 pub struct PciBlackhole(luwen::api::chip::Blackhole);
 
 impl Deref for PciBlackhole {
@@ -685,10 +668,6 @@ impl PciChip {
         self.0.as_wh().map(|v| PciWormhole(v.clone()))
     }
 
-    pub fn as_gs(&self) -> Option<PciGrayskull> {
-        self.0.as_gs().map(|v| PciGrayskull(v.clone()))
-    }
-
     pub fn as_bh(&self) -> Option<PciBlackhole> {
         self.0.as_bh().map(|v| PciBlackhole(v.clone()))
     }
@@ -812,128 +791,6 @@ impl PciChip {
 
 common_chip_comms_impls!(PciChip);
 
-#[pymethods]
-impl PciGrayskull {
-    #[allow(clippy::too_many_arguments)]
-    pub fn setup_tlb(
-        &mut self,
-        index: u32,
-        addr: u64,
-        x_start: u8,
-        y_start: u8,
-        x_end: u8,
-        y_end: u8,
-        noc_sel: u8,
-        mcast: bool,
-        ordering: u8,
-        linked: bool,
-    ) -> PyResult<(u64, u64)> {
-        let value = PciInterface::from_gs(self);
-
-        if let Some(value) = value {
-            match luwen::kmd::tlb::Ordering::from(ordering) {
-                luwen::kmd::tlb::Ordering::UNKNOWN(ordering) => Err(PyException::new_err(format!(
-                    "Invalid ordering {ordering}."
-                ))),
-                ordering => value.setup_tlb(
-                    index, addr, x_start, y_start, x_end, y_end, noc_sel, mcast, ordering, linked,
-                ),
-            }
-        } else {
-            Err(PyException::new_err(
-                "Could not get PCI interface for this chip.",
-            ))
-        }
-    }
-
-    pub fn set_default_tlb(&self, index: u32) -> PyResult<()> {
-        let value = PciInterface::from_gs(self);
-
-        if let Some(value) = value {
-            value.pci_interface.borrow_mut().default_tlb = PossibleTlbAllocation::Hardcoded(index);
-            Ok(())
-        } else {
-            Err(PyException::new_err(
-                "Could not get PCI interface for this chip.",
-            ))
-        }
-    }
-
-    pub fn pci_axi_read32(&self, addr: u32) -> PyResult<u32> {
-        let value = PciInterface::from_gs(self);
-        if let Some(value) = value {
-            value
-                .axi_read32(addr)
-                .map_err(|v| PyException::new_err(v.to_string()))
-        } else {
-            Err(PyException::new_err(
-                "Could not get PCI interface for this chip.",
-            ))
-        }
-    }
-
-    pub fn pci_axi_write32(&self, addr: u32, data: u32) -> PyResult<()> {
-        let value = PciInterface::from_gs(self);
-        if let Some(value) = value {
-            value
-                .axi_write32(addr, data)
-                .map_err(|v| PyException::new_err(v.to_string()))
-        } else {
-            Err(PyException::new_err(
-                "Could not get PCI interface for this chip.",
-            ))
-        }
-    }
-
-    pub fn pci_board_type(&self) -> PyResult<u16> {
-        let value = PciInterface::from_gs(self);
-        if let Some(value) = value {
-            Ok(value.pci_interface.borrow().device.physical.subsystem_id)
-        } else {
-            Err(PyException::new_err(
-                "Could not get PCI interface for this chip.",
-            ))
-        }
-    }
-
-    pub fn pci_interface_id(&self) -> PyResult<usize> {
-        let value = PciInterface::from_gs(self);
-        if let Some(value) = value {
-            Ok(value.pci_interface.borrow().device.id)
-        } else {
-            Err(PyException::new_err(
-                "Could not get PCI interface for this chip.",
-            ))
-        }
-    }
-
-    pub fn spi_read(&self, addr: u32, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
-        Python::with_gil(|_py| {
-            let ptr: *mut u8 = data.buf_ptr().cast();
-            let len = data.len_bytes();
-
-            let data = unsafe { std::slice::from_raw_parts_mut(ptr, len) };
-            self.0
-                .spi_read(addr, data)
-                .map_err(|v| PyException::new_err(v.to_string()))
-        })
-    }
-
-    pub fn spi_write(&self, addr: u32, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
-        Python::with_gil(|_py| {
-            let ptr: *mut u8 = data.buf_ptr().cast();
-            let len = data.len_bytes();
-
-            let data = unsafe { std::slice::from_raw_parts(ptr, len) };
-            self.0
-                .spi_write(addr, data)
-                .map_err(|v| PyException::new_err(v.to_string()))
-        })
-    }
-}
-
-common_chip_comms_impls!(PciGrayskull);
-
 pub struct PciInterface<'a> {
     pub pci_interface: &'a ExtendedPciDeviceWrapper,
 }
@@ -941,13 +798,6 @@ pub struct PciInterface<'a> {
 impl PciInterface<'_> {
     pub fn from_wh(wh: &PciWormhole) -> Option<PciInterface<'_>> {
         wh.0.get_if::<CallbackStorage<ExtendedPciDeviceWrapper>>()
-            .map(|v| PciInterface {
-                pci_interface: &v.user_data,
-            })
-    }
-
-    pub fn from_gs(gs: &PciGrayskull) -> Option<PciInterface<'_>> {
-        gs.0.get_if::<CallbackStorage<ExtendedPciDeviceWrapper>>()
             .map(|v| PciInterface {
                 pci_interface: &v.user_data,
             })
@@ -1803,7 +1653,6 @@ fn pyluwen(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<UninitPciChip>()?;
     m.add_class::<PciWormhole>()?;
     m.add_class::<RemoteWormhole>()?;
-    m.add_class::<PciGrayskull>()?;
     m.add_class::<DmaBuffer>()?;
     m.add_class::<AxiData>()?;
     m.add_class::<Telemetry>()?;

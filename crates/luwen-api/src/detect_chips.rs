@@ -35,8 +35,6 @@ pub enum UninitChip {
 fn clone_chip(chip: &Chip) -> Chip {
     if let Some(wh) = chip.as_wh() {
         Chip::from(Box::new(wh.clone()) as Box<dyn ChipImpl>)
-    } else if let Some(gs) = chip.as_gs() {
-        Chip::from(Box::new(gs.clone()) as Box<dyn ChipImpl>)
     } else if let Some(bh) = chip.as_bh() {
         Chip::from(Box::new(bh.clone()) as Box<dyn ChipImpl>)
     } else {

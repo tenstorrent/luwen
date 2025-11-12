@@ -8,7 +8,6 @@ use luwen::api::{chip::HlCommsInterface, ChipImpl};
 ///
 /// These tests verify that chips can be detected and properly identified.
 /// The test checks for various types of chips including:
-/// - Grayskull
 /// - Wormhole
 /// - Blackhole
 ///
@@ -26,45 +25,6 @@ mod test_utils;
 mod tests {
     use super::*;
     use test_utils::hardware_available;
-
-    #[test]
-    #[cfg_attr(
-        not(all(feature = "test_hardware", feature = "test_grayskull")),
-        ignore = "Requires hardware"
-    )]
-    fn grayskull_detect_test() {
-        assert!(hardware_available(), "Test requires hardware");
-
-        let partial_chips = luwen::pci::detect_chips_fallible().unwrap();
-        assert!(!partial_chips.is_empty(), "Should find at least one chip");
-
-        let mut found_gs = false;
-        for chip in partial_chips {
-            if let Some(upgraded_chip) = chip.try_upgrade() {
-                if let Some(gs) = upgraded_chip.as_gs() {
-                    found_gs = true;
-                    let status = chip.status();
-                    let eth_status = chip.eth_safe();
-
-                    // Test Grayskull-specific functionality
-                    let scratch_value = gs.axi_sread32("ARC_RESET.SCRATCH[0]").unwrap();
-                    println!("Grayskull scratch value: {scratch_value:x}");
-
-                    println!(
-                        "Grayskull Chip: {:?}, Status: {:?}, Ethernet: {:?}",
-                        upgraded_chip.get_arch(),
-                        status,
-                        eth_status
-                    );
-
-                    break;
-                }
-            }
-        }
-
-        // Fail test if no Grayskull chip found
-        assert!(found_gs, "Test failed: No Grayskull chip found");
-    }
 
     #[test]
     #[cfg_attr(
