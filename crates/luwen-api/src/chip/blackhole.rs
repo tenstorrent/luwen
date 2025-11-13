@@ -255,7 +255,6 @@ impl Blackhole {
     fn bh_arc_msg(
         &self,
         code: u8,
-        zero_data: Option<u32>,
         data: &[u32],
         timeout: Option<std::time::Duration>,
     ) -> Result<(u8, u16, [u32; 7]), PlatformError> {
@@ -267,7 +266,11 @@ impl Blackhole {
         }
 
         let mut request = [0; 8];
-        request[0] = code as u32 | zero_data.unwrap_or(0);
+        request[0] = {
+            let mut data0 = data[0].to_le_bytes();
+            data0[0] = code;
+            u32::from_le_bytes(data0)
+        };
         for (i, o) in data.iter().zip(request[1..].iter_mut()) {
             *o = *i;
         }
@@ -348,9 +351,7 @@ impl Blackhole {
          * Since SPI unlock/lock commands are not supported in older firmwares,
          * we will ignore errors from them and return a default status
          */
-        let (status, _, _) = self
-            .bh_arc_msg(0xC2, None, &[0, 0], None)
-            .unwrap_or_default();
+        let (status, _, _) = self.bh_arc_msg(0xC2, &[0, 0], None).unwrap_or_default();
 
         if status != 0 {
             return Err("Failed to unlock spi".into());
@@ -358,12 +359,8 @@ impl Blackhole {
 
         for chunk in value.chunks(buffer.size as usize) {
             self.axi_write(buffer.addr as u64, chunk)?;
-            let (status, _, _) = self.bh_arc_msg(
-                0x1A,
-                Some(0 << 8),
-                &[addr, chunk.len() as u32, buffer.addr],
-                None,
-            )?;
+            let (status, _, _) =
+                self.bh_arc_msg(0x1A, &[addr, chunk.len() as u32, buffer.addr], None)?;
 
             std::thread::sleep(std::time::Duration::from_millis(100));
 
@@ -375,9 +372,7 @@ impl Blackhole {
         }
 
         /* Similar to above, ignore errors from lock command */
-        let (status, _, _) = self
-            .bh_arc_msg(0xC3, None, &[0, 0], None)
-            .unwrap_or_default();
+        let (status, _, _) = self.bh_arc_msg(0xC3, &[0, 0], None).unwrap_or_default();
 
         if status != 0 {
             return Err("Failed to lock spi".into());
@@ -394,12 +389,8 @@ impl Blackhole {
         let buffer = self.get_spi_buffer()?;
 
         for chunk in value.chunks_mut(buffer.size as usize) {
-            let (status, _, _) = self.bh_arc_msg(
-                0x19,
-                Some(0 << 8),
-                &[addr, chunk.len() as u32, buffer.addr],
-                None,
-            )?;
+            let (status, _, _) =
+                self.bh_arc_msg(0x19, &[addr, chunk.len() as u32, buffer.addr], None)?;
 
             if status != 0 {
                 return Err("Failed to read from SPI".into());
@@ -681,7 +672,7 @@ impl ChipImpl for Blackhole {
             &[args.0 as u32 | ((args.1 as u32) << 16)]
         };
 
-        let (_status, rc, response) = self.bh_arc_msg(code as u8, None, data, Some(msg.timeout))?;
+        let (_status, rc, response) = self.bh_arc_msg(code as u8, data, Some(msg.timeout))?;
         Ok(match msg.msg {
             ArcMsg::Buf(_) => ArcMsgOk::OkBuf([
                 u32::from(rc),
