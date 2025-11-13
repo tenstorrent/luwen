@@ -1,3 +1,54 @@
+rust-luwen (0.7.15) noble; urgency=medium
+
+  [ Joel Smith ]
+  * Remove legacy reset test
+  * Simplify BAR mapping to single uncached region
+  * Remove deprecated test
+
+  [ Zakhary Kaplan ]
+  * build(cargo): set MSRV to 1.75.0 (#85)
+  * chore(cargo): add checksums to lock file (#108)
+  * ci(release): remove manual `Cargo.lock` conversion
+  * test: serializes tests that interact with hardware (#116)
+  * ci(rust-ci): remove thread limit
+  * build(cargo): use workspace dependencies
+  * feat: unify luwen under top-level crate
+  * refactor(core): improve ergonomics for `Arch`
+  * docs(core): document `Arch`
+  * refactor: rename `{app => apps}`
+  * refactor: move `{crates => bind}/{luwencpp,pyluwen}`
+  * docs: remove unused
+  * refactor: rename `{luwencpp => libluwen}`
+  * refactor: rename `{luwen-if => luwen-api}`
+  * refactor: rename `{ttkmd-if => luwen-kmd}`
+  * refactor: rename `{luwen-ref => luwen-pci}`
+  * refactor: rename `{luwen-core => luwen-def}`
+  * build(cargo): update descriptions
+  * build(cargo): clean up, use workspaces
+  * build(deps): remove unused dependencies
+  * chore(check): apply lints
+  * build(deps): fix broken dependencies
+  * tests: depend on `luwen` crate
+  * feat(demo): move to examples
+  * docs(readme): initial rewrite
+  * chore: fix typos
+  * refactor(pyluwen): depend on `luwen` crate
+  * refactor(libluwen): depend on `luwen` crate
+  * docs(readme): update header
+  * docs(readme): add badges
+  * build(pip): clean up
+  * docs(install): add build instructions (#125)
+  * chore(git): update .gitignore
+  * docs: clarify build instructions
+  * docs(readme/libluwen): add stability warning
+  * docs(readme): remove build instructions to `prometheus-exporter`
+  * feat: move binaries to `./apps`
+
+  [ Tenstorrent Releases ]
+  * Cargo Release independent packages
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Thu, 13 Nov 2025 20:26:07 +0000
+
 rust-luwen (0.7.14) noble; urgency=medium
 
   [ John 'Warthog9' Hawley ]
