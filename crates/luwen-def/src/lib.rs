@@ -13,9 +13,7 @@ pub enum Arch {
     ///
     /// # Note
     ///
-    /// This is a legacy architecture that is no longer supported. None of the
-    /// provided APIs guarantee support for Grayskull, and may only work
-    /// incidentally.
+    /// This is a legacy architecture that is no longer supported.
     #[deprecated]
     Grayskull,
     /// Wormhole.

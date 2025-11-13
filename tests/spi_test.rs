@@ -5,7 +5,6 @@ use luwen::pci::detect_chips;
 /// Test SPI read/write operations on chips
 ///
 /// These tests verify that SPI flash memory can be properly read and written.
-/// The test works on both Wormhole and Grayskull chips.
 ///
 /// The tests perform:
 /// - Reading board information from a fixed SPI address

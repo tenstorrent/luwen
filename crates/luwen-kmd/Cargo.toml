@@ -26,4 +26,3 @@ tracing = { workspace = true }
 
 [features]
 test_hardware = []
-test_grayskull = []
