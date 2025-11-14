@@ -257,7 +257,7 @@ impl Blackhole {
         code: u8,
         data: &[u32],
         timeout: Option<std::time::Duration>,
-    ) -> Result<(u8, u16, [u32; 7]), PlatformError> {
+    ) -> Result<(u8, u16, [u32; 8]), PlatformError> {
         if !self.check_arc_msg_safe() {
             return Err(PlatformError::ArcNotReady(
                 crate::error::ArcReadyError::BootIncomplete,
@@ -308,6 +308,7 @@ impl Blackhole {
 
         if status < 240 {
             let data = [
+                response[0],
                 response[1],
                 response[2],
                 response[3],
@@ -673,16 +674,7 @@ impl ChipImpl for Blackhole {
 
         let (_status, rc, response) = self.bh_arc_msg(code as u8, data, Some(msg.timeout))?;
         Ok(match msg.msg {
-            ArcMsg::Buf(_) => ArcMsgOk::OkBuf([
-                u32::from(rc),
-                response[0],
-                response[1],
-                response[2],
-                response[3],
-                response[4],
-                response[5],
-                response[6],
-            ]),
+            ArcMsg::Buf(_) => ArcMsgOk::OkBuf(response),
             _ => ArcMsgOk::Ok {
                 rc: rc as u32,
                 arg: response[0],
