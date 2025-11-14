@@ -27,7 +27,7 @@ impl TryFrom<&GetDeviceInfoOut> for Arch {
 
     fn try_from(value: &GetDeviceInfoOut) -> Result<Self, Self::Error> {
         match value.device_id {
-            0xfaca => Ok(Arch::Grayskull),
+            0xfaca => unimplemented!("grayskull support has been sunset"),
             0x401e => Ok(Arch::Wormhole),
             0xb140 => Ok(Arch::Blackhole),
             id => Err(id),
@@ -819,6 +819,7 @@ mod test {
 
     fn verify_noc(device: &mut PciDevice, tlb: PossibleTlbAllocation) {
         let node_info = match device.arch {
+            #[expect(deprecated)]
             Arch::Grayskull => {
                 unimplemented!("Not currently supporting GS for this test\nTo support readback the noc node id from ARC");
             }
@@ -852,10 +853,7 @@ mod test {
     }
 
     #[test]
-    #[cfg_attr(
-        any(not(feature = "test_hardware"), feature = "test_grayskull"),
-        ignore = "Requires hardware"
-    )]
+    #[cfg_attr(not(feature = "test_hardware"), ignore = "Requires hardware")]
     fn ttkmd_allocate() {
         let mut device = PciDevice::scan()
             .into_iter()

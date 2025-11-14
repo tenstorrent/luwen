@@ -2,7 +2,7 @@
 
 use serial_test::serial;
 
-use luwen::api::{chip::HlCommsInterface, ChipImpl};
+use luwen::api::ChipImpl;
 use luwen::def::Arch;
 
 /// Test utilities for verifying telemetry functionality
@@ -11,7 +11,7 @@ use luwen::def::Arch;
 /// - Chip telemetry collection
 /// - Chip status reporting
 /// - Chip architecture detection
-/// - Chip-specific functionality (Wormhole, Grayskull, Blackhole)
+/// - Chip-specific functionality (Wormhole, Blackhole)
 ///
 /// Note: These tests require physical hardware to run. By default, they are
 /// annotated with #[ignore] to avoid false failures on systems without hardware.
@@ -71,51 +71,6 @@ mod tests {
                         upgraded_chip.get_arch(),
                         Arch::Wormhole,
                         "Architecture should be Wormhole"
-                    );
-                }
-            }
-        }
-    }
-
-    #[test]
-    #[cfg_attr(
-        not(all(feature = "test_hardware", feature = "test_grayskull")),
-        ignore = "Requires real grayskull hardware"
-    )]
-    fn grayskull_test_chip_telemetry() {
-        let partial_chips = luwen::pci::detect_chips_fallible().unwrap();
-        assert!(!partial_chips.is_empty(), "Should find at least one chip");
-
-        for chip in partial_chips {
-            let upgraded_chip = chip.try_upgrade();
-            if let Some(upgraded_chip) = upgraded_chip {
-                // Only test Grayskull chips
-                if let Some(gs) = upgraded_chip.as_gs() {
-                    let status = chip.status();
-                    println!("Grayskull chip status: {status:?}");
-
-                    let eth_status = chip.eth_safe();
-                    println!("Grayskull ethernet status: {eth_status:?}");
-
-                    println!("Testing Grayskull chip");
-
-                    // Read scratch register
-                    let scratch_value = gs.axi_sread32("ARC_RESET.SCRATCH[0]").unwrap();
-                    println!("Grayskull scratch value: {scratch_value:x}");
-
-                    // Print chip information
-                    println!(
-                        "Grayskull chip: {:?}, Status: {:?}, Ethernet: {:?}",
-                        upgraded_chip.get_arch(),
-                        status,
-                        eth_status
-                    );
-
-                    // Verify that architecture is reported correctly
-                    assert_eq!(
-                        upgraded_chip.get_arch(),
-                        Arch::Grayskull,
-                        "Architecture should be Grayskull"
                     );
                 }
             }

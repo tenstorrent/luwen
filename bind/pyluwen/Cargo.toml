@@ -12,7 +12,6 @@ repository = { workspace = true }
 license = { workspace = true }
 keywords = [
   "Tenstorrent",
-  "Grayskull",
   "Wormhole",
   "Blackhole",
 ]

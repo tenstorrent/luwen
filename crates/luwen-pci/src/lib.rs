@@ -59,27 +59,24 @@ impl ExtendedPciDevice {
         let device = PciDevice::open(pci_interface)?;
 
         let (grid_size_x, grid_size_y) = match device.arch {
-            luwen_def::Arch::Grayskull => (13, 12),
-            luwen_def::Arch::Wormhole => (10, 12),
-            luwen_def::Arch::Blackhole => (17, 12),
+            #[expect(deprecated)]
+            Arch::Grayskull => unimplemented!("grayskull support has been sunset"),
+            Arch::Wormhole => (10, 12),
+            Arch::Blackhole => (17, 12),
         };
 
-        let default_tlb;
-
         // Driver API 2+ has TLB allocation APIs supporting WH & BH.
-        if device.arch != Arch::Grayskull && device.driver_version >= 2 {
+        assert!(device.driver_version >= 2);
+        let default_tlb = {
             let size = match device.arch {
+                #[expect(deprecated)]
+                Arch::Grayskull => unimplemented!("grayskull support has been sunset"),
                 Arch::Wormhole => 1 << 24,  // 16 MiB
-                Arch::Blackhole => 1 << 21, // 2 MiB
-                _ => {
-                    return Err(PciError::TlbAllocationError(
-                        "Unsupported architecture for TLB allocation".to_string(),
-                    ))
-                }
+                Arch::Blackhole => 1 << 21, //  2 MiB
             };
 
             if let Ok(tlb) = device.allocate_tlb(size) {
-                default_tlb = PossibleTlbAllocation::Allocation(tlb);
+                PossibleTlbAllocation::Allocation(tlb)
             } else {
                 // Couldn't get a tlb... ideally at this point we would fallback to using a slower but useable read/write API
                 // for now though, we will just fail
@@ -87,13 +84,7 @@ impl ExtendedPciDevice {
                     "Failed to find a free tlb".to_string(),
                 ));
             }
-        } else {
-            // Otherwise fallback to default behaviour of just taking a constant one
-            default_tlb = PossibleTlbAllocation::Hardcoded(match device.arch {
-                luwen_def::Arch::Grayskull | luwen_def::Arch::Wormhole => 184,
-                luwen_def::Arch::Blackhole => 190,
-            });
-        }
+        };
 
         Ok(ExtendedPciDeviceWrapper {
             inner: Arc::new(RwLock::new(ExtendedPciDevice {
@@ -266,9 +257,10 @@ pub fn comms_callback_inner(
                 let writer: &mut ExtendedPciDevice = &mut writer;
 
                 let (x_start, y_start) = match writer.device.arch {
-                    luwen_def::Arch::Grayskull => (0, 0),
-                    luwen_def::Arch::Wormhole => (1, 0),
-                    luwen_def::Arch::Blackhole => (0, 1),
+                    #[expect(deprecated)]
+                    Arch::Grayskull => unimplemented!("grayskull support has been sunset"),
+                    Arch::Wormhole => (1, 0),
+                    Arch::Blackhole => (0, 1),
                 };
 
                 writer.device.noc_write(
@@ -300,9 +292,10 @@ pub fn comms_callback_inner(
                 let writer: &mut ExtendedPciDevice = &mut writer;
 
                 let (min_start_x, min_start_y) = match writer.device.arch {
-                    luwen_def::Arch::Grayskull => (0, 0),
-                    luwen_def::Arch::Wormhole => (1, 0),
-                    luwen_def::Arch::Blackhole => (0, 1),
+                    #[expect(deprecated)]
+                    Arch::Grayskull => unimplemented!("grayskull support has been sunset"),
+                    Arch::Wormhole => (1, 0),
+                    Arch::Blackhole => (0, 1),
                 };
 
                 let (start_x, start_y) = (start_x.max(min_start_x), start_y.max(min_start_y));

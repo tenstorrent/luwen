@@ -27,7 +27,6 @@ impl From<EthAddr> for luwen::api::EthAddr {
 
 #[repr(u8)]
 pub enum Arch {
-    GRAYSKULL,
     WORMHOLE,
 }
 
@@ -361,7 +360,6 @@ pub fn callback_glue(
 #[no_mangle]
 pub extern "C" fn luwen_open(arch: Arch, glue: LuwenGlue) -> *mut Chip {
     let arch = match arch {
-        Arch::GRAYSKULL => luwen::def::Arch::Grayskull,
         Arch::WORMHOLE => luwen::def::Arch::Wormhole,
     };
 

@@ -115,34 +115,6 @@ pub fn generate_map(file: impl AsRef<str>) -> Result<()> {
             connection_map.insert(ident.clone(), connection_info);
 
             (ident, data)
-        } else if let Some(gs) = chip.as_gs() {
-            let result = gs
-                .arc_msg(ArcMsgOptions {
-                    msg: luwen::api::ArcMsg::Typed(luwen::api::TypedArcMsg::GetHarvesting),
-                    ..Default::default()
-                })
-                .unwrap();
-            let harvest_mask = match result {
-                luwen::api::ArcMsgOk::Ok { arg, .. } => arg,
-                luwen::api::ArcMsgOk::OkNoWait => unreachable!(),
-            };
-
-            let ident = ChipIdent {
-                arch: Arch::Grayskull,
-                board_id: None,
-                interface: gs.get_device_info()?.map(|v| v.interface_id),
-                coord: None,
-            };
-
-            let data = ChipData {
-                noc_translation_en: false,
-                harvest_mask,
-                boardtype: telemetry.try_board_type().map(|v| v.to_string()),
-            };
-
-            mmio_chips.push((ident.clone(), gs.get_device_info()?.map(|v| v.interface_id)));
-
-            (ident, data)
         } else if let Some(bh) = chip.as_bh() {
             let ident = ChipIdent {
                 arch: Arch::Blackhole,

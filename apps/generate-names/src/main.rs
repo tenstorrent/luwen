@@ -611,16 +611,6 @@ fn parse_json_and_serialize_translation_singlelayer(
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /*
-        parse_yaml_and_serialize_translation(
-            "data/grayskull",
-            "axi-pci.yaml",
-            "grayskull-axi-pci.bin",
-        )?;
-        parse_yaml_and_serialize_translation("data/wormhole", "axi-pci.yaml", "wormhole-axi-pci.bin")?;
-        parse_yaml_and_serialize_translation("data/wormhole", "axi-noc.yaml", "wormhole-axi-noc.bin")?;
-    */
-
     let os_keys = [
         "ARC_CSM.ARC_PCIE_DMA_REQUEST",
         "ARC_RESET.ARC_MISC_CNTL",
@@ -631,6 +621,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "ARC_RESET.SCRATCH[4]",
         "ARC_RESET.SCRATCH[5]",
         "ARC_RESET.POST_CODE",
+        "ARC_RESET.REFCLK_COUNTER_LOW",
+        "ARC_RESET.REFCLK_COUNTER_HIGH",
         "ARC_CSM.DATA[0]",
         "ARC_CSM.ARC_PCIE_DMA_REQUEST.trigger",
         "ARC_RESET.GPIO2_PAD_TRIEN_CNTL",
@@ -645,21 +637,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "ARC_SPI.SPI_DR",
         "ARC_SPI.SPI_BAUDR",
     ];
-    parse_yaml_and_serialize_translation_singlelayer(
-        "data/grayskull",
-        "axi-pci.yaml",
-        "axi-data/grayskull-axi-pci.bin",
-        &os_keys,
-    )?;
-    let os_keys = [
-        [
-            "ARC_RESET.REFCLK_COUNTER_LOW",
-            "ARC_RESET.REFCLK_COUNTER_HIGH",
-        ]
-        .as_slice(),
-        os_keys.as_slice(),
-    ]
-    .concat();
     parse_yaml_and_serialize_translation_singlelayer(
         "data/wormhole",
         "axi-noc.yaml",
