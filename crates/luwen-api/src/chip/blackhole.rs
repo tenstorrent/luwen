@@ -265,15 +265,14 @@ impl Blackhole {
             ));
         }
 
+        // Prepare request from data buffer
         let mut request = [0; 8];
-        request[0] = {
-            let mut data0 = data[0].to_le_bytes();
-            data0[0] = code;
-            u32::from_le_bytes(data0)
-        };
-        for (i, o) in data.iter().zip(request[1..].iter_mut()) {
-            *o = *i;
-        }
+        request.copy_from_slice(data);
+        // Override message ID
+        //
+        // This is the LSB of the first word.
+        request[0] &= !0xff;
+        request[0] |= u32::from(code);
 
         let timeout = timeout.unwrap_or(std::time::Duration::from_millis(500));
 
@@ -666,7 +665,7 @@ impl ChipImpl for Blackhole {
     fn arc_msg(&self, msg: ArcMsgOptions) -> Result<ArcMsgOk, PlatformError> {
         let code = msg.msg.msg_code();
         let data = if let ArcMsg::Buf(msg) = msg.msg {
-            &msg.clone()[1..]
+            &msg.clone()[..]
         } else {
             let args = msg.msg.args();
             &[args.0 as u32 | ((args.1 as u32) << 16)]
