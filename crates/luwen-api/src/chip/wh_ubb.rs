@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Functions related to wh_ubb systems
+use std::os::unix::fs::FileTypeExt;
 use std::process::Command;
-
 /*
 COMMAND: ipmitool raw 0x30 0x8B <ubb_num> <dev_num> <op_mode> <reset_time>
 
@@ -55,18 +55,25 @@ pub fn ubb_wait_for_driver_load() {
     let mut attempts = 0;
 
     while attempts < 100 {
+        let mut dev_num = 0;
         if std::path::Path::new(file).exists() {
-            let file_count = std::fs::read_dir(file).map(|dir| dir.count()).unwrap_or(0);
-
-            if file_count == 32 {
-                println!("Driver loaded");
-                return;
+            if let Ok(entries) = std::fs::read_dir(file) {
+                for entry in entries.flatten() {
+                    let Ok(ft) = entry.file_type() else { continue };
+                    if ft.is_char_device() {
+                        dev_num += 1;
+                    }
+                }
+                if dev_num == 32 {
+                    println!("All 32 chips found in \"/dev/tenstorrent\"");
+                    return;
+                }
             }
         }
-        println!("Waiting for driver load ... {attempts} seconds");
+        println!("Waiting for all 32 chips to show up in \"/dev/tenstorrent\", found {dev_num} chip(s) ... {attempts} seconds");
         std::thread::sleep(std::time::Duration::from_secs(1));
         attempts += 1;
     }
     // If we reach here, the driver was not loaded
-    panic!("Driver not loaded after 100 seconds... giving up");
+    panic!("Didn't find all 32 chips in /dev/tenstorrent after 100 seconds... giving up");
 }
