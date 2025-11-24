@@ -14,13 +14,11 @@ dynamic = [
   "version",
   "summary",
   "description",
-  "description_content_type",
-  "keywords",
-  "home_page",
-  "author",
-  "author_email",
+  "readme",
+  "urls",
+  "authors",
   "license",
-  "project_url",
+  "keywords",
 ]
 
 [build-system]
