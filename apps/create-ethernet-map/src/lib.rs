@@ -49,6 +49,7 @@ pub fn generate_map(file: impl AsRef<str>) -> Result<()> {
                 .unwrap();
             let harvest_mask = match result {
                 luwen::api::ArcMsgOk::Ok { rc: _, arg } => arg,
+                luwen::api::ArcMsgOk::OkBuf(buf) => buf[0],
                 luwen::api::ArcMsgOk::OkNoWait => unreachable!(),
             };
 

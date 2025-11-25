@@ -969,6 +969,7 @@ impl ChipImpl for Wormhole {
 
                 let offset = match result {
                     ArcMsgOk::Ok { arg, .. } => arg,
+                    ArcMsgOk::OkBuf([_, arg, ..]) => arg,
                     ArcMsgOk::OkNoWait => todo!(),
                 };
 
