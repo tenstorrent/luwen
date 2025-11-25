@@ -59,7 +59,7 @@ impl ExtendedPciDevice {
         let device = PciDevice::open(pci_interface)?;
 
         let (grid_size_x, grid_size_y) = match device.arch {
-            #[expect(deprecated)]
+            #[allow(deprecated)]
             Arch::Grayskull => unimplemented!("grayskull support has been sunset"),
             Arch::Wormhole => (10, 12),
             Arch::Blackhole => (17, 12),
@@ -69,7 +69,7 @@ impl ExtendedPciDevice {
         assert!(device.driver_version >= 2);
         let default_tlb = {
             let size = match device.arch {
-                #[expect(deprecated)]
+                #[allow(deprecated)]
                 Arch::Grayskull => unimplemented!("grayskull support has been sunset"),
                 Arch::Wormhole => 1 << 24,  // 16 MiB
                 Arch::Blackhole => 1 << 21, //  2 MiB
@@ -257,7 +257,7 @@ pub fn comms_callback_inner(
                 let writer: &mut ExtendedPciDevice = &mut writer;
 
                 let (x_start, y_start) = match writer.device.arch {
-                    #[expect(deprecated)]
+                    #[allow(deprecated)]
                     Arch::Grayskull => unimplemented!("grayskull support has been sunset"),
                     Arch::Wormhole => (1, 0),
                     Arch::Blackhole => (0, 1),
@@ -292,7 +292,7 @@ pub fn comms_callback_inner(
                 let writer: &mut ExtendedPciDevice = &mut writer;
 
                 let (min_start_x, min_start_y) = match writer.device.arch {
-                    #[expect(deprecated)]
+                    #[allow(deprecated)]
                     Arch::Grayskull => unimplemented!("grayskull support has been sunset"),
                     Arch::Wormhole => (1, 0),
                     Arch::Blackhole => (0, 1),

@@ -82,7 +82,7 @@ impl Chip {
     ) -> Result<Chip, PlatformError> {
         Ok(Chip {
             inner: match arch {
-                #[expect(deprecated)]
+                #[allow(deprecated)]
                 Arch::Grayskull => unimplemented!("grayskull support has been sunset"),
                 Arch::Wormhole => Box::new(Self::wh_open(arch, backend)?),
                 Arch::Blackhole => Box::new(Self::bh_open(arch, backend)?),

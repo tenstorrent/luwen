@@ -97,7 +97,7 @@ pub struct SpecificTlbInfo {
 
 pub fn get_tlb(device: &PciDevice, index: u32) -> Result<Tlb, PciError> {
     match device.arch {
-        #[expect(deprecated)]
+        #[allow(deprecated)]
         crate::Arch::Grayskull => unimplemented!("grayskull support has been sunset"),
         crate::Arch::Wormhole => wormhole::get_tlb(device, index),
         crate::Arch::Blackhole => blackhole::get_tlb(device, index),
@@ -106,7 +106,7 @@ pub fn get_tlb(device: &PciDevice, index: u32) -> Result<Tlb, PciError> {
 
 pub fn setup_tlb(device: &mut PciDevice, index: u32, tlb: Tlb) -> Result<(u64, u64), PciError> {
     match device.arch {
-        #[expect(deprecated)]
+        #[allow(deprecated)]
         crate::Arch::Grayskull => unimplemented!("grayskull support has been sunset"),
         crate::Arch::Wormhole => wormhole::setup_tlb(device, index, tlb),
         crate::Arch::Blackhole => blackhole::setup_tlb(device, index, tlb),

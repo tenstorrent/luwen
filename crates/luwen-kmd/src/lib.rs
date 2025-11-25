@@ -819,7 +819,7 @@ mod test {
 
     fn verify_noc(device: &mut PciDevice, tlb: PossibleTlbAllocation) {
         let node_info = match device.arch {
-            #[expect(deprecated)]
+            #[allow(deprecated)]
             Arch::Grayskull => {
                 unimplemented!("Not currently supporting GS for this test\nTo support readback the noc node id from ARC");
             }
