@@ -267,7 +267,9 @@ impl Blackhole {
 
         // Prepare request from data buffer
         let mut request = [0; 8];
-        request.copy_from_slice(data);
+        for (src, dst) in data.iter().copied().zip(request.iter_mut()) {
+            *dst = src;
+        }
         // Override message ID
         //
         // This is the LSB of the first word.
