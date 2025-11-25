@@ -1,3 +1,25 @@
+rust-luwen (0.7.16) noble; urgency=medium
+
+  [ Zakhary Kaplan ]
+  * feat!: deprecate grayskull
+  * feat: support raw API for `arc_msg`
+  * feat!: sunset grayskull
+  * feat: remove references to Grayskull
+  * feat: don't strip command higher bytes
+  * fix: keep first word in buf message request
+  * fix: return full buf message response
+  * fix: allow partial copy for blackhole message buffer
+  * fix: compile errors from `ArcMsgOk::OkBuf`
+  * chore(clippy): allow `clippy::clone-on-copy`
+
+  [ Samridhi Bansal ]
+  * Clean up 6U galaxy reset messages
+
+  [ Tenstorrent Releases ]
+  * Cargo Release independent packages
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Tue, 25 Nov 2025 19:41:43 +0000
+
 rust-luwen (0.7.15) noble; urgency=medium
 
   [ Joel Smith ]
