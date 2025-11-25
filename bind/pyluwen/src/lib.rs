@@ -1434,7 +1434,7 @@ common_chip_comms_impls!(PciBlackhole);
 #[pymethods]
 impl PciBlackhole {
     #[pyo3(signature = (buf, wait_for_done = true, use_second_mailbox = false, timeout = 1.0))]
-    #[expect(unused)]
+    #[allow(unused)]
     pub fn arc_msg_buf(
         &self,
         buf: Vec<u32>,
