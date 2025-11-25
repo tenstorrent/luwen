@@ -1,6 +1,6 @@
 [package]
 name = "luwen-pci"
-version = "0.7.12"
+version = { workspace = true }
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }

@@ -1,6 +1,6 @@
 [package]
 name = "luwen-kmd"
-version = "0.2.5"
+version = { workspace = true }
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
