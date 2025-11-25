@@ -668,14 +668,13 @@ impl ChipImpl for Blackhole {
     fn arc_msg(&self, msg: ArcMsgOptions) -> Result<ArcMsgOk, PlatformError> {
         let code = msg.msg.msg_code();
         let data = if let ArcMsg::Buf(msg) = msg.msg {
-            #[allow(clippy::clone_on_copy)]
-            &msg.clone()[..]
+            msg
         } else {
             let args = msg.msg.args();
-            &[args.0 as u32 | ((args.1 as u32) << 16)]
+            [args.0 as u32 | ((args.1 as u32) << 16), 0, 0, 0, 0, 0, 0, 0]
         };
 
-        let (_status, rc, response) = self.bh_arc_msg(code as u8, data, Some(msg.timeout))?;
+        let (_status, rc, response) = self.bh_arc_msg(code as u8, &data, Some(msg.timeout))?;
         Ok(match msg.msg {
             ArcMsg::Buf(_) => ArcMsgOk::OkBuf(response),
             _ => ArcMsgOk::Ok {
