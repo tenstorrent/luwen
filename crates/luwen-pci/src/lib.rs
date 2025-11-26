@@ -66,7 +66,10 @@ impl ExtendedPciDevice {
         };
 
         // Driver API 2+ has TLB allocation APIs supporting WH & BH.
-        assert!(device.driver_version >= 2);
+        assert!(
+            device.driver_version >= 2,
+            "Detected unsupported version of KMD. Please upgrade to >2.0.0"
+        );
         let default_tlb = {
             let size = match device.arch {
                 #[allow(deprecated)]
