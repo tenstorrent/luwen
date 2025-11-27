@@ -839,7 +839,7 @@ checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 
 [[package]]
 name = "luwen"
-version = "0.7.16"
+version = "0.7.17"
 dependencies = [
  "luwen-api",
  "luwen-def",
@@ -851,7 +851,7 @@ dependencies = [
 
 [[package]]
 name = "luwen-api"
-version = "0.7.14"
+version = "0.7.15"
 dependencies = [
  "bincode",
  "bitfield-struct",
@@ -875,7 +875,7 @@ version = "0.2.3"
 
 [[package]]
 name = "luwen-kmd"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "bitfield-struct",
  "luwen-def",
@@ -887,7 +887,7 @@ dependencies = [
 
 [[package]]
 name = "luwen-pci"
-version = "0.7.13"
+version = "0.7.14"
 dependencies = [
  "indicatif",
  "luwen-api",
