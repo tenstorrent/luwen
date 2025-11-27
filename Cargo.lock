@@ -839,7 +839,7 @@ checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 
 [[package]]
 name = "luwen"
-version = "0.7.17"
+version = "0.7.18"
 dependencies = [
  "luwen-api",
  "luwen-def",
@@ -1229,7 +1229,7 @@ checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
 
 [[package]]
 name = "pyluwen"
-version = "0.7.14"
+version = "0.7.15"
 dependencies = [
  "luwen",
  "pyo3",
