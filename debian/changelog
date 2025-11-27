@@ -1,3 +1,13 @@
+rust-luwen (0.7.18) noble; urgency=medium
+
+  [ Zakhary Kaplan ]
+  * chore: add a comment
+
+  [ Tenstorrent Releases ]
+  * Cargo Release independent packages
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Thu, 27 Nov 2025 17:16:51 +0000
+
 rust-luwen (0.7.17) noble; urgency=medium
 
   [ Zakhary Kaplan ]
