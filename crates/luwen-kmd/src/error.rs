@@ -21,6 +21,9 @@ pub enum PciOpenError {
     #[error("Failed to recognize id for device /dev/tenstorrent/{pci_id}: {device_id:x}")]
     UnrecognizedDeviceId { pci_id: usize, device_id: u16 },
 
+    #[error("Unsupported driver version: v{version}, please upgrade to >=2")]
+    UnsupportedDriver { version: u32 },
+
     #[error("ioctl {name} failed for device {id} with: {source}")]
     IoctlError {
         name: String,
