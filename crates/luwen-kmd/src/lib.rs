@@ -265,6 +265,14 @@ impl PciDevice {
             });
         }
 
+        // Ensure supported driver version
+        let driver_version = driver_info.output.driver_version;
+        if driver_version < 2 {
+            return Err(PciOpenError::UnsupportedDriver {
+                version: driver_version,
+            });
+        }
+
         let arch = Arch::try_from(&device_info.output).map_err(|asic_id| {
             PciOpenError::UnrecognizedDeviceId {
                 pci_id: device_id,
@@ -317,7 +325,7 @@ impl PciDevice {
             next_dma_buf: 0,
 
             device_fd: fd,
-            driver_version: driver_info.output.driver_version,
+            driver_version,
 
             config_space,
 
