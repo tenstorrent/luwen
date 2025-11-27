@@ -47,6 +47,38 @@ There are three supported use cases:
 See the included [`INSTALL.md`](./INSTALL.md) for detailed instructions on how
 to build and install Luwen.
 
+## Support
+
+### Hardware
+
+Luwen officially supports the following Tenstorrent hardware:
+
+- Wormhole
+- Blackhole
+
+#### [Firmware]
+
+Please ensure you have a supported firmware version installed on your device.
+You can flash the firmware using [`tt-flash`][tt-flash].
+
+> [!IMPORTANT]
+>
+> The current minimum supported firmware version is: `v18`.
+
+[firmware]: https://github.com/tenstorrent/tt-firmware
+[tt-flash]: https://github.com/tenstorrent/tt-flash
+
+#### [Driver (KMD)][driver]
+
+Luwen communicates with your device through a kernel-mode driver. You can find
+instructions on installing the driver on the project [homepage][driver].
+
+> [!IMPORTANT]
+>
+> The current minimum supported driver version is: `v2.0.0`.
+
+[driver]: https://github.com/tenstorrent/tt-kmd
+
 ## Organization
 
 Cargo — Rust's package manager — allows for a workspace of several crates to be
