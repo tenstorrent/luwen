@@ -1,3 +1,17 @@
+rust-luwen (0.7.17) noble; urgency=medium
+
+  [ Zakhary Kaplan ]
+  * fix: report old KMD assertion failure cause
+  * fix: add explicit error for unsupported KMD
+  * docs(readme): document support
+  * tests: add SPI test for BH
+  * fix: use correct call-site semantics for `bh_arc_msg`
+
+  [ Tenstorrent Releases ]
+  * Cargo Release independent packages
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Thu, 27 Nov 2025 16:26:39 +0000
+
 rust-luwen (0.7.16) noble; urgency=medium
 
   [ Zakhary Kaplan ]
