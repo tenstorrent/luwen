@@ -252,6 +252,11 @@ impl Blackhole {
         }
     }
 
+    /// Sends a blackhole ARC message.
+    ///
+    /// # Note
+    ///
+    /// Data is an (up to) 8-word buffer. Code overwrites the LSB of word 0.
     fn bh_arc_msg(
         &self,
         code: u8,
@@ -353,7 +358,7 @@ impl Blackhole {
          * Since SPI unlock/lock commands are not supported in older firmwares,
          * we will ignore errors from them and return a default status
          */
-        let (status, _, _) = self.bh_arc_msg(0xC2, &[0, 0], None).unwrap_or_default();
+        let (status, _, _) = self.bh_arc_msg(0xC2, &[0, 0, 0], None).unwrap_or_default();
 
         if status != 0 {
             return Err("Failed to unlock spi".into());
@@ -362,7 +367,7 @@ impl Blackhole {
         for chunk in value.chunks(buffer.size as usize) {
             self.axi_write(buffer.addr as u64, chunk)?;
             let (status, _, _) =
-                self.bh_arc_msg(0x1A, &[addr, chunk.len() as u32, buffer.addr], None)?;
+                self.bh_arc_msg(0x1A, &[0, addr, chunk.len() as u32, buffer.addr], None)?;
 
             std::thread::sleep(std::time::Duration::from_millis(100));
 
@@ -374,7 +379,7 @@ impl Blackhole {
         }
 
         /* Similar to above, ignore errors from lock command */
-        let (status, _, _) = self.bh_arc_msg(0xC3, &[0, 0], None).unwrap_or_default();
+        let (status, _, _) = self.bh_arc_msg(0xC3, &[0, 0, 0], None).unwrap_or_default();
 
         if status != 0 {
             return Err("Failed to lock spi".into());
@@ -392,7 +397,7 @@ impl Blackhole {
 
         for chunk in value.chunks_mut(buffer.size as usize) {
             let (status, _, _) =
-                self.bh_arc_msg(0x19, &[addr, chunk.len() as u32, buffer.addr], None)?;
+                self.bh_arc_msg(0x19, &[0, addr, chunk.len() as u32, buffer.addr], None)?;
 
             if status != 0 {
                 return Err("Failed to read from SPI".into());
