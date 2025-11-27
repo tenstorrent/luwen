@@ -684,7 +684,7 @@ impl ChipImpl for Blackhole {
             ArcMsg::Buf(_) => ArcMsgOk::OkBuf(response),
             _ => ArcMsgOk::Ok {
                 rc: rc as u32,
-                arg: response[0],
+                arg: response[1],
             },
         })
     }
