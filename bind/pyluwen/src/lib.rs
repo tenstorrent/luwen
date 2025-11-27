@@ -1433,6 +1433,7 @@ common_chip_comms_impls!(PciBlackhole);
 
 #[pymethods]
 impl PciBlackhole {
+    /// This is an alternate, lower-level interface to `arc_msg`.
     #[pyo3(signature = (buf, wait_for_done = true, use_second_mailbox = false, timeout = 1.0))]
     #[allow(unused)]
     pub fn arc_msg_buf(
