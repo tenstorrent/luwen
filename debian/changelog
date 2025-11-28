@@ -1,3 +1,16 @@
+rust-luwen (0.7.19) noble; urgency=medium
+
+  [ Zakhary Kaplan ]
+  * fix: repair response data in `bh_arc_msg`
+  * fix: continue fix for broken ARC message API
+  * chore: add a comment
+  * build(pip): use cargo manifest fields
+
+  [ Tenstorrent Releases ]
+  * Cargo Release independent packages
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Fri, 28 Nov 2025 16:19:24 +0000
+
 rust-luwen (0.7.18) noble; urgency=medium
 
   [ Zakhary Kaplan ]
