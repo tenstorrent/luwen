@@ -236,6 +236,7 @@ impl PciDevice {
         let fd = std::fs::OpenOptions::new()
             .read(true)
             .write(true)
+            .append(true)
             .open(format!("/dev/tenstorrent/{device_id}"));
         let fd = match fd {
             Ok(fd) => fd,
