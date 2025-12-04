@@ -327,3 +327,13 @@ nix::ioctl_readwrite_bad!(
     request_code_none!(TENSTORRENT_IOCTL_MAGIC, 13),
     ConfigureTlb
 );
+
+#[derive(Default)]
+#[repr(C)]
+pub struct SetPowerState {}
+
+nix::ioctl_readwrite_bad!(
+    set_power_state,
+    request_code_none!(TENSTORRENT_IOCTL_MAGIC, 15),
+    SetPowerState
+);
