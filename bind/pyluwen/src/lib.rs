@@ -614,7 +614,6 @@ macro_rules! common_chip_comms_impls {
                     .map(|v| v.into_iter().map(|v| v.into()).collect())
                     .map_err(|v| PyException::new_err(v.to_string()))
             }
-
     }
 }
 }
@@ -788,6 +787,27 @@ impl PciChip {
         let info = self.device_info()?;
         Ok(info.interface_id)
     }
+
+    pub fn set_power_state(&self, level: String) -> PyResult<()> {
+        if let Some(bh) = self.as_bh() {
+            bh.set_power_state(level)
+        } else if let Some(wh) = self.as_wh() {
+            wh.set_power_state(level)
+        } else {
+            Err(PyException::new_err("unknown chip type"))
+        }
+    }
+
+    #[pyo3(signature = (*, aiclk, mrisc, tensix, l2cpu))]
+    pub fn set_power(&self, aiclk: bool, mrisc: bool, tensix: bool, l2cpu: bool) -> PyResult<()> {
+        if let Some(bh) = self.as_bh() {
+            bh.set_power(aiclk, mrisc, tensix, l2cpu)
+        } else if let Some(wh) = self.as_wh() {
+            wh.set_power(aiclk, mrisc, tensix, l2cpu)
+        } else {
+            Err(PyException::new_err("unknown chip type"))
+        }
+    }
 }
 
 common_chip_comms_impls!(PciChip);
@@ -814,6 +834,31 @@ impl PciInterface<'_> {
             .map(|v| PciInterface {
                 pci_interface: &v.user_data,
             })
+    }
+
+    pub fn set_power_state(&self, level: String) -> PyResult<()> {
+        self.pci_interface
+            .borrow()
+            .device
+            .set_power_state(match level.as_str() {
+                "low" => luwen::kmd::Power::Low,
+                "high" => luwen::kmd::Power::High,
+                _ => return Err(PyException::new_err("invalid power state")),
+            })
+            .map_err(|v| PyException::new_err(v.to_string()))
+    }
+
+    pub fn set_power(&self, aiclk: bool, mrisc: bool, tensix: bool, l2cpu: bool) -> PyResult<()> {
+        self.pci_interface
+            .borrow()
+            .device
+            .set_power_state(luwen::kmd::Power::Raw {
+                aiclk,
+                mrisc,
+                tensix,
+                l2cpu,
+            })
+            .map_err(|v| PyException::new_err(v.to_string()))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1151,6 +1196,31 @@ impl PciWormhole {
             .map(|v| v.into())
             .map_err(|v| PyException::new_err(v.to_string()))
     }
+
+    pub fn set_power_state(&self, level: String) -> PyResult<()> {
+        let value = PciInterface::from_wh(self);
+
+        if let Some(value) = value {
+            value.set_power_state(level)
+        } else {
+            Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ))
+        }
+    }
+
+    #[pyo3(signature = (*, aiclk, mrisc, tensix, l2cpu))]
+    pub fn set_power(&self, aiclk: bool, mrisc: bool, tensix: bool, l2cpu: bool) -> PyResult<()> {
+        let value = PciInterface::from_wh(self);
+
+        if let Some(value) = value {
+            value.set_power(aiclk, mrisc, tensix, l2cpu)
+        } else {
+            Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ))
+        }
+    }
 }
 
 common_chip_comms_impls!(PciWormhole);
@@ -1425,6 +1495,31 @@ impl PciBlackhole {
             Err(PyException::new_err(format!(
                 "Was not able to find {tag_name} in spirom table"
             )))
+        }
+    }
+
+    pub fn set_power_state(&self, level: String) -> PyResult<()> {
+        let value = PciInterface::from_bh(self);
+
+        if let Some(value) = value {
+            value.set_power_state(level)
+        } else {
+            Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ))
+        }
+    }
+
+    #[pyo3(signature = (*, aiclk, mrisc, tensix, l2cpu))]
+    pub fn set_power(&self, aiclk: bool, mrisc: bool, tensix: bool, l2cpu: bool) -> PyResult<()> {
+        let value = PciInterface::from_bh(self);
+
+        if let Some(value) = value {
+            value.set_power(aiclk, mrisc, tensix, l2cpu)
+        } else {
+            Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ))
         }
     }
 }
