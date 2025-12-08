@@ -614,7 +614,6 @@ macro_rules! common_chip_comms_impls {
                     .map(|v| v.into_iter().map(|v| v.into()).collect())
                     .map_err(|v| PyException::new_err(v.to_string()))
             }
-
     }
 }
 }
@@ -787,6 +786,16 @@ impl PciChip {
     pub fn get_pci_interface_id(&self) -> PyResult<u32> {
         let info = self.device_info()?;
         Ok(info.interface_id)
+    }
+
+    pub fn set_power_state(&self, level: String) -> PyResult<()> {
+        if let Some(bh) = self.as_bh() {
+            bh.set_power_state(level)
+        } else if let Some(wh) = self.as_wh() {
+            wh.set_power_state(level)
+        } else {
+            Err(PyException::new_err("unknown chip type"))
+        }
     }
 }
 
