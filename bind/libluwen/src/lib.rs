@@ -460,6 +460,7 @@ pub extern "C" fn chip_arc_msg(
                 }
                 CResult::ok(rc)
             }
+            luwen::api::ArcMsgOk::OkBuf(_) => unreachable!(),
             luwen::api::ArcMsgOk::OkNoWait => CResult::ok(0),
         },
         Err(err) => {

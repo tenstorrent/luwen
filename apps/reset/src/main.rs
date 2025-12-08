@@ -51,7 +51,7 @@ fn main() {
         link_reset(interface);
         if let Ok(device) = luwen::kmd::PciDevice::open(interface) {
             let tracker = match device.arch {
-                #[expect(deprecated)]
+                #[allow(deprecated)]
                 luwen::def::Arch::Grayskull => unimplemented!("grayskull support has been sunset"),
                 luwen::def::Arch::Wormhole => {
                     Box::new(wormhole::ResetTracker::init(interface)) as Box<dyn Reset>

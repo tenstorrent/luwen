@@ -637,6 +637,7 @@ impl ActiveSpi {
         }) {
             match result {
                 crate::ArcMsgOk::Ok { rc: _, arg } => Some(arg),
+                crate::ArcMsgOk::OkBuf([_, arg, ..]) => Some(arg),
                 crate::ArcMsgOk::OkNoWait => None,
             }
         } else {

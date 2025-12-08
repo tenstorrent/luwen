@@ -26,7 +26,7 @@ pub enum Arch {
 impl Arch {
     /// Checks if the architecture is [`Arch::Grayskull`].
     #[deprecated]
-    #[expect(deprecated)]
+    #[allow(deprecated)]
     pub fn is_grayskull(&self) -> bool {
         matches!(self, Arch::Grayskull)
     }
@@ -47,7 +47,7 @@ impl FromStr for Arch {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            #[expect(deprecated)]
+            #[allow(deprecated)]
             "grayskull" => Ok(Arch::Grayskull),
             "wormhole" => Ok(Arch::Wormhole),
             "blackhole" => Ok(Arch::Blackhole),

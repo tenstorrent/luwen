@@ -13,7 +13,7 @@ use crate::{
         hl_comms::HlCommsInterface,
     },
     error::{BtWrapper, PlatformError},
-    ChipImpl,
+    ArcMsg, ChipImpl,
 };
 
 use super::{
@@ -252,13 +252,17 @@ impl Blackhole {
         }
     }
 
+    /// Sends a blackhole ARC message.
+    ///
+    /// # Note
+    ///
+    /// Data is an (up to) 8-word buffer. Code overwrites the LSB of word 0.
     fn bh_arc_msg(
         &self,
         code: u8,
-        zero_data: Option<u32>,
-        data: &[u32],
+        data: [u32; 8],
         timeout: Option<std::time::Duration>,
-    ) -> Result<(u8, u16, [u32; 7]), PlatformError> {
+    ) -> Result<(u8, u16, [u32; 8]), PlatformError> {
         if !self.check_arc_msg_safe() {
             return Err(PlatformError::ArcNotReady(
                 crate::error::ArcReadyError::BootIncomplete,
@@ -266,11 +270,16 @@ impl Blackhole {
             ));
         }
 
+        // Prepare request from data buffer
         let mut request = [0; 8];
-        request[0] = code as u32 | zero_data.unwrap_or(0);
-        for (i, o) in data.iter().zip(request[1..].iter_mut()) {
-            *o = *i;
+        for (src, dst) in data.iter().copied().zip(request.iter_mut()) {
+            *dst = src;
         }
+        // Override message ID
+        //
+        // This is the LSB of the first word.
+        request[0] &= !0xff;
+        request[0] |= u32::from(code);
 
         let timeout = timeout.unwrap_or(std::time::Duration::from_millis(500));
 
@@ -306,6 +315,7 @@ impl Blackhole {
 
         if status < 240 {
             let data = [
+                response[0],
                 response[1],
                 response[2],
                 response[3],
@@ -349,7 +359,7 @@ impl Blackhole {
          * we will ignore errors from them and return a default status
          */
         let (status, _, _) = self
-            .bh_arc_msg(0xC2, None, &[0, 0], None)
+            .bh_arc_msg(0xC2, [0, 0, 0, 0, 0, 0, 0, 0], None)
             .unwrap_or_default();
 
         if status != 0 {
@@ -360,8 +370,7 @@ impl Blackhole {
             self.axi_write(buffer.addr as u64, chunk)?;
             let (status, _, _) = self.bh_arc_msg(
                 0x1A,
-                Some(0 << 8),
-                &[addr, chunk.len() as u32, buffer.addr],
+                [0, addr, chunk.len() as u32, buffer.addr, 0, 0, 0, 0],
                 None,
             )?;
 
@@ -376,7 +385,7 @@ impl Blackhole {
 
         /* Similar to above, ignore errors from lock command */
         let (status, _, _) = self
-            .bh_arc_msg(0xC3, None, &[0, 0], None)
+            .bh_arc_msg(0xC3, [0, 0, 0, 0, 0, 0, 0, 0], None)
             .unwrap_or_default();
 
         if status != 0 {
@@ -396,8 +405,7 @@ impl Blackhole {
         for chunk in value.chunks_mut(buffer.size as usize) {
             let (status, _, _) = self.bh_arc_msg(
                 0x19,
-                Some(0 << 8),
-                &[addr, chunk.len() as u32, buffer.addr],
+                [0, addr, chunk.len() as u32, buffer.addr, 0, 0, 0, 0],
                 None,
             )?;
 
@@ -674,17 +682,20 @@ impl ChipImpl for Blackhole {
 
     fn arc_msg(&self, msg: ArcMsgOptions) -> Result<ArcMsgOk, PlatformError> {
         let code = msg.msg.msg_code();
-        let args = msg.msg.args();
+        let data = if let ArcMsg::Buf(msg) = msg.msg {
+            msg
+        } else {
+            let args = msg.msg.args();
+            [0, args.0 as u32 | ((args.1 as u32) << 16), 0, 0, 0, 0, 0, 0]
+        };
 
-        let (_status, rc, response) = self.bh_arc_msg(
-            code as u8,
-            None,
-            &[args.0 as u32 | ((args.1 as u32) << 16)],
-            Some(msg.timeout),
-        )?;
-        Ok(ArcMsgOk::Ok {
-            rc: rc as u32,
-            arg: response[0],
+        let (_status, rc, response) = self.bh_arc_msg(code as u8, data, Some(msg.timeout))?;
+        Ok(match msg.msg {
+            ArcMsg::Buf(_) => ArcMsgOk::OkBuf(response),
+            _ => ArcMsgOk::Ok {
+                rc: rc as u32,
+                arg: response[1],
+            },
         })
     }
 

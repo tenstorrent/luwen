@@ -98,6 +98,7 @@ impl TypedArcMsg {
 pub enum ArcMsg {
     Typed(TypedArcMsg),
     Raw { msg: u16, arg0: u16, arg1: u16 },
+    Buf([u32; 8]),
 }
 
 impl ArcMsg {
@@ -105,6 +106,7 @@ impl ArcMsg {
         let code = match self {
             ArcMsg::Raw { msg, .. } => *msg,
             ArcMsg::Typed(msg) => msg.msg_code(),
+            ArcMsg::Buf([msg, ..]) => u16::from(msg.to_le_bytes()[0]),
         };
 
         0xaa00 | code
@@ -138,6 +140,7 @@ impl ArcMsg {
                     FwType::FwBundleSPI => (2, 0),
                 },
             },
+            ArcMsg::Buf(_) => unimplemented!(),
         }
     }
 
@@ -225,6 +228,7 @@ pub enum ArcMsgError {
 #[derive(Debug)]
 pub enum ArcMsgOk {
     Ok { rc: u32, arg: u32 },
+    OkBuf([u32; 8]),
     OkNoWait,
 }
 

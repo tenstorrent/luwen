@@ -57,6 +57,7 @@ mod tests {
                     }) {
                         match result {
                             ArcMsgOk::Ok { rc: _, arg } => Some(arg),
+                            ArcMsgOk::OkBuf(_) => unreachable!(),
                             ArcMsgOk::OkNoWait => None,
                         }
                     } else {
