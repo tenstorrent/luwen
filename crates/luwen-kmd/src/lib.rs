@@ -572,6 +572,26 @@ impl PciDevice {
         tlb::get_tlb(self, index)
     }
 
+    pub fn set_power_state(&self, level: Power) -> Result<(), PciError> {
+        let mut state = match level {
+            Power::Low => ioctl::SetPowerState {
+                validity: (0 & 0xF) << 4 | (4 & 0xF),
+                power_flags: 0xfff0 | 0b0000,
+                ..Default::default()
+            },
+            Power::High => ioctl::SetPowerState {
+                validity: (0 & 0xF) << 4 | (4 & 0xF),
+                power_flags: 0xfff0 | 0b1111,
+                ..Default::default()
+            }
+        };
+
+        // SAFETY: State is defined as a stack-allocated struct, and will never be null.
+        unsafe { ioctl::set_power_state(self.device_fd.as_raw_fd(), &mut state) }
+            .map(|_| ())
+            .map_err(|errno| PciError::IoctlError(errno))
+    }
+
     pub fn noc_write(
         &mut self,
         index: &PossibleTlbAllocation,
@@ -688,6 +708,12 @@ impl PciDevice {
             PossibleTlbAllocation::NoAllocation => todo!(),
         }
     }
+}
+
+/// Device power level.
+pub enum Power {
+    Low,
+    High,
 }
 
 #[derive(Debug, Default, PartialEq)]

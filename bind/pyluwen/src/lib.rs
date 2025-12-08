@@ -816,6 +816,18 @@ impl PciInterface<'_> {
             })
     }
 
+    pub fn set_power_state(&self, level: String) -> PyResult<()> {
+        self.pci_interface
+            .borrow()
+            .device
+            .set_power_state(match level.as_str() {
+                "low" => luwen::kmd::Power::Low,
+                "high" => luwen::kmd::Power::High,
+                _ => return Err(PyException::new_err("invalid power state")),
+            })
+            .map_err(|v| PyException::new_err(v.to_string()))
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn setup_tlb(
         &self,
@@ -1151,6 +1163,18 @@ impl PciWormhole {
             .map(|v| v.into())
             .map_err(|v| PyException::new_err(v.to_string()))
     }
+
+    pub fn set_power_state(&self, level: String) -> PyResult<()> {
+        let value = PciInterface::from_wh(self);
+
+        if let Some(value) = value {
+            value.set_power_state(level)
+        } else {
+            Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ))
+        }
+    }
 }
 
 common_chip_comms_impls!(PciWormhole);
@@ -1425,6 +1449,18 @@ impl PciBlackhole {
             Err(PyException::new_err(format!(
                 "Was not able to find {tag_name} in spirom table"
             )))
+        }
+    }
+
+    pub fn set_power_state(&self, level: String) -> PyResult<()> {
+        let value = PciInterface::from_bh(self);
+
+        if let Some(value) = value {
+            value.set_power_state(level)
+        } else {
+            Err(PyException::new_err(
+                "Could not get PCI interface for this chip.",
+            ))
         }
     }
 }

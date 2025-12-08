@@ -328,9 +328,28 @@ nix::ioctl_readwrite_bad!(
     ConfigureTlb
 );
 
-#[derive(Default)]
 #[repr(C)]
-pub struct SetPowerState {}
+pub struct SetPowerState {
+    pub argsz: u32,
+    pub flags: u32,
+    pub reserved0: u8,
+    pub validity: u8,
+    pub power_flags: u16,
+    pub power_settings: [u16; 14],
+}
+
+impl Default for SetPowerState {
+    fn default() -> Self {
+        Self {
+            argsz: std::mem::size_of::<Self>() as u32,
+            flags: 0,
+            reserved0: 0,
+            validity: Default::default(),
+            power_flags: Default::default(),
+            power_settings: Default::default(),
+        }
+    }
+}
 
 nix::ioctl_readwrite_bad!(
     set_power_state,
