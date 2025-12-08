@@ -1,6 +1,6 @@
 [package]
 name = "pyluwen"
-version = "0.7.16"
+version = { workspace = true }
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }

@@ -1,6 +1,6 @@
 [package]
 name = "luwen-def"
-version = "0.2.3"
+version = { workspace = true }
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
