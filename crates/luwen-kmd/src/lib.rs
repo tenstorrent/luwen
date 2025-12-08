@@ -583,7 +583,21 @@ impl PciDevice {
                 validity: (0 & 0xF) << 4 | (4 & 0xF),
                 power_flags: 0xfff0 | 0b1111,
                 ..Default::default()
-            }
+            },
+            Power::Raw {
+                aiclk,
+                mrisc,
+                tensix,
+                l2cpu,
+            } => ioctl::SetPowerState {
+                validity: (0 & 0xF) << 4 | (4 & 0xF),
+                power_flags: 0xfff0
+                    | (u16::from(aiclk)
+                        | u16::from(mrisc) << 1
+                        | u16::from(tensix) << 2
+                        | u16::from(l2cpu) << 3),
+                ..Default::default()
+            },
         };
 
         // SAFETY: State is defined as a stack-allocated struct, and will never be null.
@@ -714,6 +728,12 @@ impl PciDevice {
 pub enum Power {
     Low,
     High,
+    Raw {
+        aiclk: bool,
+        mrisc: bool,
+        tensix: bool,
+        l2cpu: bool,
+    },
 }
 
 #[derive(Debug, Default, PartialEq)]
