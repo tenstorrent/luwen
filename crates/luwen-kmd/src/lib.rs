@@ -235,7 +235,6 @@ impl PciDevice {
     pub fn open(device_id: usize) -> Result<PciDevice, PciOpenError> {
         let fd = std::fs::OpenOptions::new()
             .read(true)
-            .write(true)
             .append(true)
             .open(format!("/dev/tenstorrent/{device_id}"));
         let fd = match fd {
@@ -572,6 +571,8 @@ impl PciDevice {
         tlb::get_tlb(self, index)
     }
 
+    #[allow(clippy::erasing_op)]
+    #[allow(clippy::identity_op)]
     pub fn set_power_state(&self, level: Power) -> Result<(), PciError> {
         let mut state = match level {
             Power::Low => ioctl::SetPowerState {
@@ -603,7 +604,7 @@ impl PciDevice {
         // SAFETY: State is defined as a stack-allocated struct, and will never be null.
         unsafe { ioctl::set_power_state(self.device_fd.as_raw_fd(), &mut state) }
             .map(|_| ())
-            .map_err(|errno| PciError::IoctlError(errno))
+            .map_err(PciError::IoctlError)
     }
 
     pub fn noc_write(
