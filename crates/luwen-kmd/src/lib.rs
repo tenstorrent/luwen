@@ -730,9 +730,24 @@ pub enum Power {
     Low,
     High,
     Raw {
+        /// Maximum AI Clock.
+        ///
+        /// When set, runs the AI clock at 1500 MHz. Otherwise, it will run at
+        /// a lower-power 800 MHz.
         aiclk: bool,
+        /// MRISC PHY Wakeup.
+        ///
+        /// Wake up or power down the MRISC cores.
         mrisc: bool,
+        /// Enable Tensix.
+        ///
+        /// When unset, the Tensix cores will be clock gated (disabled) to
+        /// conserve system power.
         tensix: bool,
+        /// Enable L2CPU.
+        ///
+        /// When unset, the L2CPU will be clock gated (disabled) to conserve
+        /// system power.
         l2cpu: bool,
     },
 }
