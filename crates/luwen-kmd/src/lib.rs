@@ -235,7 +235,7 @@ impl PciDevice {
     pub fn open(device_id: usize) -> Result<PciDevice, PciOpenError> {
         let fd = std::fs::OpenOptions::new()
             .read(true)
-            .write(true)
+            .append(true)
             .open(format!("/dev/tenstorrent/{device_id}"));
         let fd = match fd {
             Ok(fd) => fd,
@@ -571,6 +571,42 @@ impl PciDevice {
         tlb::get_tlb(self, index)
     }
 
+    #[allow(clippy::erasing_op)]
+    #[allow(clippy::identity_op)]
+    pub fn set_power_state(&self, level: Power) -> Result<(), PciError> {
+        let mut state = match level {
+            Power::Low => ioctl::SetPowerState {
+                validity: (0 & 0xF) << 4 | (4 & 0xF),
+                power_flags: 0xfff0 | 0b0000,
+                ..Default::default()
+            },
+            Power::High => ioctl::SetPowerState {
+                validity: (0 & 0xF) << 4 | (4 & 0xF),
+                power_flags: 0xfff0 | 0b1111,
+                ..Default::default()
+            },
+            Power::Raw {
+                aiclk,
+                mrisc,
+                tensix,
+                l2cpu,
+            } => ioctl::SetPowerState {
+                validity: (0 & 0xF) << 4 | (4 & 0xF),
+                power_flags: 0xfff0
+                    | (u16::from(aiclk)
+                        | u16::from(mrisc) << 1
+                        | u16::from(tensix) << 2
+                        | u16::from(l2cpu) << 3),
+                ..Default::default()
+            },
+        };
+
+        // SAFETY: State is defined as a stack-allocated struct, and will never be null.
+        unsafe { ioctl::set_power_state(self.device_fd.as_raw_fd(), &mut state) }
+            .map(|_| ())
+            .map_err(PciError::IoctlError)
+    }
+
     pub fn noc_write(
         &mut self,
         index: &PossibleTlbAllocation,
@@ -687,6 +723,33 @@ impl PciDevice {
             PossibleTlbAllocation::NoAllocation => todo!(),
         }
     }
+}
+
+/// Device power level.
+pub enum Power {
+    Low,
+    High,
+    Raw {
+        /// Maximum AI Clock.
+        ///
+        /// When set, runs the AI clock at 1500 MHz. Otherwise, it will run at
+        /// a lower-power 800 MHz.
+        aiclk: bool,
+        /// MRISC PHY Wakeup.
+        ///
+        /// Wake up or power down the MRISC cores.
+        mrisc: bool,
+        /// Enable Tensix.
+        ///
+        /// When unset, the Tensix cores will be clock gated (disabled) to
+        /// conserve system power.
+        tensix: bool,
+        /// Enable L2CPU.
+        ///
+        /// When unset, the L2CPU will be clock gated (disabled) to conserve
+        /// system power.
+        l2cpu: bool,
+    },
 }
 
 #[derive(Debug, Default, PartialEq)]
