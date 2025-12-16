@@ -263,6 +263,7 @@ jobs:
       - changelogs
       - build_all_depends
       - tagrelease
+      - publish-to-testpypi
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -362,7 +363,7 @@ jobs:
     name: Publish Python 🐍 distribution 📦 to TestPyPI
     needs:
       - build_all_depends
-      - generaterelease
+      - tagrelease
     runs-on: ubuntu-latest
 
     environment:
