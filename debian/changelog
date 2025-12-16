@@ -1,3 +1,28 @@
+rust-luwen (0.8.0) noble; urgency=medium
+
+  [ Zakhary Kaplan ]
+  * build(cargo): share version numbering
+  * build(cargo): clean up
+  * build(pip): use cargo manifest fields
+  * build(cargo): use workspace license
+
+  [ Petra Alexson ]
+  * Add version_bump_type input param to release workflow
+
+  [ Zakhary Kaplan ]
+  * feat!: add `O_APPEND` to `open` to signal power-aware to KMD
+  * feat: add `ioctl::set_power_state`
+  * feat: impl `PciDevice::set_power_state`
+  * feat: impl `PciChip::set_power_state`
+  * feat(pyluwen): add lower-level `set_power`
+  * chore(clippy): apply lints
+  * docs(kmd): add context for power options
+
+  [ Tenstorrent Releases ]
+  * Cargo Release independent packages
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Tue, 16 Dec 2025 15:43:50 +0000
+
 rust-luwen (0.7.19) noble; urgency=medium
 
   [ Zakhary Kaplan ]
