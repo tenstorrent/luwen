@@ -380,6 +380,8 @@ jobs:
           pattern: python-package-*
           path: dist/
           merge-multiple: true
+      - name: Remove sdist to avoid burned filename issues on TestPyPI
+        run: rm -f dist/*.tar.gz
       - name: Publish distribution 📦 to TestPyPI
         #run: echo "Hi!"
         uses: pypa/gh-action-pypi-publish@release/v1
