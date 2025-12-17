@@ -1,3 +1,14 @@
+rust-luwen (0.8.1) noble; urgency=medium
+
+  [ Zakhary Kaplan ]
+  * ci(release): make `generaterelerase` depend on `publish-to-testpypi`
+  * ci(release): skip existing artifact upload on `publish-to-testpypi`
+
+  [ Tenstorrent Releases ]
+  * Cargo Release independent packages
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Wed, 17 Dec 2025 20:20:20 +0000
+
 rust-luwen (0.8.0) noble; urgency=medium
 
   [ Zakhary Kaplan ]
