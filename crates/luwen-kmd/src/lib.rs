@@ -605,8 +605,9 @@ impl PciDevice {
         match unsafe { ioctl::set_power_state(self.device_fd.as_raw_fd(), &mut state) } {
             Ok(_) => Ok(()),
             Err(nix::errno::Errno::EINVAL) => {
-                // Old firmware/KMD doesn't support power management features.
-                // Silently ignore EINVAL to maintain backward compatibility.
+                // EINVAL is returned when the firmware or kernel module driver (KMD) is too old
+                // to support power management features. Silently ignore this error to maintain
+                // backward compatibility with older firmware versions.
                 Ok(())
             }
             Err(err) => Err(PciError::IoctlError(err)),
