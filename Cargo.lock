@@ -847,6 +847,7 @@ dependencies = [
  "luwen-pci",
  "serde_json",
  "serial_test",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

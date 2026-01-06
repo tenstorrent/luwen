@@ -16,6 +16,13 @@ pub use luwen_api as api;
 #[doc(inline)]
 pub use luwen_kmd as kmd;
 
+/// Chip reset functionality.
+///
+/// Provides reset capabilities for Wormhole and Blackhole chips,
+/// including PCIe link reset, chip-specific reset sequences, and
+/// state restoration.
+pub mod reset;
+
 /// Error types.
 #[doc(hidden)]
 pub mod err {

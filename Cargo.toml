@@ -21,6 +21,7 @@ luwen-api = { workspace = true }
 luwen-def = { workspace = true }
 luwen-kmd = { workspace = true }
 luwen-pci = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
