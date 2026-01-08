@@ -257,7 +257,7 @@ impl Telemetry {
             let frac: f64 = (self.asic_temperature & 0xFFFF).into();
             let frac = frac / 65536.0;
 
-            let int: f64 = (self.asic_temperature >> 16).into();
+            let int: f64 = ((self.asic_temperature >> 16) as i16).into();
 
             int + frac
         } else {
