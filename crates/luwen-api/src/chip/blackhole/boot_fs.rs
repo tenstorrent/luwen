@@ -4,6 +4,8 @@ use std::mem;
 
 // define constants for boot fs
 const IMAGE_TAG_SIZE: u32 = 8;
+const BOOT_FS_HEADER_START: u32 = 0x120000;
+const BOOT_FS_HEADER_MAGIC: u32 = 0x54544246; // 'TTBF' in little-endian
 
 #[bitfield_struct::bitfield(u32)] // specify the bitfield size to match the c struct
 #[derive(PartialEq, Pod, Zeroable)]
@@ -40,6 +42,14 @@ pub struct TtBootFsFd {
     pub security_flags: SecurityFdFlags,
     pub image_tag: [u8; IMAGE_TAG_SIZE as usize],
     pub fd_crc: u32,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Pod, Zeroable)]
+pub struct TtBootFsHeader {
+    pub magic: u32,
+    pub version: u32,
+    pub num_fds: u32,
 }
 
 impl TtBootFsFd {
@@ -85,16 +95,50 @@ pub fn read_fd(reader: impl Fn(u32, usize) -> Vec<u8>, addr: u32) -> Option<TtBo
     }
 }
 
-pub fn read_tag(reader: impl Fn(u32, usize) -> Vec<u8>, tag: &str) -> Option<(u32, TtBootFsFd)> {
-    let mut curr_addr = 0;
-    loop {
-        let fd = read_fd(&reader, curr_addr).unwrap();
-        if fd.flags.invalid() {
-            return None;
-        }
-        if fd.image_tag_str() == tag {
-            return Some((curr_addr, fd));
-        }
-        curr_addr += mem::size_of::<TtBootFsFd>() as u32;
+pub fn read_header(reader: impl Fn(u32, usize) -> Vec<u8>, addr: u32) -> Option<TtBootFsHeader> {
+    let header_bytes = reader(addr, mem::size_of::<TtBootFsHeader>());
+    if header_bytes.len() == mem::size_of::<TtBootFsHeader>() {
+        Some(unsafe {
+            mem::transmute::<[u8; mem::size_of::<TtBootFsHeader>()], TtBootFsHeader>(
+                header_bytes.try_into().unwrap(),
+            )
+        })
+    } else {
+        None
     }
+}
+
+pub fn read_tag(reader: impl Fn(u32, usize) -> Vec<u8>, tag: &str) -> Option<(u32, TtBootFsFd)> {
+    let header_addr = BOOT_FS_HEADER_START; // Boot FS header start address
+    let mut curr_addr;
+    let header = read_header(&reader, header_addr).unwrap();
+    let mut boot_headers: Vec<u32> = Vec::new();
+    if header.magic != BOOT_FS_HEADER_MAGIC {
+        // Legacy bootfs. Just has headers at 0x0 and 0x4000
+        boot_headers = vec![0x0, 0x4000];
+    } else {
+        curr_addr = header_addr + mem::size_of::<TtBootFsHeader>() as u32;
+        // Read through the number of FDs specified in the header
+        for _ in 0..header.num_fds {
+            // Read a u32 address of each FD
+            let addr_bytes = reader(curr_addr, 4);
+            let fd_addr = u32::from_le_bytes(addr_bytes.try_into().unwrap());
+            boot_headers.push(fd_addr);
+            curr_addr += 4;
+        }
+    }
+    for addr in boot_headers {
+        curr_addr = addr;
+        loop {
+            let fd = read_fd(&reader, curr_addr).unwrap();
+            if fd.flags.invalid() {
+                break;
+            }
+            if fd.image_tag_str() == tag {
+                return Some((addr, fd));
+            }
+            curr_addr += mem::size_of::<TtBootFsFd>() as u32;
+        }
+    }
+    None
 }
