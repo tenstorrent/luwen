@@ -1,0 +1,11 @@
+[package]
+name = "dump-flash"
+version = "0.1.0"
+edition = { workspace = true }
+
+[package.metadata.workspaces]
+independent = true
+
+[dependencies]
+luwen = { workspace = true }
+
