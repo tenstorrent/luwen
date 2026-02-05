@@ -287,6 +287,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "decode-boot-fs"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "luwen",
+ "luwen-api",
+ "prost",
+ "serde_json",
+]
+
+[[package]]
 name = "deranged"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1347,6 +1358,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
  "getrandom 0.2.16",
+]
+
+[[package]]
+name = "read-flash-info"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "luwen",
+ "luwen-api",
+ "prost",
+ "serde_json",
 ]
 
 [[package]]
