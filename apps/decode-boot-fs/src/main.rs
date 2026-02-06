@@ -1,6 +1,5 @@
 use luwen::pci::detect_chips;
 use luwen_api::chip::spirom_tables;
-use bytemuck::bytes_of;
 use prost::Message;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -19,130 +18,75 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Found {} device(s)", devices.len());
     println!();
 
+
     // Parse hex string to u32
     // Process all detected devices
     for (idx, device) in devices.iter().enumerate() {
         if idx != 0 {
             continue;
         }
+
         println!("=== Device {} ===", idx + 1);
         // Decode the boot FS table
         if let Some(bh) = device.as_bh() {
             let (original_spi_addr, original_image_size) = get_original_board_cfg_info(bh)?;
             println!("Original boardcfg SPI address: 0x{:08x}", original_spi_addr);
             println!("Original boardcfg image size: {} bytes", original_image_size);
-            let mut board_cfg_addr_1: Option<HashMap<String, Value>> = None;
-            let mut board_cfg_addr_2: Option<HashMap<String, Value>> = None;
-            match decode_boot_fs_table(bh, TAG_NAME, SPI_ADDR_1, original_image_size) {
-                Ok(decoded) => {
-                    println!("Successfully decoded {}:", TAG_NAME);
-                    println!("{}", serde_json::to_string_pretty(&decoded)?);
-                    board_cfg_addr_1 = Some(decoded);
-                }
-                Err(e) => {
-                    eprintln!("Failed to decode {}: {}", TAG_NAME, e);
-                        // Continue to next device instead of returning
-                        
-                }
-            }
-            match decode_boot_fs_table(bh, TAG_NAME, SPI_ADDR_2, original_image_size) {
-                Ok(decoded) => {
-                    println!("Successfully decoded {}:", TAG_NAME);
-                    println!("{}", serde_json::to_string_pretty(&decoded)?);
-                    board_cfg_addr_2 = Some(decoded);
-                }
-                Err(e) => {
-                    eprintln!("Failed to decode {}: {}", TAG_NAME, e);
-                    
-                }
-            }
-            // Check the board configs at both locations. 
-            // If vendorID and board ID are not 0, then flash into the chip at the original address. 
-            // If they match, then flash anyone into the correct spot. 
-            // If not, then only flash the one that is not none.
-            
-            // Helper to extract vendor_id and board_id from a config HashMap
-            let extract_ids = |config: &HashMap<String, Value>| -> (u32, u64) {
-                let vendor_id = config
-                    .get("vendor_id")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(0) as u32;
-                let board_id = config
-                    .get("board_id")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(0);
-                (vendor_id, board_id)
-            };
-            
-            let (vendor_id_1, board_id_1) = board_cfg_addr_1.as_ref().map(extract_ids).unwrap_or((0, 0));
-            let (vendor_id_2, board_id_2) = board_cfg_addr_2.as_ref().map(extract_ids).unwrap_or((0, 0));
-            
-            println!("Config at 0x{:08x}: vendor_id={}, board_id={}", SPI_ADDR_1, vendor_id_1, board_id_1);
-            println!("Config at 0x{:08x}: vendor_id={}, board_id={}", SPI_ADDR_2, vendor_id_2, board_id_2);
-            
-            // Determine which config to flash and where
-            let config_to_flash: Option<&HashMap<String, Value>>;
-            let target_spi_addr: u32;
-            
-            // Check if vendorID and board ID are not 0 in either config
-            let has_valid_ids_1 = vendor_id_1 != 0 && board_id_1 != 0;
-            let has_valid_ids_2 = vendor_id_2 != 0 && board_id_2 != 0;
-            
-            if has_valid_ids_1 && has_valid_ids_2 {
-                // Both have valid IDs - check if they match
-                if vendor_id_1 == vendor_id_2 && board_id_1 == board_id_2 {
-                    // They match - flash anyone into the correct spot (original address)
-                    println!("Configs match - flashing to original address 0x{:08x}", original_spi_addr);
-                    config_to_flash = board_cfg_addr_1.as_ref();
-                    target_spi_addr = original_spi_addr;
-                } else {
-                    // They don't match - flash the one with valid IDs to original address
-                    println!("Configs don't match - flashing valid config to original address 0x{:08x}", original_spi_addr);
-                    config_to_flash = if has_valid_ids_1 {
-                        board_cfg_addr_1.as_ref()
-                    } else {
-                        board_cfg_addr_2.as_ref()
-                    };
-                    target_spi_addr = original_spi_addr;
-                }
-            } else if has_valid_ids_1 {
-                // Only addr_1 has valid IDs
-                println!("Only config at 0x{:08x} has valid IDs - flashing to original address 0x{:08x}", SPI_ADDR_1, original_spi_addr);
-                config_to_flash = board_cfg_addr_1.as_ref();
-                target_spi_addr = original_spi_addr;
-            } else if has_valid_ids_2 {
-                // Only addr_2 has valid IDs
-                println!("Only config at 0x{:08x} has valid IDs - flashing to original address 0x{:08x}", SPI_ADDR_2, original_spi_addr);
-                config_to_flash = board_cfg_addr_2.as_ref();
-                target_spi_addr = original_spi_addr;
+
+            // Take the first valid boardcfg from either address
+            let config_to_flash = get_valid_boardcfg_at_addr(bh, SPI_ADDR_1, original_image_size)
+                .ok()
+                .flatten()
+                .or_else(|| get_valid_boardcfg_at_addr(bh, SPI_ADDR_2, original_image_size).ok().flatten());
+
+            if let Some(config) = config_to_flash {
+                println!("Flashing boardcfg to 0x{:08x}...", original_spi_addr);
+                bh.encode_and_write_boot_fs_table(config, TAG_NAME)?;
+                println!("Successfully flashed boardcfg to 0x{:08x}", original_spi_addr);
             } else {
-                // Neither has valid IDs - flash whichever one exists
-                // Don't flash anything!
-                println!("No valid IDs found for BH chip {idx}- not flashing anything");
-                continue;
-            }
-            
-            // Flash the selected config to the target address
-            if let Some(_config) = config_to_flash {
-                println!("Flashing boardcfg to 0x{:08x}...", target_spi_addr);
-                // Note: encode_and_write_boot_fs_table writes to the address from tag_info
-                // We need to write to a specific address, so we'll need to handle this differently
-                // For now, we'll use encode_and_write_boot_fs_table which writes to the original address
-                // If target_spi_addr != original_spi_addr, we'd need a custom write function
-                if target_spi_addr == original_spi_addr {
-                    bh.encode_and_write_boot_fs_table(_config.clone(), TAG_NAME)?;
-                    println!("Successfully flashed boardcfg to 0x{:08x}", target_spi_addr);
-                } else {
-                    eprintln!("Warning: Cannot flash to non-original address 0x{:08x} (original is 0x{:08x})", target_spi_addr, original_spi_addr);
-                    eprintln!("Using encode_and_write_boot_fs_table which writes to original address");
-                    bh.encode_and_write_boot_fs_table(_config.clone(), TAG_NAME)?;
-                }
+                println!("No valid boardcfg found at 0x{:08x} or 0x{:08x} - not flashing", SPI_ADDR_1, SPI_ADDR_2);
             }
 
         }
     }
 
     Ok(())
+}
+
+fn get_valid_boardcfg_at_addr(
+    chip: &luwen_api::chip::Blackhole,
+    spi_addr: u32,
+    original_image_size: usize,
+) -> Result<Option<HashMap<String, Value>>, Box<dyn std::error::Error>> {
+    let boardcfg = match decode_boot_fs_table(chip, TAG_NAME, spi_addr, original_image_size) {
+        Ok(decoded) => {
+            println!("Successfully decoded {} at 0x{:08x}:", TAG_NAME, spi_addr);
+            println!("{}", serde_json::to_string_pretty(&decoded)?);
+            Some(decoded)
+        }
+        Err(e) => {
+            eprintln!("Failed to decode {} at 0x{:08x}: {}", TAG_NAME, spi_addr, e);
+            None
+        }
+    };
+
+    let extract_ids = |config: &HashMap<String, Value>| -> (u32, u64) {
+        let vendor_id = config
+            .get("vendor_id")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as u32;
+        let board_id = config
+            .get("board_id")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        (vendor_id, board_id)
+    };
+
+    let (vendor_id, board_id) = boardcfg.as_ref().map(extract_ids).unwrap_or((0, 0));
+    println!("Config at 0x{:08x}: vendor_id={}, board_id={}", spi_addr, vendor_id, board_id);
+
+    let has_valid_ids = vendor_id != 0 && board_id != 0;
+    Ok(if has_valid_ids { boardcfg } else { None })
 }
 
 fn get_original_board_cfg_info(
