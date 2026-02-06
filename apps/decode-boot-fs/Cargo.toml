@@ -12,4 +12,5 @@ luwen = { workspace = true }
 luwen-api = { workspace = true }
 prost = "0.13"
 serde_json = { workspace = true }
+bytemuck = "1.0"
 
