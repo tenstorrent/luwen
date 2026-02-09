@@ -2,7 +2,7 @@ use luwen::pci::detect_chips;
 use std::fs::{self, File};
 use std::io::{self, Write};
 
-const FLASH_DUMP_SIZE: usize = 16 * 1024 * 1024; // 16 MB
+const FLASH_DUMP_SIZE: usize = 64 * 1024 * 1024; // 16 MB
 const CHUNK_SIZE: usize = 64 * 1024; // Read in 64KB chunks
 const OUTPUT_DIR: &str = "flash_dump";
 

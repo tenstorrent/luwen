@@ -22,9 +22,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse hex string to u32
     // Process all detected devices
     for (idx, device) in devices.iter().enumerate() {
-        if idx != 0 {
-            continue;
-        }
 
         println!("=== Device {} ===", idx + 1);
         // Decode the boot FS table
@@ -39,12 +36,60 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .flatten()
                 .or_else(|| get_valid_boardcfg_at_addr(bh, SPI_ADDR_2, original_image_size).ok().flatten());
 
-            if let Some(config) = config_to_flash {
+            let flashed_config = if let Some(config) = config_to_flash {
                 println!("Flashing boardcfg to 0x{:08x}...", original_spi_addr);
-                bh.encode_and_write_boot_fs_table(config, TAG_NAME)?;
+                bh.encode_and_write_boot_fs_table(config.clone(), TAG_NAME)?;
                 println!("Successfully flashed boardcfg to 0x{:08x}", original_spi_addr);
+                Some(config)
             } else {
                 println!("No valid boardcfg found at 0x{:08x} or 0x{:08x} - not flashing", SPI_ADDR_1, SPI_ADDR_2);
+                None
+            };
+            
+            // Always read and display boardcfg from flash (whether we flashed or not)
+            println!();
+            println!("=== Reading boardcfg from flash at 0x{:08x} ===", original_spi_addr);
+            match decode_boot_fs_table(bh, TAG_NAME, original_spi_addr, original_image_size) {
+                Ok(flash_config) => {
+                    println!("Successfully read and decoded boardcfg from 0x{:08x}:", original_spi_addr);
+                    println!("{}", serde_json::to_string_pretty(&flash_config)?);
+                    
+                    // Extract IDs for comparison if we flashed
+                    let extract_ids = |config: &HashMap<String, Value>| -> (u32, u64) {
+                        let vendor_id = config
+                            .get("vendor_id")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0) as u32;
+                        let board_id = config
+                            .get("board_id")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0);
+                        (vendor_id, board_id)
+                    };
+                    
+                    if let Some(flashed) = flashed_config {
+                        let (flashed_vendor_id, flashed_board_id) = extract_ids(&flashed);
+                        let (flash_vendor_id, flash_board_id) = extract_ids(&flash_config);
+                        
+                        println!();
+                        println!("Verification summary:");
+                        println!("  Flashed:  vendor_id={}, board_id={}", flashed_vendor_id, flashed_board_id);
+                        println!("  From flash: vendor_id={}, board_id={}", flash_vendor_id, flash_board_id);
+                        
+                        if flashed_vendor_id == flash_vendor_id && flashed_board_id == flash_board_id {
+                            println!("  ✓ Verification successful: IDs match!");
+                        } else {
+                            println!("  ✗ Verification warning: IDs do not match!");
+                        }
+                    } else {
+                        let (flash_vendor_id, flash_board_id) = extract_ids(&flash_config);
+                        println!();
+                        println!("Current boardcfg in flash: vendor_id={}, board_id={}", flash_vendor_id, flash_board_id);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Failed to read boardcfg from 0x{:08x}: {}", original_spi_addr, e);
+                }
             }
 
         }
