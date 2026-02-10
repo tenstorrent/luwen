@@ -7,6 +7,7 @@ use std::collections::HashMap;
 const TAG_NAME: &str = "boardcfg";
 const SPI_ADDR_1: u32 = 0xfff000;
 const SPI_ADDR_2: u32 = 0x3fff000;
+const BIN_FILE_PATH: &str = "flash_dump_f01cs02_copy/blackhole_0.bin";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let devices = detect_chips()?;
@@ -22,8 +23,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse hex string to u32
     // Process all detected devices
     for (idx, device) in devices.iter().enumerate() {
-
-        println!("=== Device {} ===", idx + 1);
+        if idx != 0 {
+            continue;
+        }
+        println!("=== Device {} ===", idx);
         // Decode the boot FS table
         if let Some(bh) = device.as_bh() {
             let (original_spi_addr, original_image_size) = get_original_board_cfg_info(bh)?;
@@ -38,63 +41,98 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let flashed_config = if let Some(config) = config_to_flash {
                 println!("Flashing boardcfg to 0x{:08x}...", original_spi_addr);
-                bh.encode_and_write_boot_fs_table(config.clone(), TAG_NAME)?;
-                println!("Successfully flashed boardcfg to 0x{:08x}", original_spi_addr);
-                Some(config)
+                let proto_bin_to_write = bh.encode_and_write_boot_fs_table(config.clone(), TAG_NAME, false)?;
+                // println!("Successfully flashed boardcfg to 0x{:08x}", original_spi_addr);
+                
+                // Open the bin file and write the protobin to location of original_spi_addr & original_image_size in the bin file
+                // Open the bin file for reading and writing, error if it does not exist
+                use std::fs::OpenOptions;
+                use std::io::{Seek, SeekFrom, Write};
+
+                let mut file = OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .create(false)
+                    .open(BIN_FILE_PATH)
+                    .map_err(|e| format!("Failed to open {}: {}", BIN_FILE_PATH, e))?;
+
+                let proto_bin_len = proto_bin_to_write.len() as u32;
+                let required_size = original_spi_addr + proto_bin_len;
+                let file_metadata = file.metadata()?;
+                if file_metadata.len() < required_size as u64 {
+                    return Err(format!(
+                        "Bin file '{}' too small, must be at least {} bytes for write at 0x{:08x} ({} bytes)",
+                        BIN_FILE_PATH, required_size, original_spi_addr, proto_bin_len
+                    ).into());
+                }
+
+                // Seek to the position corresponding to original_spi_addr
+                file.seek(SeekFrom::Start(original_spi_addr as u64))?;
+                // Write the protobin
+                file.write_all(&proto_bin_to_write)?;
+
+                // // Optional: If original_image_size > protobin length, pad the rest with zeroes
+                // if original_image_size > proto_bin_len {
+                //     let pad_len = (original_image_size - proto_bin_len) as usize;
+                //     let pad = vec![0u8; pad_len];
+                //     file.write_all(&pad)?;
+                // }
+                
+                Some(proto_bin_to_write)
             } else {
                 println!("No valid boardcfg found at 0x{:08x} or 0x{:08x} - not flashing", SPI_ADDR_1, SPI_ADDR_2);
                 None
             };
             
-            // Always read and display boardcfg from flash (whether we flashed or not)
-            println!();
-            println!("=== Reading boardcfg from flash at 0x{:08x} ===", original_spi_addr);
-            match decode_boot_fs_table(bh, TAG_NAME, original_spi_addr, original_image_size) {
-                Ok(flash_config) => {
-                    println!("Successfully read and decoded boardcfg from 0x{:08x}:", original_spi_addr);
-                    println!("{}", serde_json::to_string_pretty(&flash_config)?);
+            // // Always read and display boardcfg from flash (whether we flashed or not)
+            // println!();
+            // println!("=== Reading boardcfg from flash at 0x{:08x} ===", original_spi_addr);
+            // match decode_boot_fs_table(bh, TAG_NAME, original_spi_addr, original_image_size) {
+            //     Ok(flash_config) => {
+            //         println!("Successfully read and decoded boardcfg from 0x{:08x}:", original_spi_addr);
+            //         println!("{}", serde_json::to_string_pretty(&flash_config)?);
                     
-                    // Extract IDs for comparison if we flashed
-                    let extract_ids = |config: &HashMap<String, Value>| -> (u32, u64) {
-                        let vendor_id = config
-                            .get("vendor_id")
-                            .and_then(|v| v.as_u64())
-                            .unwrap_or(0) as u32;
-                        let board_id = config
-                            .get("board_id")
-                            .and_then(|v| v.as_u64())
-                            .unwrap_or(0);
-                        (vendor_id, board_id)
-                    };
+            //         // Extract IDs for comparison if we flashed
+            //         let extract_ids = |config: &HashMap<String, Value>| -> (u32, u64) {
+            //             let vendor_id = config
+            //                 .get("vendor_id")
+            //                 .and_then(|v| v.as_u64())
+            //                 .unwrap_or(0) as u32;
+            //             let board_id = config
+            //                 .get("board_id")
+            //                 .and_then(|v| v.as_u64())
+            //                 .unwrap_or(0);
+            //             (vendor_id, board_id)
+            //         };
                     
-                    if let Some(flashed) = flashed_config {
-                        let (flashed_vendor_id, flashed_board_id) = extract_ids(&flashed);
-                        let (flash_vendor_id, flash_board_id) = extract_ids(&flash_config);
+            //         if let Some(flashed) = flashed_config {
+            //             let (flashed_vendor_id, flashed_board_id) = extract_ids(&flashed);
+            //             let (flash_vendor_id, flash_board_id) = extract_ids(&flash_config);
                         
-                        println!();
-                        println!("Verification summary:");
-                        println!("  Flashed:  vendor_id={}, board_id={}", flashed_vendor_id, flashed_board_id);
-                        println!("  From flash: vendor_id={}, board_id={}", flash_vendor_id, flash_board_id);
+            //             println!();
+            //             println!("Verification summary:");
+            //             println!("  Flashed:  vendor_id={}, board_id={}", flashed_vendor_id, flashed_board_id);
+            //             println!("  From flash: vendor_id={}, board_id={}", flash_vendor_id, flash_board_id);
                         
-                        if flashed_vendor_id == flash_vendor_id && flashed_board_id == flash_board_id {
-                            println!("  ✓ Verification successful: IDs match!");
-                        } else {
-                            println!("  ✗ Verification warning: IDs do not match!");
-                        }
-                    } else {
-                        let (flash_vendor_id, flash_board_id) = extract_ids(&flash_config);
-                        println!();
-                        println!("Current boardcfg in flash: vendor_id={}, board_id={}", flash_vendor_id, flash_board_id);
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Failed to read boardcfg from 0x{:08x}: {}", original_spi_addr, e);
-                }
-            }
+            //             if flashed_vendor_id == flash_vendor_id && flashed_board_id == flash_board_id {
+            //                 println!("  ✓ Verification successful: IDs match!");
+            //             } else {
+            //                 println!("  ✗ Verification warning: IDs do not match!");
+            //             }
+            //         } else {
+            //             let (flash_vendor_id, flash_board_id) = extract_ids(&flash_config);
+            //             println!();
+            //             println!("Current boardcfg in flash: vendor_id={}, board_id={}", flash_vendor_id, flash_board_id);
+            //         }
+            //     }
+            //     Err(e) => {
+            //         eprintln!("Failed to read boardcfg from 0x{:08x}: {}", original_spi_addr, e);
+            //     }
+            // }
 
         }
     }
-
+    
     Ok(())
 }
 

@@ -486,7 +486,8 @@ impl Blackhole {
         &self,
         hashmap: HashMap<String, Value>,
         tag_name: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+        write_to_spi: bool,
+    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         // Convert the HashMap to a proto message and encode it to a proto bin
         let mut proto_bin = if tag_name == "cmfwcfg" {
             spirom_tables::from_hash_map::<spirom_tables::fw_table::FwTable>(hashmap)
@@ -525,10 +526,14 @@ impl Blackhole {
         };
         fd_in_spi.fd_crc = fd_chk;
 
-        self.spi_write(tag_info.0, bytes_of(&fd_in_spi))?;
-        self.spi_write(fd_in_spi.spi_addr, &proto_bin)?;
-
-        Ok(())
+        if write_to_spi {
+            self.spi_write(tag_info.0, bytes_of(&fd_in_spi))?;
+            self.spi_write(fd_in_spi.spi_addr, &proto_bin)?;
+            Ok(proto_bin)
+        } else {
+            // return the proto bin as a Vec<u8>
+            Ok(proto_bin)
+        }
     }
 }
 
