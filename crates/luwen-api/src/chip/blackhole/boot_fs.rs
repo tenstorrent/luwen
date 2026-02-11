@@ -33,7 +33,7 @@ pub struct SecurityFdFlags {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Pod, Zeroable)]
+#[derive(Copy, Clone, Pod, Zeroable, PartialEq)]
 pub struct TtBootFsFd {
     pub spi_addr: u32,
     pub copy_dest: u32,
@@ -61,18 +61,6 @@ impl TtBootFsFd {
             .position(|&c| c == 0)
             .unwrap_or(self.image_tag.len());
         String::from_utf8_lossy(&self.image_tag[..nul_pos]).to_string()
-    }
-}
-
-impl PartialEq for TtBootFsFd {
-    fn eq(&self, other: &Self) -> bool {
-        self.spi_addr == other.spi_addr
-            && self.copy_dest == other.copy_dest
-            && self.flags == other.flags
-            && self.data_crc == other.data_crc
-            && self.security_flags == other.security_flags
-            && self.image_tag == other.image_tag
-            && self.fd_crc == other.fd_crc
     }
 }
 
