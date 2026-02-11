@@ -395,6 +395,20 @@ impl Blackhole {
         Ok(())
     }
 
+    #[cfg(any())]
+    pub fn spi_write(&self, mut addr: u32, value: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+        use std::fs::File;
+        use std::os::unix::fs::FileExt;
+
+        let f = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open("test_spi.bin")?;
+
+        f.write_all_at(value, addr as u64)?;
+        Ok(())
+    }
+
     pub fn spi_read(
         &self,
         mut addr: u32,
@@ -421,6 +435,20 @@ impl Blackhole {
         Ok(())
     }
 
+    #[cfg(any())]
+    pub fn spi_read(
+        &self,
+        mut addr: u32,
+        value: &mut [u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use std::fs::File;
+        use std::os::unix::fs::FileExt;
+
+        let f = std::fs::File::open("test_spi.bin")?;
+        f.read_exact_at(value, addr as u64)?;
+        Ok(())
+    }
+
     pub fn get_local_chip_coord(&self) -> Result<EthAddr, PlatformError> {
         Ok(EthAddr {
             rack_x: 0,
@@ -434,15 +462,12 @@ impl Blackhole {
         &self,
         tag_name: &str,
     ) -> Result<Option<(u32, boot_fs::TtBootFsFd)>, Box<dyn std::error::Error>> {
-        let reader = |addr: u32, size: usize| {
+        let spi_reader = |addr: u32, size: usize| {
             let mut buf = vec![0; size];
             self.spi_read(addr, &mut buf).unwrap();
             buf
         };
-        Ok(boot_fs::read_tag(
-            &reader as &dyn Fn(u32, usize) -> Vec<u8>,
-            tag_name,
-        ))
+        Ok(boot_fs::read_tag(&spi_reader, tag_name))
     }
 
     pub fn decode_boot_fs_table(
