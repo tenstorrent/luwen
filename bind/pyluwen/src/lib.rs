@@ -16,8 +16,8 @@ use luwen::def::Arch;
 use luwen::kmd::PossibleTlbAllocation;
 use luwen::pci::{DmaConfig, ExtendedPciDeviceWrapper};
 use pyo3::exceptions::PyException;
-use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
+use pyo3::{prelude::*, IntoPyObjectExt as _};
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -1436,10 +1436,10 @@ impl PciBlackhole {
                 .0
                 .decode_boot_fs_table(tag_name)
                 .map_err(|v| PyException::new_err(v.to_string()))?;
-            let py_dict = PyDict::new_bound(py);
+            let py_dict = PyDict::new(py);
             // Convert the HashMap<String, Value> to a pydict
             for (key, value) in result {
-                let py_key: PyObject = key.into_py(py);
+                let py_key = key.into_pyobject(py)?;
                 let py_value: PyObject = serde_json_value_to_pyobject(py, &value)?;
                 py_dict.set_item(py_key, py_value)?;
             }
@@ -1811,37 +1811,37 @@ fn pyluwen(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
 fn serde_json_value_to_pyobject(py: Python, value: &Value) -> PyResult<PyObject> {
     match value {
         Value::Null => Ok(py.None()),
-        Value::Bool(b) => Ok(b.into_py(py)),
+        Value::Bool(b) => b.into_py_any(py),
         Value::Number(n) => {
             if let Some(value) = n.as_i64() {
-                Ok(value.into_py(py))
+                value.into_py_any(py)
             } else if let Some(value) = n.as_u64() {
-                Ok(value.into_py(py))
+                value.into_py_any(py)
             } else if let Some(value) = n.as_f64() {
-                Ok(value.into_py(py))
+                value.into_py_any(py)
             } else {
                 unimplemented!("No support for number of type {n}")
             }
         }
-        Value::String(s) => Ok(s.into_py(py)),
+        Value::String(s) => s.into_py_any(py),
         Value::Array(arr) => {
             // For the list we need to recursively convert each item
-            let py_list = PyList::empty_bound(py);
+            let py_list = PyList::empty(py);
             for item in arr {
                 let py_item: PyObject = serde_json_value_to_pyobject(py, item)?;
                 py_list.append(py_item)?;
             }
-            Ok(py_list.into_py(py))
+            py_list.into_py_any(py)
         }
         Value::Object(obj) => {
             // For the dict we need to recursively convert each key and value
-            let py_dict = PyDict::new_bound(py);
+            let py_dict = PyDict::new(py);
             for (key, value) in obj {
-                let py_key: PyObject = key.into_py(py);
+                let py_key = key.into_pyobject(py)?;
                 let py_value: PyObject = serde_json_value_to_pyobject(py, value)?;
                 py_dict.set_item(py_key, py_value)?;
             }
-            Ok(py_dict.into_py(py))
+            py_dict.into_py_any(py)
         }
     }
 }
