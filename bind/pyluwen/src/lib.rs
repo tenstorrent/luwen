@@ -1862,13 +1862,13 @@ fn pyobject_to_serde_json_value(_py: Python, obj: Bound<'_, PyAny>) -> PyResult<
         )?))
     } else if let Ok(s) = obj.extract::<String>() {
         Ok(Value::String(s))
-    } else if let Ok(list) = obj.downcast::<PyList>() {
+    } else if let Ok(list) = obj.cast::<PyList>() {
         let mut array = Vec::new();
         for item in list {
             array.push(pyobject_to_serde_json_value(_py, item)?);
         }
         Ok(Value::Array(array))
-    } else if let Ok(dict) = obj.downcast::<PyDict>() {
+    } else if let Ok(dict) = obj.cast::<PyDict>() {
         let mut map = serde_json::Map::new();
         for (key, value) in dict {
             let key: String = key.extract()?;
