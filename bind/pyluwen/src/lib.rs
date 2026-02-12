@@ -1434,7 +1434,7 @@ impl PciBlackhole {
                 .0
                 .decode_boot_fs_table(tag_name)
                 .map_err(|v| PyException::new_err(v.to_string()))?;
-            let py_dict = PyDict::new(py);
+            let py_dict = PyDict::new_bound(py);
             // Convert the HashMap<String, Value> to a pydict
             for (key, value) in result {
                 let py_key: PyObject = key.into_py(py);
@@ -1452,7 +1452,7 @@ impl PciBlackhole {
         tag_name: &str,
     ) -> PyResult<()> {
         // Convert the pydict to a HashMap<String, Value>
-        let py_dict = message.as_ref(py);
+        let py_dict = message.bind(py);
         let mut result: HashMap<String, Value> = HashMap::new();
 
         for (key, value) in py_dict.iter() {
@@ -1785,7 +1785,7 @@ pub fn run_ubb_wait_for_driver_load() {
 }
 
 #[pymodule]
-fn pyluwen(_py: Python, m: &PyModule) -> PyResult<()> {
+fn pyluwen(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PciChip>()?;
     m.add_class::<UninitPciChip>()?;
     m.add_class::<PciWormhole>()?;
@@ -1824,7 +1824,7 @@ fn serde_json_value_to_pyobject(py: Python, value: &Value) -> PyResult<PyObject>
         Value::String(s) => Ok(s.into_py(py)),
         Value::Array(arr) => {
             // For the list we need to recursively convert each item
-            let py_list: &PyList = PyList::empty(py);
+            let py_list = PyList::empty_bound(py);
             for item in arr {
                 let py_item: PyObject = serde_json_value_to_pyobject(py, item)?;
                 py_list.append(py_item)?;
@@ -1833,7 +1833,7 @@ fn serde_json_value_to_pyobject(py: Python, value: &Value) -> PyResult<PyObject>
         }
         Value::Object(obj) => {
             // For the dict we need to recursively convert each key and value
-            let py_dict: &PyDict = PyDict::new(py);
+            let py_dict = PyDict::new_bound(py);
             for (key, value) in obj {
                 let py_key: PyObject = key.into_py(py);
                 let py_value: PyObject = serde_json_value_to_pyobject(py, value)?;
@@ -1845,7 +1845,7 @@ fn serde_json_value_to_pyobject(py: Python, value: &Value) -> PyResult<PyObject>
 }
 
 /// Helper function to convert PyObject to serde_json::Value
-fn pyobject_to_serde_json_value(_py: Python, obj: &PyAny) -> PyResult<Value> {
+fn pyobject_to_serde_json_value(_py: Python, obj: Bound<'_, PyAny>) -> PyResult<Value> {
     if obj.is_none() {
         Ok(Value::Null)
     } else if let Ok(b) = obj.extract::<bool>() {
