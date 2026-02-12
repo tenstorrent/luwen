@@ -681,6 +681,7 @@ impl PciChip {
     }
 
     #[new]
+    #[pyo3(signature = (pci_interface = None))]
     pub fn new(pci_interface: Option<usize>) -> PyResult<Self> {
         let pci_interface = pci_interface.unwrap_or(0);
 
@@ -1021,6 +1022,7 @@ impl From<luwen::api::EthAddr> for EthAddr {
 
 #[pymethods]
 impl PciWormhole {
+    #[pyo3(signature = (rack_x=None, rack_y=None, shelf_x=None, shelf_y=None))]
     pub fn open_remote(
         &self,
         rack_x: Option<u8>,
