@@ -127,30 +127,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (idx, device) in devices.iter().enumerate() {
 
         if let Some(index) = args.index {
-            if index != (idx + 1) as u32 {
+            if index != (idx) as u32 {
                 continue;
             }
         }
 
-        println!("=== Device {} ===", idx + 1);
+        println!("=== Device {} ===", idx);
 
         if let Some(bh) = device.as_bh() {
             let mut flashed_config = None;
             let board_result = fix_board(bh, args.dry_run);
             match board_result {
                 Ok(fc) => {
-                    println!("Successfully fixed device {}: flashed new boardcfg", idx + 1);
+                    println!("Successfully fixed device {}: flashed new boardcfg", idx);
                     flashed_config = Some(fc);
                 }
-                Err(e) => println!("Failed to fix device {}: {}", idx + 1, e),
+                Err(e) => println!("Failed to fix device {}: {}", idx, e),
             }
 
             match check_boardcfg(bh, flashed_config) {
-                Ok(_) => println!("Verified boardcfg for device {}", idx + 1),
-                Err(e) => println!("Failed to check boardcfg for device {}: {}", idx + 1, e),
+                Ok(_) => println!("Verified boardcfg for device {}", idx),
+                Err(e) => println!("Failed to check boardcfg for device {}: {}", idx, e),
             }
         } else {
-            println!("Device {} is not a Blackhole chip, skipping", idx + 1);
+            println!("Device {} is not a Blackhole chip, skipping", idx);
         }
     }
 
