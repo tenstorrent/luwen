@@ -27,7 +27,7 @@ env:
   rust_stable: stable
   rust_nightly: nightly-2025-06-01
   rust_clippy: '1.87'
-  rust_min: '1.87'
+  rust_min: '1.75.0'
 
 jobs:
   # Depends on all actions that are required for a "successful" CI run.
