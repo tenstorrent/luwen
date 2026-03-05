@@ -395,20 +395,6 @@ impl Blackhole {
         Ok(())
     }
 
-    #[cfg(any())]
-    pub fn spi_write(&self, mut addr: u32, value: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
-        use std::fs::File;
-        use std::os::unix::fs::FileExt;
-
-        let f = std::fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open("test_spi.bin")?;
-
-        f.write_all_at(value, addr as u64)?;
-        Ok(())
-    }
-
     pub fn spi_read(
         &self,
         mut addr: u32,
@@ -432,20 +418,6 @@ impl Blackhole {
             addr += chunk.len() as u32;
         }
 
-        Ok(())
-    }
-
-    #[cfg(any())]
-    pub fn spi_read(
-        &self,
-        mut addr: u32,
-        value: &mut [u8],
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        use std::fs::File;
-        use std::os::unix::fs::FileExt;
-
-        let f = std::fs::File::open("test_spi.bin")?;
-        f.read_exact_at(value, addr as u64)?;
         Ok(())
     }
 
