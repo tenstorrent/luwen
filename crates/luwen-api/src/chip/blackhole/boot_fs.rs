@@ -50,7 +50,6 @@ pub struct TtBootFsHeader {
     pub magic: u32,
     pub version: u32,
     pub num_fds: u32,
-    // descriptor_table_addrs: [u32; num_fds]
 }
 
 impl TtBootFsFd {
@@ -97,17 +96,17 @@ fn find_descriptor_tables(reader: impl Fn(u32, usize) -> Vec<u8>) -> Vec<u32> {
             }
         } else {
             // Legacy bootfs. Just has tables at 0x0 and 0x4000
-            descriptor_table_addrs = vec![0x0, 0x4000];
+            return vec![0x0, 0x4000];
         }
     }
+
     descriptor_table_addrs
 }
 
 pub fn read_tag(reader: impl Fn(u32, usize) -> Vec<u8>, tag: &str) -> Option<(u32, TtBootFsFd)> {
     let boot_headers = find_descriptor_tables(&reader);
 
-    for table_addr in boot_headers {
-        let mut fd_addr = table_addr;
+    for mut fd_addr in boot_headers {
         loop {
             let fd = read_fd(&reader, fd_addr).unwrap();
             if fd.flags.invalid() {
@@ -119,5 +118,6 @@ pub fn read_tag(reader: impl Fn(u32, usize) -> Vec<u8>, tag: &str) -> Option<(u3
             fd_addr += mem::size_of::<TtBootFsFd>() as u32;
         }
     }
+
     None
 }
