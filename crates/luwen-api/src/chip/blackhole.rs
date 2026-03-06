@@ -439,7 +439,7 @@ impl Blackhole {
             self.spi_read(addr, &mut buf).unwrap();
             buf
         };
-        Ok(boot_fs::read_tag(&spi_reader, tag_name))
+        Ok(boot_fs::read_tag(spi_reader, tag_name))
     }
 
     pub fn decode_boot_fs_table(

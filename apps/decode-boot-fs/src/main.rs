@@ -34,12 +34,11 @@ fn fix_board(
 
     let mut active_boardcfg =
         decode_boot_fs_table(bh, TAG_NAME, active_boardcfg_addr, active_boardcfg_size)
-            .map(|cfg| {
+            .inspect(|cfg| {
                 println!(
                     "Found active boardcfg with board_id: {:x}",
                     cfg.get("board_id").unwrap().as_u64().unwrap()
                 );
-                cfg
             })
             .unwrap_or_else(|e| {
                 println!(
@@ -55,20 +54,18 @@ fn fix_board(
             });
 
     let backup_board_id_1 = get_boardid_from_addr(bh, BOARDCFG_BACKUP_1)?;
-    if backup_board_id_1.is_some() {
+    if let Some(backup_board_id_1) = backup_board_id_1 {
         println!(
             "Found board ID 0x{:x} at backup address 0x{:x}",
-            backup_board_id_1.unwrap(),
-            BOARDCFG_BACKUP_1
+            backup_board_id_1, BOARDCFG_BACKUP_1
         );
     }
 
     let backup_board_id_2 = get_boardid_from_addr(bh, BOARDCFG_BACKUP_2)?;
-    if backup_board_id_2.is_some() {
+    if let Some(backup_board_id_2) = backup_board_id_2 {
         println!(
             "Found board ID 0x{:x} at backup address 0x{:x}",
-            backup_board_id_2.unwrap(),
-            BOARDCFG_BACKUP_2
+            backup_board_id_2, BOARDCFG_BACKUP_2
         );
     }
 
@@ -235,7 +232,7 @@ fn get_boardid_from_addr(
 
     // TODO: Sanity-check board ID.
 
-    return Ok(Some(board_id));
+    Ok(Some(board_id))
 }
 
 fn get_active_board_cfg_info(
@@ -243,7 +240,7 @@ fn get_active_board_cfg_info(
 ) -> Result<(u32, usize), Box<dyn std::error::Error>> {
     let tag_info = chip
         .get_boot_fs_tables_spi_read("boardcfg")?
-        .ok_or_else(|| "Couldn't find boardcfg on chip")?;
+        .ok_or("Couldn't find boardcfg on chip")?;
 
     let spi_addr = tag_info.1.spi_addr;
     let image_size = tag_info.1.flags.image_size() as usize;
@@ -266,7 +263,7 @@ fn decode_boot_fs_table(
     // println!();
 
     // declare as vec to allow non-const size
-    let mut proto_bin = vec![0u8; image_size as usize];
+    let mut proto_bin = vec![0u8; image_size];
     chip.spi_read(spi_addr, &mut proto_bin)?;
 
     let final_decode_map: HashMap<String, Value>;
