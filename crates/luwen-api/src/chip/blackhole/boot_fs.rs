@@ -72,7 +72,9 @@ impl fmt::Debug for TtBootFsFd {
 
 fn read_pod<T: Pod>(reader: impl Fn(u32, usize) -> Vec<u8>, addr: u32) -> Option<T> {
     let bytes = reader(addr, mem::size_of::<T>());
-    bytes.get(..mem::size_of::<T>()).map(bytemuck::pod_read_unaligned::<T>)
+    bytes
+        .get(..mem::size_of::<T>())
+        .map(bytemuck::pod_read_unaligned::<T>)
 }
 
 pub fn read_fd(reader: impl Fn(u32, usize) -> Vec<u8>, addr: u32) -> Option<TtBootFsFd> {
@@ -88,8 +90,10 @@ fn find_descriptor_tables(reader: impl Fn(u32, usize) -> Vec<u8>) -> Vec<u32> {
 
     if let Some(header) = read_header(&reader, BOOT_FS_HEADER_START) {
         if header.magic == BOOT_FS_HEADER_MAGIC {
-            let descriptor_table_list_addr = BOOT_FS_HEADER_START + mem::size_of::<TtBootFsHeader>() as u32;
-            let descriptor_table_raw = reader(descriptor_table_list_addr, (header.num_fds * 4) as usize);
+            let descriptor_table_list_addr =
+                BOOT_FS_HEADER_START + mem::size_of::<TtBootFsHeader>() as u32;
+            let descriptor_table_raw =
+                reader(descriptor_table_list_addr, (header.num_fds * 4) as usize);
             for addr_raw in descriptor_table_raw.chunks_exact(4) {
                 let descriptor_table_addr = u32::from_le_bytes(addr_raw.try_into().unwrap());
                 descriptor_table_addrs.push(descriptor_table_addr);

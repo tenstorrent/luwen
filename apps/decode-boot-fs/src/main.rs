@@ -1,14 +1,17 @@
+use clap::Parser as _;
 use luwen::pci::detect_chips;
 use luwen_api::chip::spirom_tables;
+use luwen_api::chip::Blackhole;
 use prost::Message;
 use serde_json::Value;
 use std::collections::HashMap;
-use luwen_api::chip::Blackhole;
-use clap::Parser as _;
 
 #[derive(clap::Parser)]
 struct Args {
-    #[arg(long, help = "Don't actually write to flash, just print what would be done")]
+    #[arg(
+        long,
+        help = "Don't actually write to flash, just print what would be done"
+    )]
     dry_run: bool,
 
     #[arg(long, help = "Only attempt to fix a single device.")]
@@ -19,31 +22,54 @@ const TAG_NAME: &str = "boardcfg";
 const BOARDCFG_BACKUP_1: u32 = 0x0fff000;
 const BOARDCFG_BACKUP_2: u32 = 0x3fff000;
 
-fn fix_board(bh: &Blackhole, dry_run: bool) -> Result<HashMap<String, Value>, Box<dyn std::error::Error>> {
+fn fix_board(
+    bh: &Blackhole,
+    dry_run: bool,
+) -> Result<HashMap<String, Value>, Box<dyn std::error::Error>> {
     let (active_boardcfg_addr, active_boardcfg_size) = get_active_board_cfg_info(bh)?;
-    println!("Active boardcfg address: 0x{:x}, size: {}", active_boardcfg_addr, active_boardcfg_size);
+    println!(
+        "Active boardcfg address: 0x{:x}, size: {}",
+        active_boardcfg_addr, active_boardcfg_size
+    );
 
-    let mut active_boardcfg
-        = decode_boot_fs_table(bh, TAG_NAME, active_boardcfg_addr, active_boardcfg_size)
-        .map(|cfg| { println!("Found active boardcfg with board_id: {:x}", cfg.get("board_id").unwrap().as_u64().unwrap()); cfg })
-        .unwrap_or_else(|e| {
-            println!("Failed to decode active boardcfg: {}, creating new from scratch.", e);
+    let mut active_boardcfg =
+        decode_boot_fs_table(bh, TAG_NAME, active_boardcfg_addr, active_boardcfg_size)
+            .map(|cfg| {
+                println!(
+                    "Found active boardcfg with board_id: {:x}",
+                    cfg.get("board_id").unwrap().as_u64().unwrap()
+                );
+                cfg
+            })
+            .unwrap_or_else(|e| {
+                println!(
+                    "Failed to decode active boardcfg: {}, creating new from scratch.",
+                    e
+                );
 
-            let mut cfg = HashMap::new();
-            cfg.insert("board_id".to_string(), Value::from(0)); // Placeholder, will be overwritten if we find a valid backup
-            cfg.insert("vendor_id".to_string(), Value::from(0x1E52));
-            cfg.insert("asic_location".to_string(), Value::from(0));
-            cfg
-        });
+                let mut cfg = HashMap::new();
+                cfg.insert("board_id".to_string(), Value::from(0)); // Placeholder, will be overwritten if we find a valid backup
+                cfg.insert("vendor_id".to_string(), Value::from(0x1E52));
+                cfg.insert("asic_location".to_string(), Value::from(0));
+                cfg
+            });
 
     let backup_board_id_1 = get_boardid_from_addr(bh, BOARDCFG_BACKUP_1)?;
     if backup_board_id_1.is_some() {
-        println!("Found board ID 0x{:x} at backup address 0x{:x}", backup_board_id_1.unwrap(), BOARDCFG_BACKUP_1);
+        println!(
+            "Found board ID 0x{:x} at backup address 0x{:x}",
+            backup_board_id_1.unwrap(),
+            BOARDCFG_BACKUP_1
+        );
     }
 
     let backup_board_id_2 = get_boardid_from_addr(bh, BOARDCFG_BACKUP_2)?;
     if backup_board_id_2.is_some() {
-        println!("Found board ID 0x{:x} at backup address 0x{:x}", backup_board_id_2.unwrap(), BOARDCFG_BACKUP_2);
+        println!(
+            "Found board ID 0x{:x} at backup address 0x{:x}",
+            backup_board_id_2.unwrap(),
+            BOARDCFG_BACKUP_2
+        );
     }
 
     if backup_board_id_1.is_none() && backup_board_id_2.is_none() {
@@ -60,16 +86,28 @@ fn fix_board(bh: &Blackhole, dry_run: bool) -> Result<HashMap<String, Value>, Bo
     Ok(active_boardcfg)
 }
 
-fn check_boardcfg(bh: &Blackhole, flashed_config: Option<HashMap<String, Value>>) -> Result<(), Box<dyn std::error::Error>> {
+fn check_boardcfg(
+    bh: &Blackhole,
+    flashed_config: Option<HashMap<String, Value>>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let (active_boardcfg_addr, active_boardcfg_size) = get_active_board_cfg_info(bh)?;
-    println!("Active boardcfg address: 0x{:x}, size: {}", active_boardcfg_addr, active_boardcfg_size);
+    println!(
+        "Active boardcfg address: 0x{:x}, size: {}",
+        active_boardcfg_addr, active_boardcfg_size
+    );
 
     // Always read and display boardcfg from flash (whether we flashed or not)
     println!();
-    println!("=== Reading boardcfg from flash at 0x{:08x} ===", active_boardcfg_addr);
+    println!(
+        "=== Reading boardcfg from flash at 0x{:08x} ===",
+        active_boardcfg_addr
+    );
     match decode_boot_fs_table(bh, TAG_NAME, active_boardcfg_addr, active_boardcfg_size) {
         Ok(flash_config) => {
-            println!("Successfully read and decoded boardcfg from 0x{:08x}:", active_boardcfg_addr);
+            println!(
+                "Successfully read and decoded boardcfg from 0x{:08x}:",
+                active_boardcfg_addr
+            );
             println!("{}", serde_json::to_string_pretty(&flash_config)?);
 
             // Extract IDs for comparison if we flashed
@@ -78,10 +116,7 @@ fn check_boardcfg(bh: &Blackhole, flashed_config: Option<HashMap<String, Value>>
                     .get("vendor_id")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0) as u32;
-                let board_id = config
-                    .get("board_id")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(0);
+                let board_id = config.get("board_id").and_then(|v| v.as_u64()).unwrap_or(0);
                 (vendor_id, board_id)
             };
 
@@ -91,8 +126,14 @@ fn check_boardcfg(bh: &Blackhole, flashed_config: Option<HashMap<String, Value>>
 
                 println!();
                 println!("Verification summary:");
-                println!("  Flashed:  vendor_id={}, board_id={}", flashed_vendor_id, flashed_board_id);
-                println!("  From flash: vendor_id={}, board_id={}", flash_vendor_id, flash_board_id);
+                println!(
+                    "  Flashed:  vendor_id={}, board_id={}",
+                    flashed_vendor_id, flashed_board_id
+                );
+                println!(
+                    "  From flash: vendor_id={}, board_id={}",
+                    flash_vendor_id, flash_board_id
+                );
 
                 if flashed_vendor_id == flash_vendor_id && flashed_board_id == flash_board_id {
                     println!("  ✓ Verification successful: IDs match!");
@@ -102,11 +143,17 @@ fn check_boardcfg(bh: &Blackhole, flashed_config: Option<HashMap<String, Value>>
             } else {
                 let (flash_vendor_id, flash_board_id) = extract_ids(&flash_config);
                 println!();
-                println!("Current boardcfg in flash: vendor_id={}, board_id={}", flash_vendor_id, flash_board_id);
+                println!(
+                    "Current boardcfg in flash: vendor_id={}, board_id={}",
+                    flash_vendor_id, flash_board_id
+                );
             }
         }
         Err(e) => {
-            eprintln!("Failed to read boardcfg from 0x{:08x}: {}", active_boardcfg_addr, e);
+            eprintln!(
+                "Failed to read boardcfg from 0x{:08x}: {}",
+                active_boardcfg_addr, e
+            );
         }
     }
 
@@ -125,7 +172,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Found {} device(s)", devices.len());
 
     for (idx, device) in devices.iter().enumerate() {
-
         if let Some(index) = args.index {
             if index != (idx) as u32 {
                 continue;
@@ -161,7 +207,6 @@ fn get_boardid_from_addr(
     chip: &luwen_api::chip::Blackhole,
     spi_addr: u32,
 ) -> Result<Option<u64>, Box<dyn std::error::Error>> {
-
     let mut buf = [0u8; 16];
     chip.spi_read(spi_addr, &mut buf)?;
 
@@ -232,9 +277,8 @@ fn decode_boot_fs_table(
         final_decode_map =
             spirom_tables::to_hash_map(spirom_tables::fw_table::FwTable::decode(&*proto_bin)?);
     } else if tag_name == "boardcfg" {
-        final_decode_map = spirom_tables::to_hash_map(
-            spirom_tables::read_only::ReadOnly::decode(&*proto_bin)?,
-        );
+        final_decode_map =
+            spirom_tables::to_hash_map(spirom_tables::read_only::ReadOnly::decode(&*proto_bin)?);
     } else if tag_name == "flshinfo" {
         final_decode_map = spirom_tables::to_hash_map(
             spirom_tables::flash_info::FlashInfoTable::decode(&*proto_bin)?,
