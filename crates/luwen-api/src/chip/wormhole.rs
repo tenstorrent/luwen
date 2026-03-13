@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{backtrace, sync::Arc};
+use std::{backtrace, collections::HashMap, sync::Arc};
 
 use crate::{
     arc_msg::{ArcMsgAddr, ArcMsgOk, TypedArcMsg},
@@ -17,12 +17,23 @@ use crate::{
 };
 
 use super::{
+    blackhole::telemetry_tags::TelemetryTags,
     eth_addr::EthAddr,
     hl_comms::HlComms,
     init::status::{ComponentStatusInfo, EthernetPartialInitError, InitOptions, WaitStatus},
     remote::{EthAddresses, RemoteArcIf},
     ArcMsgOptions, ChipInitResult, CommsStatus, InitStatus, NeighbouringChip,
 };
+
+/// Cached state for the new (BH-style) telemetry table.
+/// The tag-to-offset mapping is stable across calls; only the data values change.
+#[derive(Clone)]
+struct WormholeNewTelemetry {
+    /// AXI address of the `telemetry_data` array (host-accessible).
+    telemetry_data_axi: u64,
+    /// Maps each telemetry tag value to its index in `telemetry_data`.
+    tag_offsets: HashMap<u16, u16>,
+}
 
 /// Implementation of the interface for a Wormhole
 /// both the local and remote Wormhole chips are represented by this struct
@@ -37,7 +48,11 @@ pub struct Wormhole {
     pub arc_addrs: ArcMsgAddr,
     pub eth_locations: [EthCore; 16],
     pub eth_addrs: EthAddresses,
+    /// Cached address for the legacy SMBUS telemetry (fallback for old firmware).
     telemetry_addr: Arc<once_cell::sync::OnceCell<u32>>,
+    /// Cached new (BH-style) telemetry table info. `None` means new telemetry is not
+    /// available (old firmware); `Some(...)` contains the stable tag-to-offset map.
+    new_telemetry: Arc<once_cell::sync::OnceCell<Option<WormholeNewTelemetry>>>,
 }
 
 impl HlComms for Wormhole {
@@ -67,6 +82,29 @@ impl Default for EthCore {
             enabled: true,
         }
     }
+}
+
+/// Convert the new TAG_GDDR_STATUS encoding (2 bits per tile: bit 0 = training
+/// success, bit 1 = error) into the legacy `ddr_status` encoding used by
+/// `update_init_state` (4 bits per channel matching `DramChannelStatus`:
+/// 0 = None, 1 = Fail, 2 = Pass).
+///
+/// WH has six GDDR tiles (0–5); bits for tiles 6–7 are ignored.
+fn new_gddr_status_to_ddr_status(new_status: u32) -> u32 {
+    let mut ddr_status = 0u32;
+    for i in 0..6usize {
+        let success = (new_status >> (i * 2)) & 1;
+        let error = (new_status >> (i * 2 + 1)) & 1;
+        let channel_val = if error != 0 {
+            1u32 // TrainingFail
+        } else if success != 0 {
+            2u32 // TrainingPass
+        } else {
+            0u32 // TrainingNone
+        };
+        ddr_status |= channel_val << (i * 4);
+    }
+    ddr_status
 }
 
 impl Wormhole {
@@ -99,6 +137,7 @@ impl Wormhole {
             eth_addrs: EthAddresses::default(),
 
             telemetry_addr: Arc::new(once_cell::sync::OnceCell::new()),
+            new_telemetry: Arc::new(once_cell::sync::OnceCell::new()),
 
             eth_locations: [
                 EthCore {
@@ -215,6 +254,495 @@ impl Wormhole {
 
     //     0x29
     // }
+
+    /// Attempt to initialise the new (BH-style) telemetry table available since
+    /// firmware bundle ≥ 18.4.
+    ///
+    /// The ARC Reset Unit publishes two addresses in its `NOC_NODEID_X_0` and
+    /// `NOC_NODEID_Y_0` registers (at Reset Unit offsets 0x01D0 / 0x01D4):
+    ///   * `NOC_NODEID_X_0` – ARC CPU address of the immutable `telemetry_table`
+    ///     (version + entry_count + tag_table[]).
+    ///   * `NOC_NODEID_Y_0` – ARC CPU address of the mutable `telemetry_data`
+    ///     array (one u32 per entry, indexed by the offsets in tag_table).
+    ///
+    /// Returns `None` when `NOC_NODEID_X_0` is zero (old firmware that does not
+    /// support new-style telemetry).
+    fn try_init_new_telemetry(&self) -> Result<Option<WormholeNewTelemetry>, PlatformError> {
+        // SCRATCH[0] sits at Reset Unit offset 0x0060.  NOC_NODEID_X_0 / Y_0
+        // are at Reset Unit offsets 0x01D0 / 0x01D4.  Derive their AXI
+        // addresses from SCRATCH[0] so that the same calculation works for
+        // both PCI (local) and NOC (remote) access patterns.
+        // NOC_NODEID_X_0 - SCRATCH[0] = 0x01D0 - 0x0060 = 0x0170
+        // NOC_NODEID_Y_0 - SCRATCH[0] = 0x01D4 - 0x0060 = 0x0174
+        let scratch0_addr = self.arc_if.axi_translate("ARC_RESET.SCRATCH[0]")?.addr;
+        let noc_nodeid_x0 = scratch0_addr + 0x0170;
+        let noc_nodeid_y0 = scratch0_addr + 0x0174;
+
+        let telem_table_arc_addr = self.arc_if.axi_read32(&self.chip_if, noc_nodeid_x0)?;
+
+        // A zero value means the firmware does not publish new-style telemetry.
+        if telem_table_arc_addr == 0 {
+            return Ok(None);
+        }
+
+        let telem_data_arc_addr = self.arc_if.axi_read32(&self.chip_if, noc_nodeid_y0)?;
+
+        // Both addresses must be within the CSM region (0x10000000 – 0x1007FFFF).
+        if !(0x10000000..=0x1007FFFF).contains(&telem_table_arc_addr) {
+            return Err(PlatformError::Generic(
+                format!(
+                    "Invalid telemetry table address: 0x{telem_table_arc_addr:08x}"
+                ),
+                BtWrapper::capture(),
+            ));
+        }
+        if !(0x10000000..=0x1007FFFF).contains(&telem_data_arc_addr) {
+            return Err(PlatformError::Generic(
+                format!(
+                    "Invalid telemetry data address: 0x{telem_data_arc_addr:08x}"
+                ),
+                BtWrapper::capture(),
+            ));
+        }
+
+        // Convert ARC CPU addresses to host-visible AXI addresses.
+        // ARC CSM starts at CPU address 0x10000000; ARC_CSM.DATA[0] gives
+        // the corresponding AXI base.
+        let csm_offset = self.arc_if.axi_translate("ARC_CSM.DATA[0]")?;
+        let telem_table_axi =
+            csm_offset.addr + (telem_table_arc_addr - 0x10000000) as u64;
+        let telem_data_axi =
+            csm_offset.addr + (telem_data_arc_addr - 0x10000000) as u64;
+
+        // Read the telemetry table header.
+        // Layout: [version: u32][entry_count: u32][tag_table: entry_count * u32]
+        // Each tag_table entry: low 16 bits = tag, high 16 bits = index into telemetry_data.
+        let entry_count = self.arc_if.axi_read32(&self.chip_if, telem_table_axi + 4)?;
+
+        // Sanity-check entry_count before allocating.  The firmware currently
+        // defines fewer than 70 tags; guard against corrupted data.
+        const MAX_TELEM_ENTRIES: u32 = 256;
+        if entry_count > MAX_TELEM_ENTRIES {
+            return Err(PlatformError::Generic(
+                format!("Telemetry entry_count too large: {entry_count}"),
+                BtWrapper::capture(),
+            ));
+        }
+
+        // Build the stable tag → index mapping.
+        let mut tag_offsets = HashMap::with_capacity(entry_count as usize);
+        for i in 0..entry_count {
+            let entry_axi = telem_table_axi + 8 + i as u64 * 4;
+            let entry = self.arc_if.axi_read32(&self.chip_if, entry_axi)?;
+            let tag = (entry & 0xFFFF) as u16;
+            let offset = ((entry >> 16) & 0xFFFF) as u16;
+            tag_offsets.insert(tag, offset);
+        }
+
+        Ok(Some(WormholeNewTelemetry {
+            telemetry_data_axi: telem_data_axi,
+            tag_offsets,
+        }))
+    }
+
+    /// Read telemetry using the new (BH-style) tag-based interface.
+    fn get_telemetry_new(
+        &self,
+        new_telem: &WormholeNewTelemetry,
+    ) -> Result<super::Telemetry, PlatformError> {
+        // Read the entire telemetry_data array in a single bulk AXI transfer to
+        // minimise the number of hardware round-trips.
+        let max_offset = new_telem
+            .tag_offsets
+            .values()
+            .copied()
+            .max()
+            .unwrap_or(0) as usize;
+        let data_len = (max_offset + 1) * 4;
+        let mut data_buf = vec![0u8; data_len];
+        self.arc_if
+            .axi_read(&self.chip_if, new_telem.telemetry_data_axi, &mut data_buf)?;
+
+        // Helper: look up a tag's value from the local buffer.
+        let read_tag = |tag: TelemetryTags| -> Option<u32> {
+            let &offset = new_telem.tag_offsets.get(&(tag as u16))?;
+            let idx = offset as usize * 4;
+            if idx + 4 > data_buf.len() {
+                return None;
+            }
+            Some(u32::from_le_bytes([
+                data_buf[idx],
+                data_buf[idx + 1],
+                data_buf[idx + 2],
+                data_buf[idx + 3],
+            ]))
+        };
+
+        let mut t = super::Telemetry::default();
+
+        if let Some(v) = read_tag(TelemetryTags::BoardIdHigh) {
+            t.board_id_high = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::BoardIdLow) {
+            t.board_id_low = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::AsicId) {
+            t.asic_id = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::HarvestingState) {
+            t.harvesting_state = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::UpdateTelemSpeed) {
+            t.update_telem_speed = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::Vcore) {
+            t.vcore = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::Tdp) {
+            t.tdp = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::Tdc) {
+            t.tdc = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::VddLimits) {
+            t.vdd_limits = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::ThmLimits) {
+            t.thm_limits = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::AsicTemperature) {
+            t.asic_temperature = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::VregTemperature) {
+            t.vreg_temperature = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::BoardTemperature) {
+            t.board_temperature = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::AiClk) {
+            t.aiclk = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::AxiClk) {
+            t.axiclk = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::ArcClk) {
+            t.arcclk = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::EthLiveStatus) {
+            t.eth_status0 = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::DdrStatus) {
+            // The new TAG_GDDR_STATUS uses 2 bits per tile (bit 0 = training
+            // success, bit 1 = error).  The legacy ddr_status field and the
+            // update_init_state parser expect 4 bits per tile matching the
+            // DramChannelStatus enum (0=None, 1=Fail, 2=Pass).  Convert here.
+            t.ddr_status = new_gddr_status_to_ddr_status(v);
+        }
+        if let Some(v) = read_tag(TelemetryTags::DdrSpeed) {
+            t.ddr_speed = Some(v);
+        }
+        if let Some(v) = read_tag(TelemetryTags::EthFwVersion) {
+            t.eth_fw_version = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::DdrFwVersion) {
+            t.ddr_fw_version = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::BmAppFwVersion) {
+            t.m3_app_fw_version = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::BmBlFwVersion) {
+            t.m3_bl_fw_version = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::FlashBundleVersion) {
+            t.fw_bundle_version = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::CmFwVersion) {
+            t.arc0_fw_version = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::FanSpeed) {
+            t.fan_speed = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::TimerHeartbeat) {
+            t.timer_heartbeat = v;
+            // Maintain backward compatibility: arc0_health mirrors the heartbeat.
+            t.arc0_health = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::NocTranslation) {
+            t.noc_translation_enabled = v != 0;
+        }
+        if let Some(v) = read_tag(TelemetryTags::FwBuildDate) {
+            t.wh_fw_date = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::TtFlashVersion) {
+            t.tt_flash_version = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::AsicLocation) {
+            t.asic_location = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::BoardPowerLimit) {
+            t.board_power_limit = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::InputPower) {
+            t.input_power = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::TdcLimitMax) {
+            t.tdc_limit_max = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::ThmLimitThrottle) {
+            t.thm_limit_throttle = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::ThermTripCount) {
+            t.therm_trip_count = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::AsicIdHigh) {
+            t.asic_id_high = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::AsicIdLow) {
+            t.asic_id_low = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::AiclkLimitMax) {
+            t.aiclk_limit_max = v;
+        }
+        if let Some(v) = read_tag(TelemetryTags::TdpLimitMax) {
+            t.tdp_limit_max = v;
+        }
+
+        t.board_id = ((t.board_id_high as u64) << 32) | t.board_id_low as u64;
+        t.arch = self.get_arch();
+        Ok(t)
+    }
+
+    /// Read telemetry using the legacy SMBUS telemetry interface (old firmware).
+    fn get_telemetry_legacy(&self) -> Result<super::Telemetry, PlatformError> {
+        let offset: Result<u32, PlatformError> = self
+            .telemetry_addr
+            .get_or_try_init(|| {
+                let result = self.arc_msg(ArcMsgOptions {
+                    msg: ArcMsg::Typed(TypedArcMsg::GetSmbusTelemetryAddr),
+                    ..Default::default()
+                })?;
+
+                let offset = match result {
+                    ArcMsgOk::Ok { arg, .. } => arg,
+                    ArcMsgOk::OkBuf([_, arg, ..]) => arg,
+                    ArcMsgOk::OkNoWait => todo!(),
+                };
+
+                Ok(offset)
+            })
+            .copied();
+
+        let offset = offset?;
+
+        let csm_offset = self.arc_if.axi_translate("ARC_CSM.DATA[0]")?;
+
+        let telemetry_struct_offset = csm_offset.addr + (offset - 0x10000000) as u64;
+        let enum_version = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset)?;
+        let device_id = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + 4)?;
+        let asic_ro = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (2 * 4))?;
+        let asic_idd = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (3 * 4))?;
+
+        let board_id_high = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (4 * 4))?;
+        let board_id_low = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (5 * 4))?;
+        let arc0_fw_version = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (6 * 4))?;
+        let arc1_fw_version = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (7 * 4))?;
+        let arc2_fw_version = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (8 * 4))?;
+        let arc3_fw_version = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (9 * 4))?;
+        let spibootrom_fw_version = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (10 * 4))?;
+        let eth_fw_version = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (11 * 4))?;
+        let m3_bl_fw_version = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (12 * 4))?;
+        let m3_app_fw_version = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (13 * 4))?;
+        let ddr_status = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (14 * 4))?;
+        let eth_status0 = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (15 * 4))?;
+        let eth_status1 = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (16 * 4))?;
+        let pcie_status = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (17 * 4))?;
+        let faults = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (18 * 4))?;
+        let arc0_health = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (19 * 4))?;
+        let arc1_health = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (20 * 4))?;
+        let arc2_health = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (21 * 4))?;
+        let arc3_health = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (22 * 4))?;
+        let fan_speed = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (23 * 4))?;
+        let aiclk = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (24 * 4))?;
+        let axiclk = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (25 * 4))?;
+        let arcclk = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (26 * 4))?;
+        let throttler = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (27 * 4))?;
+        let vcore = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (28 * 4))?;
+        let asic_temperature = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (29 * 4))?;
+        let vreg_temperature = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (30 * 4))?;
+        let board_temperature = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (31 * 4))?;
+        let tdp = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (32 * 4))?;
+        let tdc = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (33 * 4))?;
+        let vdd_limits = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (34 * 4))?;
+        let thm_limits = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (35 * 4))?;
+        let wh_fw_date = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (36 * 4))?;
+        let asic_tmon0 = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (37 * 4))?;
+        let asic_tmon1 = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (38 * 4))?;
+        let mvddq_power = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (39 * 4))?;
+        let gddr_train_temp0 = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (40 * 4))?;
+        let gddr_train_temp1 = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (41 * 4))?;
+        let boot_date = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (42 * 4))?;
+        let rt_seconds = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (43 * 4))?;
+        let eth_debug_status0 = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (44 * 4))?;
+        let eth_debug_status1 = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (45 * 4))?;
+        let tt_flash_version = self
+            .arc_if
+            .axi_read32(&self.chip_if, telemetry_struct_offset + (46 * 4))?;
+
+        let threshold: u32 = 0x02190000; // arc fw 2.25.0.0
+        let fw_bundle_version: u32 = if arc0_fw_version >= threshold {
+            self.arc_if
+                .axi_read32(&self.chip_if, telemetry_struct_offset + (49 * 4))?
+        } else {
+            0
+        };
+
+        Ok(super::Telemetry {
+            arch: self.get_arch(),
+            board_id: ((board_id_high as u64) << 32) | (board_id_low as u64),
+            enum_version,
+            device_id,
+            asic_ro,
+            asic_idd,
+            board_id_high,
+            board_id_low,
+            arc0_fw_version,
+            arc1_fw_version,
+            arc2_fw_version,
+            arc3_fw_version,
+            spibootrom_fw_version,
+            eth_fw_version,
+            m3_bl_fw_version,
+            m3_app_fw_version,
+            ddr_status,
+            eth_status0,
+            eth_status1,
+            pcie_status,
+            faults,
+            arc0_health,
+            arc1_health,
+            arc2_health,
+            arc3_health,
+            fan_speed,
+            aiclk,
+            axiclk,
+            arcclk,
+            throttler,
+            vcore,
+            asic_temperature,
+            vreg_temperature,
+            board_temperature,
+            tdp,
+            tdc,
+            vdd_limits,
+            thm_limits,
+            wh_fw_date,
+            asic_tmon0,
+            asic_tmon1,
+            mvddq_power,
+            gddr_train_temp0,
+            gddr_train_temp1,
+            boot_date,
+            rt_seconds,
+            eth_debug_status0,
+            eth_debug_status1,
+            tt_flash_version,
+            fw_bundle_version,
+            timer_heartbeat: arc0_health,
+            ..Default::default()
+        })
+    }
 
     fn check_arc_msg_safe(&self, msg_reg: u64, _return_reg: u64) -> Result<(), PlatformError> {
         const POST_CODE_INIT_DONE: u32 = 0xC0DE0001;
@@ -959,234 +1487,16 @@ impl ChipImpl for Wormhole {
     }
 
     fn get_telemetry(&self) -> Result<super::Telemetry, PlatformError> {
-        let offset: Result<u32, PlatformError> = self
-            .telemetry_addr
-            .get_or_try_init(|| {
-                let result = self.arc_msg(ArcMsgOptions {
-                    msg: ArcMsg::Typed(TypedArcMsg::GetSmbusTelemetryAddr),
-                    ..Default::default()
-                })?;
+        // Try to initialise (and cache) the new BH-style telemetry.
+        let new_telem = self
+            .new_telemetry
+            .get_or_try_init(|| self.try_init_new_telemetry())?;
 
-                let offset = match result {
-                    ArcMsgOk::Ok { arg, .. } => arg,
-                    ArcMsgOk::OkBuf([_, arg, ..]) => arg,
-                    ArcMsgOk::OkNoWait => todo!(),
-                };
-
-                Ok(offset)
-            })
-            .copied();
-
-        let offset = offset?;
-
-        let csm_offset = self.arc_if.axi_translate("ARC_CSM.DATA[0]")?;
-
-        let telemetry_struct_offset = csm_offset.addr + (offset - 0x10000000) as u64;
-        let enum_version = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset)?;
-        let device_id = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + 4)?;
-        let asic_ro = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (2 * 4))?;
-        let asic_idd = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (3 * 4))?;
-
-        let board_id_high = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (4 * 4))?;
-        let board_id_low = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (5 * 4))?;
-        let arc0_fw_version = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (6 * 4))?;
-        let arc1_fw_version = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (7 * 4))?;
-        let arc2_fw_version = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (8 * 4))?;
-        let arc3_fw_version = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (9 * 4))?;
-        let spibootrom_fw_version = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (10 * 4))?;
-        let eth_fw_version = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (11 * 4))?;
-        let m3_bl_fw_version = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (12 * 4))?;
-        let m3_app_fw_version = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (13 * 4))?;
-        let ddr_status = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (14 * 4))?;
-        let eth_status0 = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (15 * 4))?;
-        let eth_status1 = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (16 * 4))?;
-        let pcie_status = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (17 * 4))?;
-        let faults = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (18 * 4))?;
-        let arc0_health = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (19 * 4))?;
-        let arc1_health = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (20 * 4))?;
-        let arc2_health = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (21 * 4))?;
-        let arc3_health = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (22 * 4))?;
-        let fan_speed = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (23 * 4))?;
-        let aiclk = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (24 * 4))?;
-        let axiclk = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (25 * 4))?;
-        let arcclk = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (26 * 4))?;
-        let throttler = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (27 * 4))?;
-        let vcore = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (28 * 4))?;
-        let asic_temperature = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (29 * 4))?;
-        let vreg_temperature = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (30 * 4))?;
-        let board_temperature = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (31 * 4))?;
-        let tdp = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (32 * 4))?;
-        let tdc = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (33 * 4))?;
-        let vdd_limits = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (34 * 4))?;
-        let thm_limits = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (35 * 4))?;
-        let wh_fw_date = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (36 * 4))?;
-        let asic_tmon0 = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (37 * 4))?;
-        let asic_tmon1 = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (38 * 4))?;
-        let mvddq_power = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (39 * 4))?;
-        let gddr_train_temp0 = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (40 * 4))?;
-        let gddr_train_temp1 = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (41 * 4))?;
-        let boot_date = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (42 * 4))?;
-        let rt_seconds = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (43 * 4))?;
-        let eth_debug_status0 = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (44 * 4))?;
-        let eth_debug_status1 = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (45 * 4))?;
-        let tt_flash_version = self
-            .arc_if
-            .axi_read32(&self.chip_if, telemetry_struct_offset + (46 * 4))?;
-
-        let threshold: u32 = 0x02190000; // arc fw 2.25.0.0
-        let fw_bundle_version: u32 = if arc0_fw_version >= threshold {
-            self.arc_if
-                .axi_read32(&self.chip_if, telemetry_struct_offset + (49 * 4))?
+        if let Some(new_telem) = new_telem {
+            self.get_telemetry_new(new_telem)
         } else {
-            0
-        };
-
-        Ok(super::Telemetry {
-            arch: self.get_arch(),
-            board_id: ((board_id_high as u64) << 32) | (board_id_low as u64),
-            enum_version,
-            device_id,
-            asic_ro,
-            asic_idd,
-            board_id_high,
-            board_id_low,
-            arc0_fw_version,
-            arc1_fw_version,
-            arc2_fw_version,
-            arc3_fw_version,
-            spibootrom_fw_version,
-            eth_fw_version,
-            m3_bl_fw_version,
-            m3_app_fw_version,
-            ddr_status,
-            eth_status0,
-            eth_status1,
-            pcie_status,
-            faults,
-            arc0_health,
-            arc1_health,
-            arc2_health,
-            arc3_health,
-            fan_speed,
-            aiclk,
-            axiclk,
-            arcclk,
-            throttler,
-            vcore,
-            asic_temperature,
-            vreg_temperature,
-            board_temperature,
-            tdp,
-            tdc,
-            vdd_limits,
-            thm_limits,
-            wh_fw_date,
-            asic_tmon0,
-            asic_tmon1,
-            mvddq_power,
-            gddr_train_temp0,
-            gddr_train_temp1,
-            boot_date,
-            rt_seconds,
-            eth_debug_status0,
-            eth_debug_status1,
-            tt_flash_version,
-            fw_bundle_version,
-            timer_heartbeat: arc0_health,
-            ..Default::default()
-        })
+            self.get_telemetry_legacy()
+        }
     }
 
     fn get_device_info(&self) -> Result<Option<crate::DeviceInfo>, PlatformError> {
