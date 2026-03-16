@@ -434,15 +434,12 @@ impl Blackhole {
         &self,
         tag_name: &str,
     ) -> Result<Option<(u32, boot_fs::TtBootFsFd)>, Box<dyn std::error::Error>> {
-        let reader = |addr: u32, size: usize| {
+        let spi_reader = |addr: u32, size: usize| {
             let mut buf = vec![0; size];
             self.spi_read(addr, &mut buf).unwrap();
             buf
         };
-        Ok(boot_fs::read_tag(
-            &reader as &dyn Fn(u32, usize) -> Vec<u8>,
-            tag_name,
-        ))
+        Ok(boot_fs::read_tag(spi_reader, tag_name))
     }
 
     pub fn decode_boot_fs_table(

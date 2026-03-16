@@ -1,0 +1,16 @@
+[package]
+name = "decode-boot-fs"
+version = "0.1.0"
+edition = { workspace = true }
+
+[package.metadata.workspaces]
+independent = true
+
+[dependencies]
+clap = { workspace = true }
+luwen = { workspace = true }
+luwen-api = { workspace = true }
+prost = "0.13"
+serde_json = { workspace = true }
+bytemuck = "1.0"
+
