@@ -16,10 +16,7 @@ const REVC_NIBBLE_SHIFT: u32 = 32;
 const REVC_NIBBLE_MASK: u64 = 0xf;
 #[derive(clap::Parser)]
 struct Args {
-    #[arg(
-        long,
-        help = "Don't flash; only print what the new board ID would be"
-    )]
+    #[arg(long, help = "Don't flash; only print what the new board ID would be")]
     dry_run: bool,
 
     #[arg(long, help = "Only operate on a single device by index.")]
@@ -43,9 +40,7 @@ fn board_id_with_revc_nibble(board_id: u64) -> u64 {
     // TEST_BOARD_ID
 }
 
-fn get_active_board_cfg_info(
-    chip: &Blackhole,
-) -> Result<(u32, usize), Box<dyn std::error::Error>> {
+fn get_active_board_cfg_info(chip: &Blackhole) -> Result<(u32, usize), Box<dyn std::error::Error>> {
     let tag_info = chip
         .get_boot_fs_tables_spi_read(TAG_NAME)?
         .ok_or("Couldn't find boardcfg on chip")?;
@@ -86,14 +81,18 @@ fn decode_boot_fs_table(
 }
 
 fn run_device(bh: &Blackhole, dry_run: bool) -> Result<(), Box<dyn std::error::Error>> {
-    
     // Read board ID from boardcfg
     let (active_boardcfg_addr, active_boardcfg_size) = get_active_board_cfg_info(bh)?;
-    let active_boardcfg = decode_boot_fs_table(bh, TAG_NAME, active_boardcfg_addr, active_boardcfg_size)?;
+    let active_boardcfg =
+        decode_boot_fs_table(bh, TAG_NAME, active_boardcfg_addr, active_boardcfg_size)?;
 
     println!("Active boardcfg before: {active_boardcfg:#?}");
     let board_id = active_boardcfg.get("board_id").unwrap().as_u64().unwrap();
-    println!("Board ID from boardcfg: 0x{:08x}_{:08x}", (board_id >> 32) as u32, board_id as u32);
+    println!(
+        "Board ID from boardcfg: 0x{:08x}_{:08x}",
+        (board_id >> 32) as u32,
+        board_id as u32
+    );
 
     // Check if board is bh-glx and if not quit
     if (board_id >> 36) & 0xFFFFF != 0x47 {
@@ -120,7 +119,11 @@ fn run_device(bh: &Blackhole, dry_run: bool) -> Result<(), Box<dyn std::error::E
     );
 
     if dry_run {
-        println!("[dry_run] Would set board_id to 0x{:08x}_{:08x} (no flash performed).", (new_board_id >> 32) as u32, new_board_id as u32);
+        println!(
+            "[dry_run] Would set board_id to 0x{:08x}_{:08x} (no flash performed).",
+            (new_board_id >> 32) as u32,
+            new_board_id as u32
+        );
         return Ok(());
     }
 
@@ -130,13 +133,18 @@ fn run_device(bh: &Blackhole, dry_run: bool) -> Result<(), Box<dyn std::error::E
 
 fn flash_boardcfg(bh: &Blackhole, board_id: u64) -> Result<(), Box<dyn std::error::Error>> {
     let (active_boardcfg_addr, active_boardcfg_size) = get_active_board_cfg_info(bh)?;
-    let mut active_boardcfg = decode_boot_fs_table(bh, TAG_NAME, active_boardcfg_addr, active_boardcfg_size)?;
+    let mut active_boardcfg =
+        decode_boot_fs_table(bh, TAG_NAME, active_boardcfg_addr, active_boardcfg_size)?;
 
     active_boardcfg.insert("board_id".to_string(), Value::from(board_id));
     println!("Active boardcfg: {active_boardcfg:#?}");
 
     bh.encode_and_write_boot_fs_table(active_boardcfg, TAG_NAME)?;
-    println!("Flashed boardcfg with new board_id 0x{:08x}_{:08x}.", (board_id >> 32) as u32, board_id as u32);
+    println!(
+        "Flashed boardcfg with new board_id 0x{:08x}_{:08x}.",
+        (board_id >> 32) as u32,
+        board_id as u32
+    );
 
     Ok(())
 }
