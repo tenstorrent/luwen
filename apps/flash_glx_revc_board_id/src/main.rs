@@ -18,9 +18,6 @@ const REVC_NIBBLE_MASK: u64 = 0xf;
 struct Args {
     #[arg(long, help = "Don't flash; only print what the new board ID would be")]
     dry_run: bool,
-
-    #[arg(long, help = "Only operate on a single device by index.")]
-    index: Option<u32>,
 }
 
 const TAG_NAME: &str = "boardcfg";
@@ -161,16 +158,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Found {} device(s)", devices.len());
 
     for (idx, device) in devices.iter().enumerate() {
-        // // test only on first device
-        // if idx != 0 {
-        //     continue;
-        // }
-        if let Some(index) = args.index {
-            if index != idx as u32 {
-                continue;
-            }
-        }
-
         println!("=== Device {} ===", idx);
 
         if let Some(bh) = device.as_bh() {
