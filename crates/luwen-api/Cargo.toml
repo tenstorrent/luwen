@@ -1,16 +1,17 @@
 [package]
 name = "luwen-api"
 version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
 description = """
 High-level interface for Tenstorrent device interactions
 """
-edition = "2021"
+readme = { workspace = true }
+repository = { workspace = true }
 license = { workspace = true }
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[package.metadata.workspaces]
-independent = true
 
 [dependencies]
 bincode = { workspace = true }

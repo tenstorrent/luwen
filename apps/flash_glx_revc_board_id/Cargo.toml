@@ -2,9 +2,7 @@
 name = "flash_glx_revc_board_id"
 version = "0.1.0"
 edition = { workspace = true }
-
-[package.metadata.workspaces]
-independent = true
+publish = false
 
 [dependencies]
 clap = { workspace = true }

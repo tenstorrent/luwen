@@ -10,6 +10,7 @@ C++ bindings for luwen
 readme = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
+publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -18,9 +19,6 @@ assets = [
   ["target/release/luwen.h", "/usr/include/luwen.h", "644"],
   ["target/release/libluwen.so", "/usr/lib/", "644"],
 ]
-
-[package.metadata.workspaces]
-independent = true
 
 [lib]
 name = "luwen"
