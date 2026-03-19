@@ -20,9 +20,6 @@ assets = [
   ["target/release/libluwen.so", "/usr/lib/", "644"],
 ]
 
-[package.metadata.workspaces]
-independent = true
-
 [lib]
 name = "luwen"
 crate-type = ["cdylib"]
