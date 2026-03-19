@@ -89,8 +89,8 @@ jobs:
         run: git config --global user.email "${EMAIL}"
       - name: Git name
         run: git config --global user.name "${NAME}"
-      - name: Install cargo-workspaces
-        run: cargo install cargo-workspaces@0.3.6 --locked
+      - name: Install cargo-edit
+        run: cargo install cargo-edit --locked
       - name: What version are we?
         id: luwenver
         run: |
@@ -98,13 +98,19 @@ jobs:
           echo "luwen_version=${luwen_ver}"
           echo "luwen_version=${luwen_ver}" >> "$GITHUB_OUTPUT"
       - name: Bump the version
-        run: cargo ws version ${{ github.event.inputs.version_bump_type }} --allow-branch ${{ needs.tempbranch.outputs.rc_ref }} --no-git-tag --message "Cargo Release %v" -y
+        run: cargo set-version --bump ${{ github.event.inputs.version_bump_type }}
       - name: What NEW Version?
         id: new-luwen-version
         run: |
           export luwen_version_new="$( cargo metadata --format-version 1 | jq '.packages[] | select( .name =="luwen" ) | .version' | sed 's/"//g' )"
           echo "luwen_version_new=${luwen_version_new}"
           echo "luwen_version_new=${luwen_version_new}" >> "$GITHUB_OUTPUT"
+      - name: Commit version bump
+        run: |
+          git add .
+          git commit -m "Cargo Release ${{ steps.new-luwen-version.outputs.luwen_version_new }}"
+          git pull --rebase
+          git push
       - name: Parse version from string
         id: version
         uses: release-kit/semver@v2
