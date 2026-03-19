@@ -13,9 +13,6 @@ license = { workspace = true }
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[package.metadata.workspaces]
-independent = true
-
 [dependencies]
 luwen-api = { workspace = true }
 luwen-def = { workspace = true }
