@@ -602,9 +602,16 @@ impl PciDevice {
         };
 
         // SAFETY: State is defined as a stack-allocated struct, and will never be null.
-        unsafe { ioctl::set_power_state(self.device_fd.as_raw_fd(), &mut state) }
-            .map(|_| ())
-            .map_err(PciError::IoctlError)
+        match unsafe { ioctl::set_power_state(self.device_fd.as_raw_fd(), &mut state) } {
+            Ok(_) => Ok(()),
+            Err(nix::errno::Errno::EINVAL) => {
+                // EINVAL is returned when the firmware or kernel module driver (KMD) is too old
+                // to support power management features. Silently ignore this error to maintain
+                // backward compatibility with older firmware versions.
+                Ok(())
+            }
+            Err(err) => Err(PciError::IoctlError(err)),
+        }
     }
 
     pub fn noc_write(
