@@ -51,7 +51,7 @@ pub enum MemorySlices {
 }
 
 #[derive(RustEmbed)]
-#[folder = "../../axi-data"]
+#[folder = "axi-data"]
 struct WHPciData;
 
 pub fn load_axi_table(file: &str, _version: u32) -> MemorySlices {
