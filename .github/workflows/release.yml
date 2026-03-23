@@ -402,8 +402,8 @@ jobs:
   publish-crates-io:
     name: Publish Rust package
     needs:
-      - changelogs
-      - tagrelease
+      - build_all_depends
+      - generaterelease
     runs-on: ubuntu-latest
     permissions:
       id-token: write
