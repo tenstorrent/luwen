@@ -1,3 +1,69 @@
+rust-luwen (0.8.2) noble; urgency=medium
+
+  [ Zakhary Kaplan ]
+  * fix: correctly decode negative 16.16 FP temperature
+
+  [ Daniel DeGrasse ]
+  * add support for multiple bootfs headers on blackhole
+
+  [ Samridhi Bansal ]
+  * Dump flash script for customer
+  * Add app to check board id in backup
+  * Updated decode and flash script
+
+  [ Petra Alexson ]
+  * Create get_valid_boardcfg_at_addr helper function and simplify logic
+
+  [ Samridhi Bansal ]
+  * More debug on these scripts
+  * python hex script
+  * Updated main to Andrew's changes - tested against bin files
+
+  [ Andrew Lewycky ]
+  * boot_fs improvements
+  * Derive PartialEq for TtBootFsFd instead of open-coding
+  * spi file hack (disabled)
+
+  [ Samridhi Bansal ]
+  * Move the index to start from 0 to match board ID
+
+  [ Zakhary Kaplan ]
+  * feat: remove unused `spi_{read,write}`
+  * feat: minor style tweaks
+  * chore: move `read_bin_hex.py` to scripts
+  * style: format everything
+  * chore(clippy): apply lints
+
+  [ Samridhi Bansal ]
+  * App to add rev c tag to board ID:
+
+  [ Zakhary Kaplan ]
+  * style: format everything
+
+  [ Samridhi Bansal ]
+  * Remove the index arg - unnecessary for this app
+
+  [ Zakhary Kaplan ]
+  * fix(wormhole): don't wait for DRAM initialization
+  * chore: mark apps and bindings as unpublishable, add full metadata to luwen-api
+  * ci(release): publish luwen crates to crates.io
+  * ci(release): use cargo publish --workspace instead of cargo-workspaces
+  * ci(release): replace cargo-workspaces version bump with cargo-edit
+  * chore: remove cargo-workspaces metadata from all crates
+  * fix(msrv): replace is_multiple_of with % operator for 1.75.0 compatibility
+
+  [ copilot-swe-agent[bot] ]
+  * Pin cargo-edit to v0.13.9 using @ syntax
+  * build(cargo): add version to workspace path dependencies
+  * build(cargo): add version to workspace path dependencies
+  * fix(luwen-api): symlink axi-data into crate for packaging
+  * fix(ci): install protoc in publish-crates-io
+
+  [ Tenstorrent Releases ]
+  * Cargo Release 0.8.2
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Mon, 23 Mar 2026 18:50:33 +0000
+
 rust-luwen (0.8.1) noble; urgency=medium
 
   [ Zakhary Kaplan ]
