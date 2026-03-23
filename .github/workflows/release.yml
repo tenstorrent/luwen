@@ -90,7 +90,7 @@ jobs:
       - name: Git name
         run: git config --global user.name "${NAME}"
       - name: Install cargo-edit
-        run: cargo install cargo-edit --locked
+        run: cargo install cargo-edit@0.13.9 --locked
       - name: What version are we?
         id: luwenver
         run: |
