@@ -27,7 +27,7 @@ pub fn remove_padding_proto_bin(proto_bin: &[u8]) -> Result<&[u8], Box<dyn std::
     }
     // Some FW versions (80.18.0 - 18.5.0) have a bug padding proto_bins to a multiple of 8 bytes
     // using trailing 0s. Valid encoded protobufs shouldn't have extra 0s after the padding
-    let proto_bin = if proto_bin.len().is_multiple_of(8) && proto_bin.ends_with(&[0, 0, 0, 0]) {
+    let proto_bin = if proto_bin.len() % 8 == 0 && proto_bin.ends_with(&[0, 0, 0, 0]) {
         &proto_bin[..proto_bin.len() - 4]
     } else {
         proto_bin

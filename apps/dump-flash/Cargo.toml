@@ -2,9 +2,9 @@
 name = "dump-flash"
 version = "0.1.0"
 edition = { workspace = true }
+publish = false
 
-[package.metadata.workspaces]
-independent = true
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 luwen = { workspace = true }
