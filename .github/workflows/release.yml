@@ -98,7 +98,7 @@ jobs:
           echo "luwen_version=${luwen_ver}"
           echo "luwen_version=${luwen_ver}" >> "$GITHUB_OUTPUT"
       - name: Bump the version
-        run: cargo set-version --bump ${{ github.event.inputs.version_bump_type }}
+        run: cargo set-version --package=luwen --bump=${{ github.event.inputs.version_bump_type }}
       - name: What NEW Version?
         id: new-luwen-version
         run: |
