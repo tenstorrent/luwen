@@ -1,3 +1,16 @@
+rust-luwen (0.8.3) noble; urgency=medium
+
+  [ Zakhary Kaplan ]
+  * ci(release): publish crates.io after release is generated
+  * ci(release): remove TestPyPI publishing step
+  * ci(release): upgrade softprops/action-gh-release to v2
+  * ci(release): upgrade actions to Node.js 24
+
+  [ Tenstorrent Releases ]
+  * Cargo Release 0.8.3
+
+ -- Tenstorrent Releases <releases@tenstorrent.com>  Mon, 23 Mar 2026 20:22:14 +0000
+
 rust-luwen (0.8.2) noble; urgency=medium
 
   [ Zakhary Kaplan ]
