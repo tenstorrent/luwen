@@ -1,0 +1,195 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+
+  # Gate job that depends on all required CI jobs passing.
+  pass:
+    runs-on: ubuntu-latest
+    needs:
+      - build
+      - docs
+      - lint
+      - test
+      - test-bh
+      - test-wh
+    steps:
+      - run: exit 0
+
+  # Gate job for lint checks.
+  lint:
+    runs-on: ubuntu-latest
+    needs:
+      - clippy
+      - fmt
+      - typos
+    steps:
+      - run: exit 0
+
+  # Build Rust workspace and Python wheels.
+  build:
+    needs: cross
+    uses: ./.github/workflows/build.yml
+
+  # Check for warnings and lint errors with clippy.
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Run cargo check
+        run: cargo check --workspace --all-targets --all-features
+      - name: Run cargo clippy
+        run: cargo clippy --workspace --all-targets --all-features
+
+  # Verify the workspace cross-compiles for non-x86 targets.
+  cross:
+    needs: msrv
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - riscv64gc-unknown-linux-gnu
+          - aarch64-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          target: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Run cargo check
+        run: |
+          cargo check --workspace --exclude pyluwen \
+            --all-features --target ${{ matrix.target }}
+
+  # Build rustdoc and verify no warnings are emitted.
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build documentation
+        run: cargo doc --lib --no-deps --all-features --document-private-items
+
+  # Verify code is formatted with rustfmt.
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+  # Verify the crate builds on the minimum supported Rust version.
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Get MSRV from Cargo.toml
+        run: |
+          msrv=$(
+            cargo metadata --no-deps --format-version 1 \
+              | jq -r '.packages[] | select(.name=="luwen") | .rust_version'
+          )
+          echo "msrv=$msrv" >> "$GITHUB_ENV"
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Install Rust ${{ env.msrv }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.msrv }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Check MSRV
+        run: cargo check --workspace --all-features
+
+  # Run all tests that do not require hardware.
+  test:
+    needs: msrv
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run cargo test
+        run: |
+          set -euxo pipefail
+          cargo test --no-fail-fast --workspace --exclude pyluwen
+          cargo test --doc --no-fail-fast --workspace \
+            --exclude pyluwen --all-features
+
+  # Run the hardware test suite on Blackhole hardware.
+  test-bh:
+    needs:
+      - lint
+      - msrv
+    runs-on: tt-ubuntu-2204-p150b-stable
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run cargo test
+        # All run in one thread; if it starts taking too long I could start
+        # requiring guaranteed thread safety.
+        run: |
+          cargo test --no-fail-fast --workspace --exclude pyluwen \
+            --features test_hardware --features test_blackhole \
+            --features test_p100a
+
+  # Run the hardware test suite on Wormhole hardware.
+  test-wh:
+    needs:
+      - lint
+      - msrv
+    runs-on: tt-ubuntu-2204-n150-stable
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run cargo test
+        # All run in one thread; if it starts taking too long I could start
+        # requiring guaranteed thread safety.
+        run: |
+          cargo test --no-fail-fast --workspace --exclude pyluwen \
+            --features test_hardware --features test_wormhole \
+            --features test_n150
+
+  # Check for typos in source files.
+  typos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: crate-ci/typos@v1
