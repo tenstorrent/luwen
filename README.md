@@ -37,7 +37,7 @@ There are three supported use cases:
 1. General chip discovery and initialization, replacing `create-ethernet-map`
    and `tt-smi`. Will probably also add the ability to issue resets.
 1. Low-level syseng-only debug capability (via Python bindings, as `pyluwen`;
-   requires Python 3.11+).
+   requires Python 3.10+).
    - To avoid needing to have multiple in-flight stacks, access the implemented
      communication APIs directly.
    - Direct access to the types defined in `luwen-pci`, allowing modification
