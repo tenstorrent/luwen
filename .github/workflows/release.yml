@@ -52,7 +52,7 @@ jobs:
           ref: ${{ needs.branch.outputs.ref }}
       - name: Configure Git identity
         run: |
-          git config --global user.name "Tenstorrent Releases"
+          git config --global user.name "Tenstorrent"
           git config --global user.email "releases@tenstorrent.com"
       - uses: cargo-bins/cargo-binstall@v1.17.8
       - name: Install cargo-edit
