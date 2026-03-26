@@ -54,7 +54,7 @@ jobs:
         run: |
           git config --global user.name "Tenstorrent Releases"
           git config --global user.email "releases@tenstorrent.com"
-      - uses: cargo-bins/cargo-binstall@v1
+      - uses: cargo-bins/cargo-binstall@v1.17.8
       - name: Install cargo-edit
         run: cargo binstall --no-confirm cargo-edit@0.13.9
       - name: Bump version
