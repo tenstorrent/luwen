@@ -34,11 +34,12 @@ fn fix_board(
 
     let mut active_boardcfg =
         decode_boot_fs_table(bh, TAG_NAME, active_boardcfg_addr, active_boardcfg_size)
-            .inspect(|cfg| {
+            .map(|cfg| {
                 println!(
                     "Found active boardcfg with board_id: {:x}",
                     cfg.get("board_id").unwrap().as_u64().unwrap()
                 );
+                cfg
             })
             .unwrap_or_else(|e| {
                 println!(

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Allow function definitions inside PyMethod macros that appear outside of modules where they're used
+#![allow(unknown_lints)]
 #![allow(non_local_definitions)]
 
 use std::ops::{Deref, DerefMut};

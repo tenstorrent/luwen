@@ -1,4 +1,4 @@
-name: "Auto-label Community Issues"
+name: Auto-label Community Issues
 
 on:
   issues:
@@ -7,12 +7,14 @@ on:
     types: [opened]
 
 permissions:
-  contents: read 
+  contents: read
   issues: write
   pull-requests: write
-  
+
 jobs:
-  community-labeling:
+
+  # Apply community labels to issues and PRs from external contributors.
+  community:
     uses: tenstorrent/tt-github-actions/.github/workflows/issues-community-autotag.yml@main
     secrets:
       AUTOLABEL_COMMUNITY_ISSUES: ${{ secrets.AUTOLABEL_COMMUNITY_ISSUES }}

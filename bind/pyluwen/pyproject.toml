@@ -4,7 +4,6 @@ requires-python = ">=3.10"
 classifiers = [
   "Programming Language :: Rust",
   "Programming Language :: Python :: Implementation :: CPython",
-  "Programming Language :: Python :: Implementation :: PyPy",
   "License :: OSI Approved :: Apache Software License",
   "Operating System :: POSIX :: Linux",
   "Topic :: System :: Hardware",
