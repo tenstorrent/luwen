@@ -1,4 +1,4 @@
-name: Auto-label Community Issues
+name: Triage
 
 on:
   issues:
