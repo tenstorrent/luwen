@@ -7,6 +7,10 @@ on:
         default: ${{ github.ref }}
         required: false
         type: string
+      upload:
+        default: false
+        required: false
+        type: boolean
 
 permissions:
   contents: read
@@ -60,6 +64,7 @@ jobs:
           before-script-linux: |
             dnf install -y protobuf-compiler
       - name: Store wheel
+        if: inputs.upload
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}

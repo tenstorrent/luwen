@@ -13,6 +13,8 @@ jobs:
   # Build release artifacts
   build:
     uses: ./.github/workflows/build.yml
+    with:
+      upload: true
 
   # Publish to crates.io via OIDC
   crates:
