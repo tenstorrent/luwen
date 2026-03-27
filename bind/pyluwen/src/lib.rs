@@ -799,12 +799,19 @@ impl PciChip {
         }
     }
 
-    #[pyo3(signature = (*, aiclk, mrisc, tensix, l2cpu))]
-    pub fn set_power(&self, aiclk: bool, mrisc: bool, tensix: bool, l2cpu: bool) -> PyResult<()> {
+    #[pyo3(signature = (*, aiclk, mrisc, tensix, l2cpu, pcie))]
+    pub fn set_power(
+        &self,
+        aiclk: bool,
+        mrisc: bool,
+        tensix: bool,
+        l2cpu: bool,
+        pcie: bool,
+    ) -> PyResult<()> {
         if let Some(bh) = self.as_bh() {
-            bh.set_power(aiclk, mrisc, tensix, l2cpu)
+            bh.set_power(aiclk, mrisc, tensix, l2cpu, pcie)
         } else if let Some(wh) = self.as_wh() {
-            wh.set_power(aiclk, mrisc, tensix, l2cpu)
+            wh.set_power(aiclk, mrisc, tensix, l2cpu, pcie)
         } else {
             Err(PyException::new_err("unknown chip type"))
         }
@@ -849,7 +856,14 @@ impl PciInterface<'_> {
             .map_err(|v| PyException::new_err(v.to_string()))
     }
 
-    pub fn set_power(&self, aiclk: bool, mrisc: bool, tensix: bool, l2cpu: bool) -> PyResult<()> {
+    pub fn set_power(
+        &self,
+        aiclk: bool,
+        mrisc: bool,
+        tensix: bool,
+        l2cpu: bool,
+        pcie: bool,
+    ) -> PyResult<()> {
         self.pci_interface
             .borrow()
             .device
@@ -858,6 +872,7 @@ impl PciInterface<'_> {
                 mrisc,
                 tensix,
                 l2cpu,
+                pcie,
             })
             .map_err(|v| PyException::new_err(v.to_string()))
     }
@@ -1210,12 +1225,19 @@ impl PciWormhole {
         }
     }
 
-    #[pyo3(signature = (*, aiclk, mrisc, tensix, l2cpu))]
-    pub fn set_power(&self, aiclk: bool, mrisc: bool, tensix: bool, l2cpu: bool) -> PyResult<()> {
+    #[pyo3(signature = (*, aiclk, mrisc, tensix, l2cpu, pcie))]
+    pub fn set_power(
+        &self,
+        aiclk: bool,
+        mrisc: bool,
+        tensix: bool,
+        l2cpu: bool,
+        pcie: bool,
+    ) -> PyResult<()> {
         let value = PciInterface::from_wh(self);
 
         if let Some(value) = value {
-            value.set_power(aiclk, mrisc, tensix, l2cpu)
+            value.set_power(aiclk, mrisc, tensix, l2cpu, pcie)
         } else {
             Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
@@ -1511,12 +1533,19 @@ impl PciBlackhole {
         }
     }
 
-    #[pyo3(signature = (*, aiclk, mrisc, tensix, l2cpu))]
-    pub fn set_power(&self, aiclk: bool, mrisc: bool, tensix: bool, l2cpu: bool) -> PyResult<()> {
+    #[pyo3(signature = (*, aiclk, mrisc, tensix, l2cpu, pcie))]
+    pub fn set_power(
+        &self,
+        aiclk: bool,
+        mrisc: bool,
+        tensix: bool,
+        l2cpu: bool,
+        pcie: bool,
+    ) -> PyResult<()> {
         let value = PciInterface::from_bh(self);
 
         if let Some(value) = value {
-            value.set_power(aiclk, mrisc, tensix, l2cpu)
+            value.set_power(aiclk, mrisc, tensix, l2cpu, pcie)
         } else {
             Err(PyException::new_err(
                 "Could not get PCI interface for this chip.",
