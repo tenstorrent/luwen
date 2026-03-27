@@ -2,10 +2,11 @@ name: Release
 
 on:
   workflow_dispatch:
-    # Select the semver component to increment for this release.
+    branches:
+      - main
     inputs:
       bump:
-        description: Release type
+        description: Version bump
         required: true
         default: patch
         type: choice
@@ -113,6 +114,12 @@ jobs:
             --title "v${version}" \
             --target "${{ needs.commit.outputs.sha }}" \
             --generate-notes
+      - name: Trigger publish
+        run: |
+          gh api repos/${{ github.repository }}/dispatches \
+            --method POST \
+            -f event_type=publish \
+            -F client_payload[tag]="v${{ needs.commit.outputs.version }}"
 
   # Merge the release branch
   merge:

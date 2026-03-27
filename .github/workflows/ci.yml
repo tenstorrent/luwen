@@ -46,6 +46,8 @@ jobs:
   build:
     needs: cross
     uses: ./.github/workflows/build.yml
+    with:
+      upload: true
 
   # Check for warnings and lint errors with clippy.
   clippy:

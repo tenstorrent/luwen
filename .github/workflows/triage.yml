@@ -13,7 +13,7 @@ permissions:
 
 jobs:
 
-  # Apply community labels to issues and PRs from external contributors.
+  # Label issues and PRs from external contributors
   community:
     uses: tenstorrent/tt-github-actions/.github/workflows/issues-community-autotag.yml@main
     secrets:

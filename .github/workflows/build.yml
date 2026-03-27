@@ -11,6 +11,13 @@ on:
         default: false
         required: false
         type: boolean
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: Upload artifacts
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: read
