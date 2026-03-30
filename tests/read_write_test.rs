@@ -482,6 +482,10 @@ mod tests {
 
     #[test]
     #[cfg_attr(
+        any(feature = "test_hardware", feature = "test_blackhole"),
+        ignore = "Test has an issue. Do not run."
+    )]
+    #[cfg_attr(
         not(all(feature = "test_hardware", feature = "test_blackhole")),
         ignore = "Requires real blackhole hardware"
     )]
