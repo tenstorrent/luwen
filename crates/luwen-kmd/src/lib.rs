@@ -576,13 +576,13 @@ impl PciDevice {
     pub fn set_power_state(&self, level: Power) -> Result<(), PciError> {
         let mut state = match level {
             Power::Low => ioctl::SetPowerState {
-                validity: (0 & 0xF) << 4 | (4 & 0xF),
-                power_flags: 0xfff0 | 0b0000,
+                validity: (0 & 0xF) << 4 | (5 & 0xF),
+                power_flags: 0xffe0 | 0b00000,
                 ..Default::default()
             },
             Power::High => ioctl::SetPowerState {
-                validity: (0 & 0xF) << 4 | (4 & 0xF),
-                power_flags: 0xfff0 | 0b1111,
+                validity: (0 & 0xF) << 4 | (5 & 0xF),
+                power_flags: 0xffe0 | 0b11111,
                 ..Default::default()
             },
             Power::Raw {
@@ -590,13 +590,15 @@ impl PciDevice {
                 mrisc,
                 tensix,
                 l2cpu,
+                pcie,
             } => ioctl::SetPowerState {
-                validity: (0 & 0xF) << 4 | (4 & 0xF),
-                power_flags: 0xfff0
+                validity: (0 & 0xF) << 4 | (5 & 0xF),
+                power_flags: 0xffe0
                     | (u16::from(aiclk)
                         | u16::from(mrisc) << 1
                         | u16::from(tensix) << 2
-                        | u16::from(l2cpu) << 3),
+                        | u16::from(l2cpu) << 3
+                        | u16::from(pcie) << 4),
                 ..Default::default()
             },
         };
@@ -749,6 +751,11 @@ pub enum Power {
         /// When unset, the L2CPU will be clock gated (disabled) to conserve
         /// system power.
         l2cpu: bool,
+        /// PCIe Link Speed.
+        ///
+        /// When unset, the PCIe link runs at Gen 1. When set, it runs at the
+        /// maximum speed supported by the device.
+        pcie: bool,
     },
 }
 
