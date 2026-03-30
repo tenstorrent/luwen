@@ -751,9 +751,10 @@ pub enum Power {
         /// When unset, the L2CPU will be clock gated (disabled) to conserve
         /// system power.
         l2cpu: bool,
-        /// PCIe Link Speed Control.
+        /// PCIe Link Speed.
         ///
-        /// When set, allows PCIe link speed adjustments for power management.
+        /// When unset, the PCIe link runs at Gen 1. When set, it runs at the
+        /// maximum speed supported by the device.
         pcie: bool,
     },
 }
