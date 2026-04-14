@@ -8,4 +8,4 @@ publish = false
 
 [dependencies]
 luwen = { workspace = true }
-rand = "0.8.5"
+rand = "0.9.3"
