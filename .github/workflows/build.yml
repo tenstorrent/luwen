@@ -54,6 +54,7 @@ jobs:
             args: >-
               --release --sdist --out dist
               -m bind/pyluwen/Cargo.toml
+              --features abi3-py311
             artifact: wheels-abi3
     steps:
       - uses: actions/checkout@v6
