@@ -1,0 +1,14 @@
+[package]
+name = "bh-mod"
+version = "0.1.0"
+edition = { workspace = true }
+publish = false
+
+[dependencies]
+anyhow = "1.0.98"
+clap = { workspace = true, features = ["wrap_help"] }
+luwen = { workspace = true }
+luwen-api = { workspace = true }
+serde_json = { workspace = true }
+tabled = "0.20.0"
+thiserror = { workspace = true }
