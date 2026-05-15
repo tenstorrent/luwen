@@ -25,54 +25,60 @@ fn run() -> anyhow::Result<()> {
         .iter()
         .filter_map(|p| p.file_name()?.to_str()?.parse().ok())
         .collect();
+    let mut selected: Vec<(usize, &luwen_api::chip::Blackhole)> = Vec::new();
     for (idx, chip) in chips.iter().enumerate() {
         let info = chip
             .get_device_info()
             .map_err(|e| anyhow::anyhow!("{e}"))?
             .context("no device info")?;
-        let interface_id = info.interface_id as usize;
         if !filter.is_empty() && !filter.contains(&info.interface_id) {
             continue;
         }
         let bh = chip
             .as_bh()
             .with_context(|| format!("device {idx} is not a Blackhole chip"))?;
-        let wrote = match &args.cmd {
-            Cmd::Get { table, fmt, fields } => {
-                table::get(bh, table.as_ref(), fmt, fields)?;
-                false
+        selected.push((info.interface_id as usize, bh));
+    }
+    if selected.is_empty() {
+        return Ok(());
+    }
+    let wrote = match &args.cmd {
+        Cmd::Get { table, fmt, fields } => {
+            table::get(&selected, table.as_ref(), fmt, fields)?;
+            false
+        }
+        Cmd::Set { dry_run, fields } => {
+            let mut op = table::Set::new(&selected);
+            for f in fields {
+                op = op.field(f);
             }
-            Cmd::Set { dry_run, fields } => {
-                let mut op = table::Set::new(bh);
+            if *dry_run {
+                op = op.dry_run();
+            }
+            op.run()?;
+            !dry_run
+        }
+        Cmd::Res {
+            dry_run,
+            all,
+            fields,
+        } => {
+            let mut op = table::Reset::new(&selected);
+            if !all {
                 for f in fields {
                     op = op.field(f);
                 }
-                if *dry_run {
-                    op = op.dry_run();
-                }
-                op.run()?;
-                !dry_run
             }
-            Cmd::Res {
-                dry_run,
-                all,
-                fields,
-            } => {
-                let mut op = table::Reset::new(bh);
-                if !all {
-                    for f in fields {
-                        op = op.field(f);
-                    }
-                }
-                if *dry_run {
-                    op = op.dry_run();
-                }
-                op.run()?;
-                !dry_run
+            if *dry_run {
+                op = op.dry_run();
             }
-        };
-        if wrote {
-            reset::chip_reset(interface_id)
+            op.run()?;
+            !dry_run
+        }
+    };
+    if wrote {
+        for (interface_id, _) in &selected {
+            reset::chip_reset(*interface_id)
                 .map_err(|e| anyhow::anyhow!("{e}"))
                 .context("chip reset failed")?;
         }
@@ -110,7 +116,7 @@ enum Cmd {
         /// Fields to include (dot-notation path); omit to include all.
         fields: Vec<String>,
     },
-    /// Write fields to fw_table.
+    /// Write fields to `fw_table`.
     #[command(visible_alias = "s")]
     Set {
         /// Print what would change without writing to flash or resetting.
@@ -134,8 +140,7 @@ enum Cmd {
 }
 
 /// A protobuf table in SPI flash.
-#[derive(Clone)]
-#[derive(clap::ValueEnum)]
+#[derive(Clone, clap::ValueEnum)]
 pub enum Table {
     /// Writable firmware config table (`cmfwcfg`).
     FwTable,
@@ -146,8 +151,7 @@ pub enum Table {
 }
 
 /// Output format for the `get` subcommand.
-#[derive(Clone)]
-#[derive(clap::ValueEnum)]
+#[derive(Clone, clap::ValueEnum)]
 pub enum Fmt {
     /// ASCII table.
     Pretty,

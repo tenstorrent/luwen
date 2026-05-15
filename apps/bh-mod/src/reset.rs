@@ -21,7 +21,9 @@ pub fn chip_reset(interface_id: usize) -> Result<(), Box<dyn std::error::Error>>
             },
             ..Default::default()
         };
-        unsafe { luwen::kmd::ioctl::reset_device(std::os::fd::AsRawFd::as_raw_fd(&fd), &mut req) }?;
+        unsafe {
+            luwen::kmd::ioctl::reset_device(std::os::fd::AsRawFd::as_raw_fd(&fd), &raw mut req)
+        }?;
         assert_eq!(req.output.result, 0);
     }
 
@@ -60,7 +62,9 @@ pub fn chip_reset(interface_id: usize) -> Result<(), Box<dyn std::error::Error>>
             },
             ..Default::default()
         };
-        unsafe { luwen::kmd::ioctl::reset_device(std::os::fd::AsRawFd::as_raw_fd(&fd), &mut req) }?;
+        unsafe {
+            luwen::kmd::ioctl::reset_device(std::os::fd::AsRawFd::as_raw_fd(&fd), &raw mut req)
+        }?;
         assert_eq!(req.output.result, 0);
     }
 
