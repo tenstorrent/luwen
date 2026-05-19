@@ -16,6 +16,17 @@ effect.
 
 Factory defaults live in `origcfg` and are the source for `res`.
 
+## Build
+
+From the workspace root:
+
+```sh
+cargo build --release -p bh-mod
+```
+
+The binary lands at `target/release/bh-mod`. Requires the `tenstorrent`
+kernel driver loaded and at least one Blackhole device present.
+
 ## Commands
 
 ```
