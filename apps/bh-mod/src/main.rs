@@ -117,6 +117,8 @@ struct Args {
     /// Path under /dev/tenstorrent to operate on. Repeatable. Omit to target all available devices.
     #[arg(short = 'd', long = "dev", value_name = "PATH", global = true)]
     dev: Vec<PathBuf>,
+    #[command(flatten)]
+    verbose: clap_verbosity_flag::Verbosity<clap_verbosity_flag::WarnLevel>,
     #[command(subcommand)]
     cmd: Cmd,
 }
