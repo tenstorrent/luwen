@@ -679,7 +679,7 @@ impl ActiveSpi {
             } else {
                 for (a, b) in data[(offset - start_offset) as usize..]
                     .iter_mut()
-                    .zip(read_data.into_iter())
+                    .zip(read_data)
                 {
                     *a = b;
                 }
