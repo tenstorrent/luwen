@@ -36,6 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get the output directory from Cargo
     let out_dir = env::var("OUT_DIR")?;
     compiled_proto_file_by_name("fw_table", &out_dir)?;
+    compiled_proto_file_by_name("fw_table_override", &out_dir)?;
     compiled_proto_file_by_name("flash_info", &out_dir)?;
     compiled_proto_file_by_name("read_only", &out_dir)?;
 

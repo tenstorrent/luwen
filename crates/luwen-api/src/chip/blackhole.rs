@@ -25,6 +25,7 @@ use super::{
 };
 
 pub mod boot_fs;
+pub mod ccfgovr;
 pub mod message;
 pub mod spirom_tables;
 
@@ -526,6 +527,30 @@ impl Blackhole {
         self.spi_write(fd_in_spi.spi_addr, &proto_bin)?;
 
         Ok(())
+    }
+
+    /// Read the active ccfgovr override map (empty if neither bank validates).
+    pub fn ccfgovr_read(&self) -> Result<HashMap<String, Value>, Box<dyn std::error::Error>> {
+        ccfgovr::read_active(self)
+    }
+
+    /// Read the merged effective view: cmfwcfg with the active override applied.
+    pub fn ccfgovr_effective(&self) -> Result<HashMap<String, Value>, Box<dyn std::error::Error>> {
+        ccfgovr::read_effective(self)
+    }
+
+    /// Read both banks' raw state.
+    pub fn ccfgovr_read_state(&self) -> Result<ccfgovr::State, Box<dyn std::error::Error>> {
+        ccfgovr::State::read(self)
+    }
+
+    /// Write `map` as the next ccfgovr override to the inactive bank.
+    /// Returns the bank that is now active (the one just written).
+    pub fn ccfgovr_write(
+        &self,
+        map: HashMap<String, Value>,
+    ) -> Result<ccfgovr::Bank, Box<dyn std::error::Error>> {
+        ccfgovr::write(self, map)
     }
 }
 

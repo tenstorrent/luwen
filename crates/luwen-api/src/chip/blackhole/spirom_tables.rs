@@ -9,6 +9,9 @@ pub mod flash_info {
 pub mod fw_table {
     include!(concat!(env!("OUT_DIR"), "/fw_table.rs"));
 }
+pub mod fw_table_override {
+    include!(concat!(env!("OUT_DIR"), "/fw_table_override.rs"));
+}
 pub mod read_only {
     include!(concat!(env!("OUT_DIR"), "/read_only.rs"));
 }
