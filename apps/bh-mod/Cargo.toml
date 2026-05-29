@@ -9,6 +9,7 @@ anyhow = "1.0.98"
 clap = { workspace = true, features = ["wrap_help"] }
 luwen = { workspace = true }
 luwen-api = { workspace = true }
+miette = { version = "5", features = ["fancy"] }
 serde_json = { workspace = true }
 tabled = "0.17.0"
 thiserror = { workspace = true }

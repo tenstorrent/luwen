@@ -12,8 +12,23 @@ use luwen::pci::detect_chips;
 mod reset;
 mod table;
 
-fn main() -> anyhow::Result<()> {
-    run()
+fn main() -> std::process::ExitCode {
+    let Err(err) = run() else {
+        return std::process::ExitCode::SUCCESS;
+    };
+    // Build a miette Report from anyhow's context chain (innermost-out so
+    // each wrap_err re-stacks an outer context on top) and render it via
+    // miette's fancy printer. Print it ourselves so we get just the
+    // colored bullet, not Rust's "Error:" Termination prefix.
+    let chain: Vec<String> = err.chain().map(ToString::to_string).collect();
+    let mut iter = chain.into_iter().rev();
+    let root = iter.next().expect("anyhow error has at least one cause");
+    let mut report = miette::Report::msg(root);
+    for ctx in iter {
+        report = report.wrap_err(ctx);
+    }
+    eprintln!("{report:?}");
+    std::process::ExitCode::FAILURE
 }
 
 fn run() -> anyhow::Result<()> {
