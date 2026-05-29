@@ -33,6 +33,7 @@ fn main() -> std::process::ExitCode {
 
 fn run() -> anyhow::Result<()> {
     let args = Args::parse();
+    init_tracing(args.verbose.tracing_level_filter());
     let chips = detect_chips().map_err(|e| anyhow::anyhow!("{e}"))?;
     anyhow::ensure!(!chips.is_empty(), "no chips detected");
     let filter: Vec<u32> = args
@@ -121,6 +122,21 @@ struct Args {
     verbose: clap_verbosity_flag::Verbosity<clap_verbosity_flag::WarnLevel>,
     #[command(subcommand)]
     cmd: Cmd,
+}
+
+/// Configure a `tracing` subscriber driven by `-v/--verbose`.
+fn init_tracing(level: tracing::level_filters::LevelFilter) {
+    use tracing_subscriber::filter::EnvFilter;
+    use tracing_subscriber::fmt;
+    use tracing_subscriber::prelude::*;
+
+    // Honour RUST_LOG if set, otherwise fall back to the verbosity flag.
+    let filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(level.to_string()));
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(fmt::layer().with_writer(std::io::stderr).without_time())
+        .init();
 }
 
 #[derive(clap::Subcommand)]
