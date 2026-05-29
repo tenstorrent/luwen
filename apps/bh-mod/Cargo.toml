@@ -14,3 +14,5 @@ miette = { version = "5", features = ["fancy"] }
 serde_json = { workspace = true }
 tabled = "0.17.0"
 thiserror = { workspace = true }
+tracing.workspace = true
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["env-filter", "fmt", "registry"] }
