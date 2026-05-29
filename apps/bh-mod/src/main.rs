@@ -158,6 +158,7 @@ enum Cmd {
         #[arg(long)]
         delta: bool,
         /// Fields to include (dot-notation path); omit to include all.
+        #[arg(value_parser = parse_field_path)]
         fields: Vec<String>,
     },
     /// Merge fields into the `ccfgovr` override.
@@ -180,8 +181,19 @@ enum Cmd {
         all: bool,
         /// Fields to remove from the override (dot-notation path);
         /// conflicts with --all.
+        #[arg(value_parser = parse_field_path)]
         fields: Vec<String>,
     },
+}
+
+/// Reject field paths that contain `=` (which would be a `set`-style
+/// assignment used in the wrong subcommand).
+fn parse_field_path(s: &str) -> Result<String, String> {
+    if s.contains('=') {
+        Err(format!("bad field path {s:?}"))
+    } else {
+        Ok(s.to_string())
+    }
 }
 
 /// A protobuf table in SPI flash.
