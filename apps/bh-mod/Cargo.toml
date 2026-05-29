@@ -7,6 +7,7 @@ publish = false
 [dependencies]
 anyhow = "1.0.98"
 clap = { workspace = true, features = ["wrap_help"] }
+clap-verbosity-flag = { version = "3.0.4", default-features = false, features = ["tracing"] }
 luwen = { workspace = true }
 luwen-api = { workspace = true }
 miette = { version = "5", features = ["fancy"] }
