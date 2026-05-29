@@ -43,8 +43,13 @@ fn run() -> anyhow::Result<()> {
         return Ok(());
     }
     let wrote = match &args.cmd {
-        Cmd::Get { table, fmt, fields } => {
-            table::get(&selected, table.as_ref(), fmt, fields)?;
+        Cmd::Get {
+            table,
+            fmt,
+            delta,
+            fields,
+        } => {
+            table::get(&selected, table.as_ref(), fmt, *delta, fields)?;
             false
         }
         Cmd::Set { dry_run, fields } => {
@@ -80,15 +85,18 @@ fn run() -> anyhow::Result<()> {
         for (interface_id, _) in &selected {
             reset::chip_reset(*interface_id)
                 .map_err(|e| anyhow::anyhow!("{e}"))
-                .context("chip reset failed")?;
+                .context("chip reset")?;
         }
     }
     Ok(())
 }
 
-/// Read and modify Blackhole SPI flash protobuf tables.
+/// Read and modify Blackhole SPI flash firmware configuration.
 ///
-/// Any write operation (set, res) performs a chip reset to activate changes.
+/// `set` and `res` operate on the `ccfgovr` override banks, which the
+/// firmware merges on top of `cmfwcfg` at boot. The original `cmfwcfg`
+/// partition is never written. Any write operation performs a chip reset
+/// so the new config takes effect.
 #[derive(clap::Parser)]
 struct Args {
     /// Path under /dev/tenstorrent to operate on. Repeatable. Omit to target all available devices.
@@ -113,10 +121,13 @@ enum Cmd {
             default_value = "pretty"
         )]
         fmt: Fmt,
+        /// Only show rows whose override is set.
+        #[arg(long)]
+        delta: bool,
         /// Fields to include (dot-notation path); omit to include all.
         fields: Vec<String>,
     },
-    /// Write fields to `fw_table`.
+    /// Merge fields into the `ccfgovr` override.
     #[command(visible_alias = "s")]
     Set {
         /// Print what would change without writing to flash or resetting.
@@ -125,16 +136,17 @@ enum Cmd {
         /// Field assignments in `field=value` form (dot-notation path).
         fields: Vec<String>,
     },
-    /// Restore fields from the factory default (origcfg).
+    /// Remove fields from the `ccfgovr` override (cmfwcfg value re-emerges).
     #[command(visible_aliases = ["r", "reset"])]
     Res {
         /// Print what would change without writing to flash or resetting.
         #[arg(short = 'n', long)]
         dry_run: bool,
-        /// Restore all fields to factory default.
+        /// Clear all override fields.
         #[arg(short = 'a', long, conflicts_with = "fields")]
         all: bool,
-        /// Fields to restore (dot-notation path); conflicts with --all.
+        /// Fields to remove from the override (dot-notation path);
+        /// conflicts with --all.
         fields: Vec<String>,
     },
 }
@@ -142,7 +154,8 @@ enum Cmd {
 /// A protobuf table in SPI flash.
 #[derive(Clone, clap::ValueEnum)]
 pub enum Table {
-    /// Writable firmware config table (`cmfwcfg`).
+    /// Firmware config view (`cmfwcfg` defaults alongside the active
+    /// `ccfgovr` override).
     FwTable,
     /// Read-only board config table (`boardcfg`).
     ReadOnly,
