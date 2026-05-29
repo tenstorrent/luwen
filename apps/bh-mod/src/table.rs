@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::Context as _;
+use luwen_api::chip::spirom_tables::{self, fw_table_override::FwTableOverride};
 use luwen_api::chip::Blackhole;
 use serde_json::Value;
 use tabled::builder::Builder;
@@ -8,35 +9,184 @@ use tabled::settings::Style;
 
 type Chip<'a> = (usize, &'a Blackhole);
 type Write<'a> = (usize, &'a Blackhole, HashMap<String, Value>, Vec<Diff>);
+type FwView = (usize, HashMap<String, Value>, HashMap<String, Value>);
 
 pub fn get(
     chips: &[Chip<'_>],
     table: Option<&crate::Table>,
     fmt: &crate::Fmt,
+    delta: bool,
     fields: &[String],
 ) -> anyhow::Result<()> {
-    let tags: &[&str] = match table {
-        None | Some(crate::Table::FwTable) => &["cmfwcfg"],
-        Some(crate::Table::ReadOnly) => &["boardcfg"],
-        Some(crate::Table::FlashInfo) => &["flshinfo"],
-    };
-    for tag in tags {
-        let chip_maps: Vec<(usize, HashMap<String, Value>)> = chips
-            .iter()
-            .map(|(id, bh)| {
-                let map = bh
-                    .decode_boot_fs_table(tag)
-                    .map_err(|e| anyhow::anyhow!("{e}"))
-                    .with_context(|| format!("failed to decode table {tag:?}"))?;
-                Ok((*id, map))
-            })
-            .collect::<anyhow::Result<_>>()?;
-        match fmt {
-            crate::Fmt::Pretty => render_pretty(&chip_maps, fields),
-            crate::Fmt::Json => render_json(&chip_maps, fields)?,
-        }
+    match table {
+        Some(crate::Table::ReadOnly) => get_simple(chips, "boardcfg", fmt, fields),
+        Some(crate::Table::FlashInfo) => get_simple(chips, "flshinfo", fmt, fields),
+        Some(crate::Table::FwTable) | None => get_fw_table(chips, fmt, delta, fields),
+    }
+}
+
+/// Render a single-source table (boardcfg, flshinfo) as a two-column
+/// `Field | Value`.
+fn get_simple(
+    chips: &[Chip<'_>],
+    tag: &str,
+    fmt: &crate::Fmt,
+    fields: &[String],
+) -> anyhow::Result<()> {
+    let chip_maps: Vec<(usize, HashMap<String, Value>)> = chips
+        .iter()
+        .map(|(id, bh)| -> anyhow::Result<_> {
+            let map = bh
+                .decode_boot_fs_table(tag)
+                .map_err(|e| anyhow::anyhow!("{e}"))
+                .with_context(|| format!("decoding {tag}"))?;
+            Ok((*id, map))
+        })
+        .collect::<anyhow::Result<_>>()?;
+    match fmt {
+        crate::Fmt::Pretty => render_pretty(&chip_maps, fields),
+        crate::Fmt::Json => render_json(&chip_maps, fields)?,
     }
     Ok(())
+}
+
+/// Render the fw-table view as a three-column `Field | Default | Override`,
+/// with `Default` from `cmfwcfg` and `Override` from the active
+/// `ccfgovr` bank. `delta` filters to rows whose override is set.
+fn get_fw_table(
+    chips: &[Chip<'_>],
+    fmt: &crate::Fmt,
+    delta: bool,
+    fields: &[String],
+) -> anyhow::Result<()> {
+    let per_chip: Vec<FwView> = chips
+        .iter()
+        .map(|(id, bh)| -> anyhow::Result<_> {
+            let cmfwcfg = bh
+                .decode_boot_fs_table("cmfwcfg")
+                .map_err(|e| anyhow::anyhow!("{e}"))
+                .context("decoding cmfwcfg")?;
+            let mut ovr = bh
+                .ccfgovr_read()
+                .map_err(|e| anyhow::anyhow!("{e}"))
+                .context("reading ccfgovr")?;
+            prune_for_display(&mut ovr);
+            Ok((*id, cmfwcfg, ovr))
+        })
+        .collect::<anyhow::Result<_>>()?;
+    match fmt {
+        crate::Fmt::Pretty => render_fw_table_pretty(&per_chip, delta, fields),
+        crate::Fmt::Json => render_fw_table_json(&per_chip, delta, fields)?,
+    }
+    Ok(())
+}
+
+fn render_fw_table_pretty(per_chip: &[FwView], delta: bool, fields: &[String]) {
+    for (i, (id, cmfwcfg, ovr)) in per_chip.iter().enumerate() {
+        let rows = fw_table_rows(cmfwcfg, ovr, delta, fields);
+        if per_chip.len() > 1 {
+            if i > 0 {
+                println!();
+            }
+            println!("=== chip {id} ===");
+        }
+        if rows.is_empty() {
+            let msg = if !fields.is_empty() {
+                "No matching fields."
+            } else if delta {
+                "No overrides set."
+            } else {
+                "No fields."
+            };
+            println!("{msg}");
+            continue;
+        }
+        let mut builder = Builder::default();
+        builder.push_record(["Field", "Default", "Override"]);
+        for (field, default, override_) in rows {
+            builder.push_record([field.as_str(), default.as_str(), override_.as_str()]);
+        }
+        let mut tbl = builder.build();
+        tbl.with(Style::modern_rounded());
+        println!("{tbl}");
+    }
+}
+
+fn render_fw_table_json(per_chip: &[FwView], delta: bool, fields: &[String]) -> anyhow::Result<()> {
+    let obj: serde_json::Map<String, Value> = per_chip
+        .iter()
+        .map(|(id, cmfwcfg, ovr)| {
+            let rows = fw_table_rows(cmfwcfg, ovr, delta, fields);
+            let entries: serde_json::Map<String, Value> = rows
+                .into_iter()
+                .map(|(field, default, override_)| {
+                    let mut entry = serde_json::Map::new();
+                    entry.insert("default".to_string(), parse_or_string(&default));
+                    entry.insert("override".to_string(), parse_or_string(&override_));
+                    (field, Value::Object(entry))
+                })
+                .collect();
+            (id.to_string(), Value::Object(entries))
+        })
+        .collect();
+    let out = if obj.len() == 1 {
+        obj.into_iter().next().expect("len==1").1
+    } else {
+        Value::Object(obj)
+    };
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&out).context("rendering JSON")?
+    );
+    Ok(())
+}
+
+/// Build `(field, default, override)` rows for the fw-table view.
+/// `delta` keeps only rows whose `override` is set.
+fn fw_table_rows(
+    cmfwcfg: &HashMap<String, Value>,
+    ovr: &HashMap<String, Value>,
+    delta: bool,
+    fields: &[String],
+) -> Vec<(String, String, String)> {
+    let mut cmfwcfg_rows = Vec::new();
+    flatten(cmfwcfg, "", &mut cmfwcfg_rows);
+    let cmfwcfg_lookup: HashMap<String, String> = cmfwcfg_rows.iter().cloned().collect();
+
+    let mut ovr_rows = Vec::new();
+    flatten(ovr, "", &mut ovr_rows);
+    let ovr_lookup: HashMap<String, String> = ovr_rows.iter().cloned().collect();
+
+    let mut rows: Vec<(String, String, String)> = Vec::new();
+    for (field, default) in &cmfwcfg_rows {
+        let override_ = ovr_lookup.get(field).cloned().unwrap_or_default();
+        if delta && override_.is_empty() {
+            continue;
+        }
+        rows.push((field.clone(), default.clone(), override_));
+    }
+    // Surface override-only fields (shouldn't normally happen, but be safe).
+    for (field, override_) in &ovr_rows {
+        if !cmfwcfg_lookup.contains_key(field) {
+            rows.push((field.clone(), String::new(), override_.clone()));
+        }
+    }
+    if !fields.is_empty() {
+        rows.retain(|(f, _, _)| {
+            fields
+                .iter()
+                .any(|p| f == p || f.starts_with(&format!("{p}.")))
+        });
+    }
+    rows
+}
+
+fn parse_or_string(s: &str) -> Value {
+    if s.is_empty() {
+        Value::Null
+    } else {
+        serde_json::from_str(s).unwrap_or_else(|_| Value::String(s.to_string()))
+    }
 }
 
 fn render_pretty(chip_maps: &[(usize, HashMap<String, Value>)], fields: &[String]) {
@@ -59,6 +209,10 @@ fn render_pretty(chip_maps: &[(usize, HashMap<String, Value>)], fields: &[String
     let Some((_, first_rows)) = per_chip.first() else {
         return;
     };
+    if per_chip.iter().all(|(_, rows)| rows.is_empty()) {
+        println!("No matching fields.");
+        return;
+    }
 
     let multi = per_chip.len() > 1 && per_chip[1..].iter().any(|(_, rows)| rows != first_rows);
 
@@ -118,13 +272,13 @@ fn render_json(
         if fields.is_empty() {
             println!(
                 "{}",
-                serde_json::to_string_pretty(map).context("failed to serialize table to JSON")?
+                serde_json::to_string_pretty(map).context("rendering JSON")?
             );
         } else {
             let obj = filtered_obj(map, fields);
             println!(
                 "{}",
-                serde_json::to_string_pretty(&obj).context("failed to serialize fields to JSON")?
+                serde_json::to_string_pretty(&obj).context("rendering JSON")?
             );
         }
     } else {
@@ -132,7 +286,7 @@ fn render_json(
             .iter()
             .map(|(id, map)| -> anyhow::Result<(String, Value)> {
                 let val = if fields.is_empty() {
-                    serde_json::to_value(map).context("failed to serialize table")?
+                    serde_json::to_value(map).context("rendering JSON")?
                 } else {
                     Value::Object(filtered_obj(map, fields))
                 };
@@ -141,7 +295,7 @@ fn render_json(
             .collect::<anyhow::Result<_>>()?;
         println!(
             "{}",
-            serde_json::to_string_pretty(&outer).context("failed to serialize tables to JSON")?
+            serde_json::to_string_pretty(&outer).context("rendering JSON")?
         );
     }
     Ok(())
@@ -171,134 +325,156 @@ struct Diff {
 
 fn print_diff_table(chips: &[(usize, &[Diff])]) {
     if chips.len() == 1 {
-        let (id, diffs) = chips[0];
-        if !diffs.is_empty() {
-            let old_header = format!("Old ({id})");
-            let mut builder = Builder::default();
-            builder.push_record(["Field", &old_header, "New"]);
-            for Diff { field, old, new } in diffs {
-                builder.push_record([field.as_str(), old.as_str(), new.as_str()]);
-            }
-            let mut tbl = builder.build();
-            tbl.with(Style::modern_rounded());
-            println!("{tbl}");
-        }
-        println!("{} change(s) on chip {id}", diffs.len());
+        print_single_chip_diff(chips[0]);
     } else {
-        // Collect all changed fields across chips, preserving first-seen order.
-        let mut seen = std::collections::HashSet::new();
-        let mut all_fields: Vec<String> = Vec::new();
-        for (_, diffs) in chips {
-            for d in *diffs {
-                if seen.insert(d.field.clone()) {
-                    all_fields.push(d.field.clone());
-                }
-            }
-        }
-        if !all_fields.is_empty() {
-            // Build per-chip old-value vectors across all changed fields, then group.
-            let old_vals: Vec<Vec<String>> = chips
-                .iter()
-                .map(|(_, diffs)| {
-                    all_fields
-                        .iter()
-                        .map(|f| {
-                            diffs
-                                .iter()
-                                .find(|d| &d.field == f)
-                                .map_or_else(|| "\u{2014}".to_string(), |d| d.old.clone())
-                        })
-                        .collect()
-                })
-                .collect();
-            let groups = group_by_pattern(&old_vals);
-
-            let mut builder = Builder::default();
-            let mut header = vec!["Field".to_string()];
-            for group in &groups {
-                let ids = group
-                    .iter()
-                    .map(|&i| chips[i].0.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                header.push(format!("Old ({ids})"));
-            }
-            header.push("New".to_string());
-            builder.push_record(header);
-            for (fi, field) in all_fields.iter().enumerate() {
-                let new_val = chips
-                    .iter()
-                    .find_map(|(_, diffs)| {
-                        diffs
-                            .iter()
-                            .find(|d| &d.field == field)
-                            .map(|d| d.new.clone())
-                    })
-                    .unwrap_or_default();
-                let mut row = vec![field.clone()];
-                for group in &groups {
-                    row.push(old_vals[group[0]][fi].clone());
-                }
-                row.push(new_val);
-                builder.push_record(row);
-            }
-            let mut tbl = builder.build();
-            tbl.with(Style::modern_rounded());
-            println!("{tbl}");
-        }
-        // Group chips by identical change count so "0 change(s) on chip 0, 0 change(s) on chip 1"
-        // collapses to "0 change(s) on chips 0, 1".
-        let mut count_groups: Vec<(usize, Vec<usize>)> = Vec::new();
-        for (id, diffs) in chips {
-            let n = diffs.len();
-            if let Some(g) = count_groups.iter_mut().find(|(c, _)| *c == n) {
-                g.1.push(*id);
-            } else {
-                count_groups.push((n, vec![*id]));
-            }
-        }
-        let summary: Vec<String> = count_groups
-            .iter()
-            .map(|(n, ids)| {
-                let label = if ids.len() == 1 {
-                    format!("chip {}", ids[0])
-                } else {
-                    format!(
-                        "chips {}",
-                        ids.iter()
-                            .map(usize::to_string)
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    )
-                };
-                format!("{n} change(s) on {label}")
-            })
-            .collect();
-        println!("{}", summary.join("\n"));
+        print_multi_chip_diff(chips);
     }
 }
 
-fn push_diffs(path: &str, before: Option<&Value>, after: Option<&Value>, out: &mut Vec<Diff>) {
-    if let (Some(Value::Object(b_map)), Some(Value::Object(a_map))) = (before, after) {
-        let mut keys: std::collections::BTreeSet<&String> = b_map.keys().collect();
-        keys.extend(a_map.keys());
-        for key in keys {
-            push_diffs(
-                &format!("{path}.{key}"),
-                b_map.get(key),
-                a_map.get(key),
-                out,
-            );
+fn print_single_chip_diff((id, diffs): (usize, &[Diff])) {
+    if !diffs.is_empty() {
+        let old_header = format!("Old ({id})");
+        let mut builder = Builder::default();
+        builder.push_record(["Field", &old_header, "New"]);
+        for Diff { field, old, new } in diffs {
+            builder.push_record([field.as_str(), old.as_str(), new.as_str()]);
         }
-    } else {
-        let old = fmt_val(before);
-        let new = fmt_val(after);
-        if old != new {
-            out.push(Diff {
-                field: path.to_string(),
-                old,
-                new,
-            });
+        let mut tbl = builder.build();
+        tbl.with(Style::modern_rounded());
+        println!("{tbl}");
+    }
+    println!("{} change(s) on chip {id}", diffs.len());
+}
+
+fn print_multi_chip_diff(chips: &[(usize, &[Diff])]) {
+    // Collect changed fields across chips, preserving first-seen order
+    let mut seen = std::collections::HashSet::new();
+    let mut fields: Vec<String> = Vec::new();
+    for (_, diffs) in chips {
+        for d in *diffs {
+            if seen.insert(d.field.clone()) {
+                fields.push(d.field.clone());
+            }
+        }
+    }
+    if !fields.is_empty() {
+        print_multi_chip_table(chips, &fields);
+    }
+    println!("{}", multi_chip_summary(chips).join("\n"));
+}
+
+fn print_multi_chip_table(chips: &[(usize, &[Diff])], fields: &[String]) {
+    // Per-chip old-value vectors, grouped by identical pattern
+    let old_vals: Vec<Vec<String>> = chips
+        .iter()
+        .map(|(_, diffs)| {
+            fields
+                .iter()
+                .map(|f| {
+                    diffs
+                        .iter()
+                        .find(|d| &d.field == f)
+                        .map_or_else(|| "\u{2014}".to_string(), |d| d.old.clone())
+                })
+                .collect()
+        })
+        .collect();
+    let groups = group_by_pattern(&old_vals);
+
+    let mut builder = Builder::default();
+    let mut header = vec!["Field".to_string()];
+    for group in &groups {
+        let ids = group
+            .iter()
+            .map(|&i| chips[i].0.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        header.push(format!("Old ({ids})"));
+    }
+    header.push("New".to_string());
+    builder.push_record(header);
+    for (fi, field) in fields.iter().enumerate() {
+        let new_val = chips
+            .iter()
+            .find_map(|(_, diffs)| {
+                diffs
+                    .iter()
+                    .find(|d| &d.field == field)
+                    .map(|d| d.new.clone())
+            })
+            .unwrap_or_default();
+        let mut row = vec![field.clone()];
+        for group in &groups {
+            row.push(old_vals[group[0]][fi].clone());
+        }
+        row.push(new_val);
+        builder.push_record(row);
+    }
+    let mut tbl = builder.build();
+    tbl.with(Style::modern_rounded());
+    println!("{tbl}");
+}
+
+fn multi_chip_summary(chips: &[(usize, &[Diff])]) -> Vec<String> {
+    // Group chips by identical change count so equal counts collapse to a
+    // single line ("N change(s) on chips X, Y")
+    let mut groups: Vec<(usize, Vec<usize>)> = Vec::new();
+    for (id, diffs) in chips {
+        let n = diffs.len();
+        if let Some(g) = groups.iter_mut().find(|(c, _)| *c == n) {
+            g.1.push(*id);
+        } else {
+            groups.push((n, vec![*id]));
+        }
+    }
+    groups
+        .iter()
+        .map(|(n, ids)| {
+            let label = if ids.len() == 1 {
+                format!("chip {}", ids[0])
+            } else {
+                format!(
+                    "chips {}",
+                    ids.iter()
+                        .map(usize::to_string)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            };
+            format!("{n} change(s) on {label}")
+        })
+        .collect()
+}
+
+fn push_diffs(path: &str, before: Option<&Value>, after: Option<&Value>, out: &mut Vec<Diff>) {
+    match (before, after) {
+        (Some(Value::Object(b)), Some(Value::Object(a))) => {
+            let mut keys: std::collections::BTreeSet<&String> = b.keys().collect();
+            keys.extend(a.keys());
+            for key in keys {
+                push_diffs(&format!("{path}.{key}"), b.get(key), a.get(key), out);
+            }
+        }
+        (Some(Value::Object(b)), None) => {
+            for (key, val) in b {
+                push_diffs(&format!("{path}.{key}"), Some(val), None, out);
+            }
+        }
+        (None, Some(Value::Object(a))) => {
+            for (key, val) in a {
+                push_diffs(&format!("{path}.{key}"), None, Some(val), out);
+            }
+        }
+        _ => {
+            let old = fmt_val(before);
+            let new = fmt_val(after);
+            if old != new {
+                out.push(Diff {
+                    field: path.to_string(),
+                    old,
+                    new,
+                });
+            }
         }
     }
 }
@@ -370,21 +546,42 @@ impl<'a> Set<'a> {
     pub fn run(self) -> anyhow::Result<()> {
         let mut writes: Vec<Write<'_>> = Vec::new();
         for (id, bh) in self.chips {
-            let mut map = bh
+            let cmfwcfg = bh
                 .decode_boot_fs_table("cmfwcfg")
                 .map_err(|e| anyhow::anyhow!("{e}"))
-                .context("failed to decode cmfwcfg")?;
-            let mut diffs: Vec<Diff> = Vec::new();
+                .context("decoding cmfwcfg")?;
+            let before_map = bh
+                .ccfgovr_read()
+                .map_err(|e| anyhow::anyhow!("{e}"))
+                .context("reading ccfgovr")?;
+            let mut new_map = before_map.clone();
+            let mut paths: Vec<&str> = Vec::new();
             for spec in &self.fields {
                 let (path, raw) = spec
                     .split_once('=')
                     .with_context(|| format!("invalid spec {spec:?}: expected field=value"))?;
-                let before = get_value(&map, path).cloned();
-                patch_field(&mut map, path, raw)?;
-                let after = get_value(&map, path).cloned();
-                push_diffs(path, before.as_ref(), after.as_ref(), &mut diffs);
+                // Look up the field's type from cmfwcfg (the FwTable schema
+                // covers a superset of FwTableOverride and uses the same
+                // types for matching fields, so it's a safe type source).
+                let mut typed = get_value(&cmfwcfg, path)
+                    .with_context(|| format!("unknown field path: {path}"))?
+                    .clone();
+                set_value(&mut typed, path, raw)?;
+                insert_at_path(&mut new_map, path, typed);
+                paths.push(path);
             }
-            writes.push((*id, bh, map, diffs));
+            // Round-trip through FwTableOverride: any path not in the
+            // override proto is silently dropped by serde.
+            let round_tripped = override_round_trip(&new_map);
+            for path in &paths {
+                anyhow::ensure!(
+                    get_value(&new_map, path) == get_value(&round_tripped, path),
+                    "cannot override {path}",
+                );
+            }
+            let mut diffs: Vec<Diff> = Vec::new();
+            collect_diffs(&before_map, &new_map, &mut diffs);
+            writes.push((*id, bh, new_map, diffs));
         }
         let chip_diffs: Vec<(usize, &[Diff])> = writes
             .iter()
@@ -393,9 +590,9 @@ impl<'a> Set<'a> {
         print_diff_table(&chip_diffs);
         if !self.dry_run {
             for (_, bh, map, _) in writes {
-                bh.encode_and_write_boot_fs_table(map, "cmfwcfg")
+                bh.ccfgovr_write(map)
                     .map_err(|e| anyhow::anyhow!("{e}"))
-                    .context("failed to write cmfwcfg")?;
+                    .context("writing ccfgovr")?;
             }
         }
         Ok(())
@@ -430,36 +627,22 @@ impl<'a> Reset<'a> {
     pub fn run(self) -> anyhow::Result<()> {
         let mut writes: Vec<Write<'_>> = Vec::new();
         for (id, bh) in self.chips {
-            let orig = bh
-                .decode_boot_fs_table("origcfg")
+            let before_map = bh
+                .ccfgovr_read()
                 .map_err(|e| anyhow::anyhow!("{e}"))
-                .context("failed to decode origcfg")?;
-            let mut current = bh
-                .decode_boot_fs_table("cmfwcfg")
-                .map_err(|e| anyhow::anyhow!("{e}"))
-                .context("failed to decode cmfwcfg")?;
-            let mut diffs: Vec<Diff> = Vec::new();
-            if self.fields.is_empty() {
-                for (key, val) in &orig {
-                    let before = current.get(key);
-                    if before != Some(val) {
-                        push_diffs(key, before, Some(val), &mut diffs);
-                        current.insert(key.clone(), val.clone());
-                    }
-                }
+                .context("reading ccfgovr")?;
+            let new_map: HashMap<String, Value> = if self.fields.is_empty() {
+                HashMap::new()
             } else {
+                let mut m = before_map.clone();
                 for path in &self.fields {
-                    let orig_val = get_value(&orig, path)
-                        .with_context(|| format!("unknown field path: {path}"))?
-                        .clone();
-                    let before = get_value(&current, path).cloned();
-                    if before.as_ref() != Some(&orig_val) {
-                        push_diffs(path, before.as_ref(), Some(&orig_val), &mut diffs);
-                        put_field(&mut current, path, orig_val)?;
-                    }
+                    remove_at_path(&mut m, path);
                 }
-            }
-            writes.push((*id, bh, current, diffs));
+                m
+            };
+            let mut diffs: Vec<Diff> = Vec::new();
+            collect_diffs(&before_map, &new_map, &mut diffs);
+            writes.push((*id, bh, new_map, diffs));
         }
         let chip_diffs: Vec<(usize, &[Diff])> = writes
             .iter()
@@ -468,9 +651,9 @@ impl<'a> Reset<'a> {
         print_diff_table(&chip_diffs);
         if !self.dry_run {
             for (_, bh, map, _) in writes {
-                bh.encode_and_write_boot_fs_table(map, "cmfwcfg")
+                bh.ccfgovr_write(map)
                     .map_err(|e| anyhow::anyhow!("{e}"))
-                    .context("failed to write cmfwcfg")?;
+                    .context("writing ccfgovr")?;
             }
         }
         Ok(())
@@ -502,64 +685,144 @@ fn get_nested<'a>(val: &'a Value, path: &str) -> Option<&'a Value> {
     }
 }
 
-fn patch_field(map: &mut HashMap<String, Value>, path: &str, raw: &str) -> anyhow::Result<()> {
-    let (head, tail) = split(path);
-    let val = map
-        .get_mut(head)
-        .with_context(|| format!("unknown field path: {path}"))?;
-    match tail {
-        None => set_value(val, path, raw),
-        Some(rest) => patch_nested(val, path, rest, raw),
-    }
-}
-
-fn patch_nested(val: &mut Value, full: &str, rest: &str, raw: &str) -> anyhow::Result<()> {
-    let (head, tail) = split(rest);
-    let Value::Object(map) = val else {
-        anyhow::bail!("unknown field path: {full}");
-    };
-    let val = map
-        .get_mut(head)
-        .with_context(|| format!("unknown field path: {full}"))?;
-    match tail {
-        None => set_value(val, full, raw),
-        Some(rest) => patch_nested(val, full, rest, raw),
-    }
-}
-
-fn put_field(map: &mut HashMap<String, Value>, path: &str, new: Value) -> anyhow::Result<()> {
+/// Insert `value` at `path`, creating intermediate `Value::Object`s as
+/// needed and overwriting any non-object intermediates.
+fn insert_at_path(map: &mut HashMap<String, Value>, path: &str, value: Value) {
     let (head, tail) = split(path);
     match tail {
         None => {
-            map.insert(head.to_string(), new);
-            Ok(())
+            map.insert(head.to_string(), value);
         }
         Some(rest) => {
-            let val = map
-                .get_mut(head)
-                .with_context(|| format!("unknown field path: {path}"))?;
-            put_nested(val, path, rest, new)
+            let entry = map
+                .entry(head.to_string())
+                .or_insert_with(|| Value::Object(serde_json::Map::new()));
+            if !matches!(entry, Value::Object(_)) {
+                *entry = Value::Object(serde_json::Map::new());
+            }
+            let Value::Object(obj) = entry else {
+                unreachable!()
+            };
+            insert_in_object(obj, rest, value);
         }
     }
 }
 
-fn put_nested(val: &mut Value, full: &str, rest: &str, new: Value) -> anyhow::Result<()> {
-    let (head, tail) = split(rest);
-    let Value::Object(map) = val else {
-        anyhow::bail!("unknown field path: {full}");
-    };
+fn insert_in_object(obj: &mut serde_json::Map<String, Value>, path: &str, value: Value) {
+    let (head, tail) = split(path);
     match tail {
         None => {
-            map.insert(head.to_string(), new);
-            Ok(())
+            obj.insert(head.to_string(), value);
         }
         Some(rest) => {
-            let val = map
-                .get_mut(head)
-                .with_context(|| format!("unknown field path: {full}"))?;
-            put_nested(val, full, rest, new)
+            let entry = obj
+                .entry(head.to_string())
+                .or_insert_with(|| Value::Object(serde_json::Map::new()));
+            if !matches!(entry, Value::Object(_)) {
+                *entry = Value::Object(serde_json::Map::new());
+            }
+            let Value::Object(child) = entry else {
+                unreachable!()
+            };
+            insert_in_object(child, rest, value);
         }
     }
+}
+
+/// Remove the leaf at `path`. Empty intermediate `Value::Object`s left
+/// behind are pruned.
+fn remove_at_path(map: &mut HashMap<String, Value>, path: &str) {
+    let (head, tail) = split(path);
+    match tail {
+        None => {
+            map.remove(head);
+        }
+        Some(rest) => {
+            let Some(Value::Object(child)) = map.get_mut(head) else {
+                return;
+            };
+            remove_in_object(child, rest);
+            if child.is_empty() {
+                map.remove(head);
+            }
+        }
+    }
+}
+
+fn remove_in_object(obj: &mut serde_json::Map<String, Value>, path: &str) {
+    let (head, tail) = split(path);
+    match tail {
+        None => {
+            obj.remove(head);
+        }
+        Some(rest) => {
+            let Some(Value::Object(child)) = obj.get_mut(head) else {
+                return;
+            };
+            remove_in_object(child, rest);
+            if child.is_empty() {
+                obj.remove(head);
+            }
+        }
+    }
+}
+
+/// Serialize a `HashMap` through `FwTableOverride` and back. Fields not in
+/// the override schema get silently dropped by serde, so this is the
+/// allow-list filter used by `Set::run` to reject unsupported paths.
+fn override_round_trip(map: &HashMap<String, Value>) -> HashMap<String, Value> {
+    let ovr: FwTableOverride = spirom_tables::from_hash_map(map.clone());
+    spirom_tables::to_hash_map(ovr)
+}
+
+/// Collect leaf-level diffs between two override maps. Keys present in one
+/// and missing in the other map to `before=Some/after=None` (or vice versa)
+/// and recurse into matching `Value::Object` pairs.
+fn collect_diffs(
+    before: &HashMap<String, Value>,
+    after: &HashMap<String, Value>,
+    out: &mut Vec<Diff>,
+) {
+    let mut keys: std::collections::BTreeSet<&String> = before.keys().collect();
+    keys.extend(after.keys());
+    for key in keys {
+        push_diffs(key, before.get(key), after.get(key), out);
+    }
+}
+
+/// Returns true if a value is the proto3 default (and would be omitted
+/// from the encoded wire form).
+fn is_empty_value(v: &Value) -> bool {
+    match v {
+        Value::Null => true,
+        Value::Bool(b) => !b,
+        Value::Number(n) => {
+            n.as_u64() == Some(0) || n.as_i64() == Some(0) || n.as_f64() == Some(0.0)
+        }
+        Value::String(s) => s.is_empty(),
+        Value::Array(a) => a.is_empty(),
+        Value::Object(m) => m.is_empty() || m.values().all(is_empty_value),
+    }
+}
+
+/// Strip empty/default values from a `HashMap` so the override view shows
+/// only fields that are actually overridden on the wire.
+fn prune_for_display(map: &mut HashMap<String, Value>) {
+    for v in map.values_mut() {
+        if let Value::Object(obj) = v {
+            prune_object(obj);
+        }
+    }
+    map.retain(|_, v| !is_empty_value(v));
+}
+
+fn prune_object(obj: &mut serde_json::Map<String, Value>) {
+    for v in obj.values_mut() {
+        if let Value::Object(child) = v {
+            prune_object(child);
+        }
+    }
+    obj.retain(|_, v| !is_empty_value(v));
 }
 
 fn set_value(val: &mut Value, path: &str, raw: &str) -> anyhow::Result<()> {
