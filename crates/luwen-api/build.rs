@@ -6,11 +6,6 @@ fn try_to_compiled_proto_file_by_name(name: &str, out_dir: &str) -> Result<(), s
     let mut protoc_build_config = prost_build::Config::new();
     protoc_build_config.out_dir(out_dir);
 
-    // Required for the proto3 `optional` keyword in fw_table_override.proto
-    // on protoc < 3.21 (e.g. Ubuntu 22.04's bundled protobuf-compiler).
-    // No-op on newer protoc.
-    protoc_build_config.protoc_arg("--experimental_allow_proto3_optional");
-
     // Add `#[derive(Serialize)]` to all generated messages for easy HashMap conversion
     protoc_build_config.type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]");
 
@@ -38,6 +33,12 @@ fn compiled_proto_file_by_name(
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Use a vendored protoc so the build works regardless of the system
+    // protobuf-compiler version. fw_table_override.proto uses proto3
+    // `optional`, which needs protoc >= 3.15; CI environments often ship
+    // older protoc that doesn't recognise the feature.
+    env::set_var("PROTOC", protoc_bin_vendored::protoc_bin_path()?);
+
     // Get the output directory from Cargo
     let out_dir = env::var("OUT_DIR")?;
     compiled_proto_file_by_name("fw_table", &out_dir)?;
