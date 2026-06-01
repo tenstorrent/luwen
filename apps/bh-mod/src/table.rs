@@ -237,12 +237,7 @@ fn render_pretty(chip_maps: &[(usize, HashMap<String, Value>)], fields: &[String
 
         let mut header = vec!["Field".to_string()];
         for group in &groups {
-            let ids = group
-                .iter()
-                .map(|&i| per_chip[i].0.to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
-            header.push(ids);
+            header.push(compress_ids(group.iter().map(|&i| per_chip[i].0)));
         }
         builder.push_record(header);
         for (fi, (name, _)) in first_rows.iter().enumerate() {
@@ -384,12 +379,10 @@ fn print_multi_chip_table(chips: &[(usize, &[Diff])], fields: &[String]) {
     let mut builder = Builder::default();
     let mut header = vec!["Field".to_string()];
     for group in &groups {
-        let ids = group
-            .iter()
-            .map(|&i| chips[i].0.to_string())
-            .collect::<Vec<_>>()
-            .join(", ");
-        header.push(format!("Old ({ids})"));
+        header.push(format!(
+            "Old ({})",
+            compress_ids(group.iter().map(|&i| chips[i].0))
+        ));
     }
     header.push("New".to_string());
     builder.push_record(header);
@@ -433,13 +426,7 @@ fn multi_chip_summary(chips: &[(usize, &[Diff])]) -> Vec<String> {
             let label = if ids.len() == 1 {
                 format!("chip {}", ids[0])
             } else {
-                format!(
-                    "chips {}",
-                    ids.iter()
-                        .map(usize::to_string)
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
+                format!("chips {}", compress_ids(ids.iter().copied()))
             };
             format!("{n} change(s) on {label}")
         })
@@ -477,6 +464,38 @@ fn push_diffs(path: &str, before: Option<&Value>, after: Option<&Value>, out: &m
             }
         }
     }
+}
+
+/// Render a list of chip IDs as compact contiguous ranges:
+/// `[0,1,2,3] -> "0-3"`, `[0,1,3,4] -> "0-1, 3-4"`, `[5] -> "5"`.
+fn compress_ids(ids: impl IntoIterator<Item = usize>) -> String {
+    let mut sorted: Vec<usize> = ids.into_iter().collect();
+    sorted.sort_unstable();
+    sorted.dedup();
+    let mut parts: Vec<String> = Vec::new();
+    let mut iter = sorted.into_iter();
+    let Some(first) = iter.next() else {
+        return String::new();
+    };
+    let (mut start, mut end) = (first, first);
+    let push = |parts: &mut Vec<String>, s: usize, e: usize| {
+        parts.push(if s == e {
+            s.to_string()
+        } else {
+            format!("{s}-{e}")
+        });
+    };
+    for id in iter {
+        if id == end + 1 {
+            end = id;
+        } else {
+            push(&mut parts, start, end);
+            start = id;
+            end = id;
+        }
+    }
+    push(&mut parts, start, end);
+    parts.join(", ")
 }
 
 fn group_by_pattern(patterns: &[Vec<String>]) -> Vec<Vec<usize>> {
