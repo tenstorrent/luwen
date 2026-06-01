@@ -658,6 +658,7 @@ impl<'a> Set<'a> {
             }
             let mut diffs: Vec<Diff> = Vec::new();
             collect_diffs(&before_map, &new_map, &mut diffs);
+            fill_default_fallbacks(&mut diffs, &cmfwcfg);
             writes.push((*id, bh, new_map, diffs));
         }
         let chip_diffs: Vec<(usize, &[Diff])> = writes
@@ -673,6 +674,23 @@ impl<'a> Set<'a> {
             }
         }
         Ok(())
+    }
+}
+
+/// Fill empty `old`/`new` strings in diffs with the cmfwcfg default so
+/// the diff table shows what value was (or will be) in effect when the
+/// override is unset, rather than a blank cell.
+fn fill_default_fallbacks(diffs: &mut [Diff], cmfwcfg: &HashMap<String, Value>) {
+    for d in diffs.iter_mut() {
+        let Some(cmf) = get_value(cmfwcfg, &d.field).map(Value::to_string) else {
+            continue;
+        };
+        if d.old.is_empty() {
+            d.old.clone_from(&cmf);
+        }
+        if d.new.is_empty() {
+            d.new = cmf;
+        }
     }
 }
 
@@ -704,6 +722,10 @@ impl<'a> Reset<'a> {
     pub fn run(self) -> anyhow::Result<()> {
         let mut writes: Vec<Write<'_>> = Vec::new();
         for (id, bh) in self.chips {
+            let cmfwcfg = bh
+                .decode_boot_fs_table("cmfwcfg")
+                .map_err(|e| anyhow::anyhow!("{e}"))
+                .context("decoding cmfwcfg")?;
             let before_map = bh
                 .ccfgovr_read()
                 .map_err(|e| anyhow::anyhow!("{e}"))
@@ -719,6 +741,7 @@ impl<'a> Reset<'a> {
             };
             let mut diffs: Vec<Diff> = Vec::new();
             collect_diffs(&before_map, &new_map, &mut diffs);
+            fill_default_fallbacks(&mut diffs, &cmfwcfg);
             writes.push((*id, bh, new_map, diffs));
         }
         let chip_diffs: Vec<(usize, &[Diff])> = writes
