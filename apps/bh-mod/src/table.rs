@@ -10,6 +10,8 @@ use tabled::settings::Style;
 type Chip<'a> = (usize, &'a Blackhole);
 type Write<'a> = (usize, &'a Blackhole, HashMap<String, Value>, Vec<Diff>);
 type FwView = (usize, HashMap<String, Value>, HashMap<String, Value>);
+type FwRow = (String, String, String);
+type ChipRows = (usize, Vec<FwRow>);
 
 pub fn get(
     chips: &[Chip<'_>],
@@ -82,34 +84,76 @@ fn get_fw_table(
 }
 
 fn render_fw_table_pretty(per_chip: &[FwView], delta: bool, fields: &[String]) {
-    for (i, (id, cmfwcfg, ovr)) in per_chip.iter().enumerate() {
-        let rows = fw_table_rows(cmfwcfg, ovr, delta, fields);
-        if per_chip.len() > 1 {
-            if i > 0 {
-                println!();
-            }
-            println!("=== chip {id} ===");
-        }
-        if rows.is_empty() {
-            let msg = if !fields.is_empty() {
-                "No matching fields."
-            } else if delta {
-                "No overrides set."
-            } else {
-                "No fields."
-            };
-            println!("{msg}");
-            continue;
-        }
-        let mut builder = Builder::default();
-        builder.push_record(["Field", "Default", "Override"]);
-        for (field, default, override_) in rows {
-            builder.push_record([field.as_str(), default.as_str(), override_.as_str()]);
-        }
-        let mut tbl = builder.build();
-        tbl.with(Style::modern_rounded());
-        println!("{tbl}");
+    let per_chip_rows: Vec<ChipRows> = per_chip
+        .iter()
+        .map(|(id, cmfwcfg, ovr)| (*id, fw_table_rows(cmfwcfg, ovr, delta, fields)))
+        .collect();
+    if per_chip_rows.iter().all(|(_, r)| r.is_empty()) {
+        let msg = if !fields.is_empty() {
+            "No matching fields."
+        } else if delta {
+            "No overrides set."
+        } else {
+            "No fields."
+        };
+        println!("{msg}");
+        return;
     }
+
+    // Group chips whose (default, override) rows are identical so their
+    // columns can share a header. The multi-group case collapses to one
+    // pair of columns labelled with a chip range.
+    let mut groups: Vec<Vec<usize>> = Vec::new();
+    for (i, (_, rows)) in per_chip_rows.iter().enumerate() {
+        if let Some(g) = groups.iter_mut().find(|g| per_chip_rows[g[0]].1 == *rows) {
+            g.push(i);
+        } else {
+            groups.push(vec![i]);
+        }
+    }
+
+    // Union of fields across all chips, preserving the per-chip ordering.
+    let mut seen = std::collections::HashSet::new();
+    let mut fields_in_order: Vec<String> = Vec::new();
+    for (_, rows) in &per_chip_rows {
+        for (f, _, _) in rows {
+            if seen.insert(f.clone()) {
+                fields_in_order.push(f.clone());
+            }
+        }
+    }
+
+    let single_group = groups.len() == 1;
+    let mut builder = Builder::default();
+    let mut header = vec!["Field".to_string()];
+    for group in &groups {
+        if single_group {
+            header.push("Default".to_string());
+            header.push("Override".to_string());
+        } else {
+            let label = compress_ids(group.iter().map(|&i| per_chip_rows[i].0));
+            header.push(format!("Default ({label})"));
+            header.push(format!("Override ({label})"));
+        }
+    }
+    builder.push_record(header);
+    for field in &fields_in_order {
+        let mut row = vec![field.clone()];
+        for group in &groups {
+            let rep_rows = &per_chip_rows[group[0]].1;
+            let (default, override_) = rep_rows
+                .iter()
+                .find(|(f, _, _)| f == field)
+                .map(|(_, d, o)| (d.clone(), o.clone()))
+                .unwrap_or_default();
+            row.push(default);
+            row.push(override_);
+        }
+        builder.push_record(row);
+    }
+    let mut tbl = builder.build();
+    tbl.with(Style::modern_rounded());
+    println!("{tbl}");
 }
 
 fn render_fw_table_json(per_chip: &[FwView], delta: bool, fields: &[String]) -> anyhow::Result<()> {
@@ -148,7 +192,7 @@ fn fw_table_rows(
     ovr: &HashMap<String, Value>,
     delta: bool,
     fields: &[String],
-) -> Vec<(String, String, String)> {
+) -> Vec<FwRow> {
     let mut cmfwcfg_rows = Vec::new();
     flatten(cmfwcfg, "", &mut cmfwcfg_rows);
     let cmfwcfg_lookup: HashMap<String, String> = cmfwcfg_rows.iter().cloned().collect();
