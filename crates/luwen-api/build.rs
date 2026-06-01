@@ -6,6 +6,11 @@ fn try_to_compiled_proto_file_by_name(name: &str, out_dir: &str) -> Result<(), s
     let mut protoc_build_config = prost_build::Config::new();
     protoc_build_config.out_dir(out_dir);
 
+    // Required for the proto3 `optional` keyword in fw_table_override.proto
+    // on protoc < 3.21 (e.g. Ubuntu 22.04's bundled protobuf-compiler).
+    // No-op on newer protoc.
+    protoc_build_config.protoc_arg("--experimental_allow_proto3_optional");
+
     // Add `#[derive(Serialize)]` to all generated messages for easy HashMap conversion
     protoc_build_config.type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]");
 
