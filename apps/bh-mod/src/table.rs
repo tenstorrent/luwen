@@ -134,17 +134,26 @@ fn render_fw_table_pretty(per_chip: &[FwView], delta: bool, fields: &[String]) {
         }
     }
 
+    // Drop the Override column entirely when no chip has any overrides
+    // set; an empty column adds nothing.
+    let any_override = per_chip_rows
+        .iter()
+        .any(|(_, rows)| rows.iter().any(|(_, _, o)| !o.is_empty()));
     let single_group = groups.len() == 1;
     let mut builder = Builder::default();
     let mut header = vec!["Field".to_string()];
     for group in &groups {
         if single_group {
             header.push("Default".to_string());
-            header.push("Override".to_string());
+            if any_override {
+                header.push("Override".to_string());
+            }
         } else {
             let label = compress_ids(group.iter().map(|&i| per_chip_rows[i].0));
             header.push(format!("Default ({label})"));
-            header.push(format!("Override ({label})"));
+            if any_override {
+                header.push(format!("Override ({label})"));
+            }
         }
     }
     builder.push_record(header);
@@ -158,7 +167,9 @@ fn render_fw_table_pretty(per_chip: &[FwView], delta: bool, fields: &[String]) {
                 .map(|(_, d, o)| (d.clone(), o.clone()))
                 .unwrap_or_default();
             row.push(default);
-            row.push(override_);
+            if any_override {
+                row.push(override_);
+            }
         }
         builder.push_record(row);
     }
