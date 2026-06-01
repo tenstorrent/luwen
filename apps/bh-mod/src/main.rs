@@ -98,12 +98,44 @@ fn run() -> anyhow::Result<()> {
         }
     };
     if wrote {
-        for (interface_id, _) in &selected {
-            reset::chip_reset(*interface_id)
-                .map_err(|e| anyhow::anyhow!("{e}"))
-                .context("chip reset")?;
-        }
+        let verbose_logging =
+            args.verbose.tracing_level_filter() > tracing::level_filters::LevelFilter::WARN;
+        reset_chips(&selected, verbose_logging)?;
     }
+    Ok(())
+}
+
+/// Reset every selected chip in sequence, showing a progress bar that
+/// ticks as each chip finishes.
+///
+/// `verbose_logging` hides the bar — its stderr redraws collide with the
+/// tracing-subscriber's log lines, so the logs are the status indicator
+/// when the user has asked for them.
+fn reset_chips(
+    selected: &[(usize, &luwen_api::chip::Blackhole)],
+    verbose_logging: bool,
+) -> anyhow::Result<()> {
+    use indicatif::{ProgressBar, ProgressStyle};
+
+    let pb = if verbose_logging {
+        ProgressBar::hidden()
+    } else {
+        ProgressBar::new(selected.len() as u64)
+    };
+    pb.set_style(
+        ProgressStyle::with_template("  resetting {bar:30.cyan/blue} {percent:>3}% ETA {eta}")
+            .expect("static template")
+            .progress_chars("█░"),
+    );
+    pb.enable_steady_tick(std::time::Duration::from_millis(120));
+
+    for (id, _) in selected {
+        reset::chip_reset(*id)
+            .map_err(|e| anyhow::anyhow!("{e}"))
+            .context("chip reset")?;
+        pb.inc(1);
+    }
+    pb.finish_and_clear();
     Ok(())
 }
 
