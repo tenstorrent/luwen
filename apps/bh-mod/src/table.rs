@@ -5,13 +5,24 @@ use luwen_api::chip::spirom_tables::{self, fw_table_override::FwTableOverride};
 use luwen_api::chip::Blackhole;
 use serde_json::Value;
 use tabled::builder::Builder;
-use tabled::settings::Style;
+use tabled::settings::{Style, Width};
 
 type Chip<'a> = (usize, &'a Blackhole);
 type Write<'a> = (usize, &'a Blackhole, HashMap<String, Value>, Vec<Diff>);
 type FwView = (usize, HashMap<String, Value>, HashMap<String, Value>);
 type FwRow = (String, String, String);
 type ChipRows = (usize, Vec<FwRow>);
+
+/// Apply our standard style and (when stdout is a TTY) wrap the table to
+/// the terminal width so it doesn't overflow.
+fn print_table(builder: Builder) {
+    let mut tbl = builder.build();
+    tbl.with(Style::modern_rounded());
+    if let Some((terminal_size::Width(w), _)) = terminal_size::terminal_size() {
+        tbl.with(Width::wrap(w as usize).keep_words(true));
+    }
+    println!("{tbl}");
+}
 
 pub fn get(
     chips: &[Chip<'_>],
@@ -151,9 +162,7 @@ fn render_fw_table_pretty(per_chip: &[FwView], delta: bool, fields: &[String]) {
         }
         builder.push_record(row);
     }
-    let mut tbl = builder.build();
-    tbl.with(Style::modern_rounded());
-    println!("{tbl}");
+    print_table(builder);
 }
 
 fn render_fw_table_json(per_chip: &[FwView], delta: bool, fields: &[String]) -> anyhow::Result<()> {
@@ -297,9 +306,7 @@ fn render_pretty(chip_maps: &[(usize, HashMap<String, Value>)], fields: &[String
             builder.push_record([k.as_str(), v.as_str()]);
         }
     }
-    let mut tbl = builder.build();
-    tbl.with(Style::modern_rounded());
-    println!("{tbl}");
+    print_table(builder);
 }
 
 fn render_json(
@@ -378,9 +385,7 @@ fn print_single_chip_diff((id, diffs): (usize, &[Diff])) {
         for Diff { field, old, new } in diffs {
             builder.push_record([field.as_str(), old.as_str(), new.as_str()]);
         }
-        let mut tbl = builder.build();
-        tbl.with(Style::modern_rounded());
-        println!("{tbl}");
+        print_table(builder);
     }
     println!("{} change(s) on chip {id}", diffs.len());
 }
@@ -447,9 +452,7 @@ fn print_multi_chip_table(chips: &[(usize, &[Diff])], fields: &[String]) {
         row.push(new_val);
         builder.push_record(row);
     }
-    let mut tbl = builder.build();
-    tbl.with(Style::modern_rounded());
-    println!("{tbl}");
+    print_table(builder);
 }
 
 fn multi_chip_summary(chips: &[(usize, &[Diff])]) -> Vec<String> {
