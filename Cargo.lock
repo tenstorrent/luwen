@@ -125,6 +125,7 @@ dependencies = [
  "anyhow",
  "clap",
  "clap-verbosity-flag",
+ "humantime",
  "indicatif 0.18.4",
  "luwen",
  "luwen-api",
@@ -707,6 +708,12 @@ checksum = "5444c27eef6923071f7ebcc33e3444508466a76f7a2b93da00ed6e19f30c1ddb"
 dependencies = [
  "windows-sys 0.48.0",
 ]
+
+[[package]]
+name = "humantime"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "135b12329e5e3ce057a9f972339ea52bc954fe1e9358ef27f95e89716fbc5424"
 
 [[package]]
 name = "icu_collections"

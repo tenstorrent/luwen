@@ -9,7 +9,10 @@ const RESET_DEVICE_ASIC_RESET: u32 = 4;
 /// reappeared. Restores PCI config and re-inits the kmd state.
 const RESET_DEVICE_POST_RESET: u32 = 6;
 
-pub fn chip_reset(interface_id: usize) -> Result<(), Box<dyn std::error::Error>> {
+pub fn chip_reset(
+    interface_id: usize,
+    timeout: Duration,
+) -> Result<(), Box<dyn std::error::Error>> {
     let dev_path = format!("/dev/tenstorrent/{interface_id}");
     if !Path::new(&dev_path).exists() {
         // Chip detected via Ethernet, not direct PCIe — there's no kmd
@@ -28,7 +31,7 @@ pub fn chip_reset(interface_id: usize) -> Result<(), Box<dyn std::error::Error>>
     // ASIC_RESET drops the PCIe link, the device disappears from
     // /sys/bus/pci, and kmd may assign a new /dev/tenstorrent/<N> when it
     // comes back. Re-locate by BDF (the slot is stable).
-    let (new_id, new_path) = wait_for_bdf(&bdf, Duration::from_secs(30))?;
+    let (new_id, new_path) = wait_for_bdf(&bdf, timeout)?;
     tracing::info!(new_id, %bdf, "device reappeared after ASIC_RESET");
 
     tracing::info!(new_id, %bdf, "issuing POST_RESET");

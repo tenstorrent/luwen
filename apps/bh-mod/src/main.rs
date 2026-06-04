@@ -100,7 +100,7 @@ fn run() -> anyhow::Result<()> {
     if wrote {
         let verbose_logging =
             args.verbose.tracing_level_filter() > tracing::level_filters::LevelFilter::WARN;
-        reset_chips(&selected, verbose_logging)?;
+        reset_chips(&selected, verbose_logging, args.reset_timeout)?;
     }
     Ok(())
 }
@@ -114,6 +114,7 @@ fn run() -> anyhow::Result<()> {
 fn reset_chips(
     selected: &[(usize, &luwen_api::chip::Blackhole)],
     verbose_logging: bool,
+    timeout: std::time::Duration,
 ) -> anyhow::Result<()> {
     use indicatif::{ProgressBar, ProgressStyle};
 
@@ -130,7 +131,7 @@ fn reset_chips(
     pb.enable_steady_tick(std::time::Duration::from_millis(120));
 
     for (id, _) in selected {
-        reset::chip_reset(*id)
+        reset::chip_reset(*id, timeout)
             .map_err(|e| anyhow::anyhow!("{e}"))
             .context("chip reset")?;
         pb.inc(1);
@@ -150,6 +151,15 @@ struct Args {
     /// Path under /dev/tenstorrent to operate on. Repeatable. Omit to target all available devices.
     #[arg(short = 'd', long = "dev", value_name = "PATH", global = true)]
     dev: Vec<PathBuf>,
+    /// Per-chip ASIC reset timeout (e.g. `30s`, `2m`, `500ms`).
+    #[arg(
+        long,
+        value_name = "DURATION",
+        default_value = "30s",
+        value_parser = humantime::parse_duration,
+        global = true,
+    )]
+    reset_timeout: std::time::Duration,
     #[command(flatten)]
     verbose: clap_verbosity_flag::Verbosity<clap_verbosity_flag::WarnLevel>,
     #[command(subcommand)]
