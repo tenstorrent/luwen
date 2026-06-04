@@ -28,7 +28,7 @@ pub fn chip_reset(interface_id: usize) -> Result<(), Box<dyn std::error::Error>>
     // ASIC_RESET drops the PCIe link, the device disappears from
     // /sys/bus/pci, and kmd may assign a new /dev/tenstorrent/<N> when it
     // comes back. Re-locate by BDF (the slot is stable).
-    let (new_id, new_path) = wait_for_bdf(&bdf, Duration::from_secs(10))?;
+    let (new_id, new_path) = wait_for_bdf(&bdf, Duration::from_secs(30))?;
     tracing::info!(new_id, %bdf, "device reappeared after ASIC_RESET");
 
     tracing::info!(new_id, %bdf, "issuing POST_RESET");
