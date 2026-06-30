@@ -147,6 +147,7 @@ fn reset_chips(
 /// partition is never written. Any write operation performs a chip reset
 /// so the new config takes effect.
 #[derive(clap::Parser)]
+#[command(version)]
 struct Args {
     /// Path under /dev/tenstorrent to operate on. Repeatable. Omit to target all available devices.
     #[arg(short = 'd', long = "dev", value_name = "PATH", global = true)]
