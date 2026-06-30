@@ -146,18 +146,8 @@ fn reset_chips(
 /// firmware merges on top of `cmfwcfg` at boot. The original `cmfwcfg`
 /// partition is never written. Any write operation performs a chip reset
 /// so the new config takes effect.
-/// Crate version plus the luwen git commit it was built from, so a bare
-/// binary can report its own provenance via `bh-mod --version`. The git SHA is
-/// injected at build time by `build.rs` (`BH_MOD_GIT_SHA`).
-const VERSION: &str = concat!(
-    env!("CARGO_PKG_VERSION"),
-    " (luwen ",
-    env!("BH_MOD_GIT_SHA"),
-    ")"
-);
-
 #[derive(clap::Parser)]
-#[command(version = VERSION)]
+#[command(version)]
 struct Args {
     /// Path under /dev/tenstorrent to operate on. Repeatable. Omit to target all available devices.
     #[arg(short = 'd', long = "dev", value_name = "PATH", global = true)]
