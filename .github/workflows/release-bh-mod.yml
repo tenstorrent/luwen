@@ -1,0 +1,152 @@
+name: Release (bh-mod)
+
+# Cut a standalone bh-mod release, independent of luwen's `v*` release cycle.
+# Bumps the bh-mod package version, tags it `bh-mod-v<version>`, builds the
+# binary, and publishes a GitHub release with the binary attached as an asset.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+
+  # Stage commits on a temporary branch
+  branch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      ref: ${{ steps.ref.outputs.ref }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Name release branch
+        id: ref
+        run: |
+          echo "ref=release/bh-mod/${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+      - name: Create release branch
+        run: |
+          git checkout -b "${{ steps.ref.outputs.ref }}"
+          git push --branches
+
+  # Make release commit
+  commit:
+    needs: branch
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+      sha: ${{ steps.sha.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.branch.outputs.ref }}
+      - name: Configure Git identity
+        run: |
+          git config --global user.name "Tenstorrent"
+          git config --global user.email "releases@tenstorrent.com"
+      - uses: cargo-bins/cargo-binstall@v1.17.8
+      - name: Install cargo-edit
+        run: cargo binstall --no-confirm cargo-edit@0.13.9
+      - name: Bump version
+        run: |
+          cargo set-version \
+            --package=bh-mod \
+            --bump=${{ inputs.bump }}
+      - name: Get new version
+        id: bump
+        run: |
+          version=$(
+            cargo metadata --format-version 1 \
+              | jq -r '.packages[] | select(.name=="bh-mod") | .version'
+          )
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Create release commit
+        run: |
+          git add .
+          git commit -m \
+            "chore(release): bump bh-mod to bh-mod-v${{ steps.bump.outputs.version }}"
+          git pull --rebase
+          git push
+      - name: Get HEAD SHA
+        id: sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  # Build the binary and publish the GitHub release with it attached
+  release:
+    needs: commit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.commit.outputs.sha }}
+          fetch-tags: true
+          fetch-depth: 0
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build bh-mod
+        run: cargo build --release -p bh-mod
+      - name: Smoke test
+        run: ./target/release/bh-mod --version
+      - name: Create GitHub release
+        run: |
+          set -euo pipefail
+          tag="bh-mod-v${{ needs.commit.outputs.version }}"
+          gh release create "$tag" target/release/bh-mod \
+            --title "$tag" \
+            --target "${{ needs.commit.outputs.sha }}" \
+            --generate-notes
+
+  # Merge the release branch
+  merge:
+    needs:
+      - branch
+      - release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-tags: true
+          fetch-depth: 0
+      - name: Merge release branch
+        run: |
+          git merge --ff-only origin/${{ needs.branch.outputs.ref }}
+          git push
+
+  # Delete the release branch
+  cleanup:
+    if: always() && needs.branch.result == 'success'
+    needs:
+      - branch
+      - merge
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: Delete release branch
+        run: |
+          git push origin --delete "${{ needs.branch.outputs.ref }}"
