@@ -283,15 +283,15 @@ fn read_bank(bh: &Blackhole, bank: Bank) -> Result<BankRead, Box<dyn std::error:
     let map = if hdr.body_len == 0 {
         HashMap::new()
     } else {
-        // Strip the null terminator and trailing zero pad to recover the
-        // protobuf prefix. Encoded proto3 messages never end in 0x00 (a
-        // 0-byte at this position is either the appended null terminator
-        // or padding), so scanning backward for the last nonzero byte is
-        // unambiguous.
-        let proto_end = body_bytes
-            .iter()
-            .rposition(|&b| b != 0)
-            .map_or(0, |p| p + 1);
+        // Recover the protobuf prefix length, then decode it. The body is
+        // `<proto><0x00 terminator><0x00 pad..>`. We cannot find the
+        // terminator by scanning for zeros: proto3 `optional` scalar fields
+        // encode their trailing value verbatim, so a message can legitimately
+        // end in 0x00 (e.g. an `optional bool` set to false, or an
+        // `optional uint32` set to 0). Instead, walk the message field by
+        // field (matching the firmware's PB_DECODE_NULLTERMINATED framing) and
+        // stop at the first 0x00 tag byte.
+        let proto_end = proto_prefix_len(&body_bytes)?;
         spirom_tables::to_hash_map(FwTableOverride::decode(&body_bytes[..proto_end])?)
     };
 
@@ -301,6 +301,29 @@ fn read_bank(bh: &Blackhole, bank: Bank) -> Result<BankRead, Box<dyn std::error:
         header: Some(hdr),
         body: Some(map),
     })
+}
+
+/// Length of the encoded `FwTableOverride` prefix inside a bank body.
+///
+/// The body is `<proto><0x00 terminator><0x00 pad..>`. Because proto3
+/// `optional` scalar fields serialize a trailing value that can itself be
+/// 0x00, the terminator is not distinguishable from proto data by value alone.
+/// Walk the message field by field (skipping each field's payload by wire
+/// type) and stop at the first 0x00 tag byte, which is the null terminator.
+fn proto_prefix_len(body: &[u8]) -> Result<usize, prost::DecodeError> {
+    use prost::encoding::{decode_key, skip_field, DecodeContext};
+
+    let mut buf: &[u8] = body;
+    while !buf.is_empty() {
+        // A 0x00 first byte encodes tag 0 / wire-type 0, which is never a
+        // valid field key: it is the appended null terminator.
+        if buf[0] == 0 {
+            break;
+        }
+        let (tag, wire_type) = decode_key(&mut buf)?;
+        skip_field(wire_type, tag, &mut buf, DecodeContext::default())?;
+    }
+    Ok(body.len() - buf.len())
 }
 
 fn is_header_plausible(hdr: &BankHeader) -> bool {
@@ -320,4 +343,51 @@ fn compute_cksum(hdr: &BankHeader, body: &[u8]) -> u32 {
     hasher.update(&bytes_of(hdr)[..CKSUM_HDR_LEN]);
     hasher.update(body);
     hasher.finalize()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Append the FW null terminator and zero-pad to a 4-byte boundary, exactly
+    // as `write()` frames a non-empty body.
+    fn frame(proto: &[u8]) -> Vec<u8> {
+        let mut b = proto.to_vec();
+        b.push(0);
+        while b.len() % 4 != 0 {
+            b.push(0);
+        }
+        b
+    }
+
+    #[test]
+    fn prefix_len_message_ending_in_zero() {
+        // feature_enable{kernel_throttler_at_floor_en=false}: field 3 (LEN) ->
+        // submessage `50 00` (field 10 bool = 0). The message ends in 0x00.
+        let proto = [0x1A, 0x02, 0x50, 0x00];
+        let body = frame(&proto);
+        assert_eq!(proto_prefix_len(&body).unwrap(), proto.len());
+        // The recovered prefix must round-trip through the decoder.
+        FwTableOverride::decode(&body[..proto_prefix_len(&body).unwrap()]).unwrap();
+    }
+
+    #[test]
+    fn prefix_len_message_ending_nonzero() {
+        // feature_enable{kernel_throttler_at_floor_en=true}: submessage `50 01`.
+        let proto = [0x1A, 0x02, 0x50, 0x01];
+        let body = frame(&proto);
+        assert_eq!(proto_prefix_len(&body).unwrap(), proto.len());
+    }
+
+    #[test]
+    fn prefix_len_len_delimited_containing_zero() {
+        // chip_limits{tdp_limit=0} then feature_enable{...=false}: exercises a
+        // varint value of 0 in the middle and a trailing zero at the end.
+        // chip_limits (field 2) -> `12 03 28 00 ...`? Build explicitly:
+        // field 2 LEN {tdp_limit(field5, varint)=0 => 28 00}
+        let proto = [0x12, 0x02, 0x28, 0x00, 0x1A, 0x02, 0x50, 0x00];
+        let body = frame(&proto);
+        assert_eq!(proto_prefix_len(&body).unwrap(), proto.len());
+        FwTableOverride::decode(&body[..proto_prefix_len(&body).unwrap()]).unwrap();
+    }
 }
