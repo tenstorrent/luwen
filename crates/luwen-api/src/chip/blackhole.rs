@@ -4,7 +4,7 @@
 use bytemuck::bytes_of;
 use num_traits::cast::FromPrimitive;
 
-use std::sync::Arc;
+use std::{mem::size_of, sync::Arc};
 
 use crate::{
     arc_msg::ArcMsgOk,
@@ -38,15 +38,80 @@ use std::collections::HashMap;
 
 // pub use telemetry_tags::telemetry_tags_to_u32;
 
-fn u32_from_slice(data: &[u8], index: u16) -> u32 {
-    let mut output = 0;
-    let index = index * 4;
-    let data_chunk = &data[index as usize..(index + 4) as usize];
-    for i in data_chunk.iter().rev().copied() {
-        output <<= 8;
-        output |= i as u32;
+const CSM_START: u32 = 0x10000000;
+const CSM_END: u32 = 0x1007FFFF;
+
+fn u32_from_slice(data: &[u8], index: usize) -> Option<u32> {
+    let start = index.checked_mul(size_of::<u32>())?;
+    let end = start.checked_add(size_of::<u32>())?;
+    Some(u32::from_le_bytes(data.get(start..end)?.try_into().ok()?))
+}
+
+fn required_telemetry_data_words(tag_data: &[u8], entry_count: usize) -> Option<usize> {
+    let required_tag_bytes = entry_count.checked_mul(size_of::<u32>())?;
+    if tag_data.len() < required_tag_bytes {
+        return None;
     }
-    output
+
+    (0..entry_count)
+        .map(|index| u32_from_slice(tag_data, index).map(|entry| (entry >> 16) as usize))
+        .collect::<Option<Vec<_>>>()?
+        .into_iter()
+        .max()
+        .map_or(Some(0), |max_offset| max_offset.checked_add(1))
+}
+
+fn csm_contains_block(address: u32, byte_len: usize) -> bool {
+    if !(CSM_START..=CSM_END).contains(&address) {
+        return false;
+    }
+    if byte_len == 0 {
+        return true;
+    }
+
+    let Ok(byte_len) = u32::try_from(byte_len) else {
+        return false;
+    };
+    address
+        .checked_add(byte_len - 1)
+        .is_some_and(|end| end <= CSM_END)
+}
+
+#[cfg(test)]
+mod telemetry_layout_tests {
+    use super::{csm_contains_block, required_telemetry_data_words, u32_from_slice, CSM_END};
+    use std::mem::size_of;
+
+    fn tag_entry(tag: u16, offset: u16) -> [u8; 4] {
+        ((u32::from(offset) << 16) | u32::from(tag)).to_le_bytes()
+    }
+
+    #[test]
+    fn sparse_offsets_determine_data_span() {
+        let tags = [tag_entry(1, 0), tag_entry(2, 17), tag_entry(3, 4)].concat();
+
+        assert_eq!(required_telemetry_data_words(&tags, 3), Some(18));
+    }
+
+    #[test]
+    fn word_decoder_supports_indices_above_63() {
+        let mut words = vec![0u8; 65 * size_of::<u32>()];
+        words[64 * size_of::<u32>()..65 * size_of::<u32>()]
+            .copy_from_slice(&0xDEADBEEFu32.to_le_bytes());
+
+        assert_eq!(u32_from_slice(&words, 64), Some(0xDEADBEEF));
+    }
+
+    #[test]
+    fn truncated_tag_table_is_rejected() {
+        assert_eq!(required_telemetry_data_words(&tag_entry(1, 0), 2), None);
+    }
+
+    #[test]
+    fn csm_validation_checks_the_entire_block() {
+        assert!(csm_contains_block(CSM_END - 3, 4));
+        assert!(!csm_contains_block(CSM_END - 3, 5));
+    }
 }
 
 #[derive(Clone)]
@@ -60,6 +125,7 @@ pub struct Blackhole {
     pub eth_addrs: EthAddresses,
 
     spi_buffer_addr: AxiData,
+    telemetry_data_addr: AxiData,
     telemetry_struct_addr: AxiData,
     scratch_ram_base: AxiData,
 }
@@ -141,6 +207,7 @@ impl Blackhole {
             eth_addrs: EthAddresses::default(),
 
             spi_buffer_addr: arc_if.axi_translate("arc_ss.reset_unit.SCRATCH_RAM[10]")?,
+            telemetry_data_addr: arc_if.axi_translate("arc_ss.reset_unit.SCRATCH_RAM[12]")?,
             telemetry_struct_addr: arc_if.axi_translate("arc_ss.reset_unit.SCRATCH_RAM[13]")?,
             scratch_ram_base: arc_if.axi_translate("arc_ss.reset_unit.SCRATCH_RAM[0]")?,
 
@@ -730,11 +797,6 @@ impl ChipImpl for Blackhole {
     }
 
     fn get_telemetry(&self) -> Result<super::Telemetry, PlatformError> {
-        // Get chip telemetry and device data
-        // Read telemetry data block address from scratch ram
-        // Then read and parse telemetry data
-
-        // Get address of telem struct from scratch ram
         let mut scratch_reg_13_value = [0u8; 4];
         self.axi_read_field(&self.telemetry_struct_addr, &mut scratch_reg_13_value)?;
         let telem_struct_addr = u32::from_le_bytes(scratch_reg_13_value);
@@ -744,43 +806,98 @@ impl ChipImpl for Blackhole {
                 BtWrapper::capture(),
             ));
         }
-        // Check if the address is within CSM memory. Otherwise, it must be invalid
-        if !(0x10000000..=0x1007FFFF).contains(&telem_struct_addr) {
+        if !csm_contains_block(telem_struct_addr, 8) {
             return Err(PlatformError::Generic(
                 format!("Invalid Telemetry struct address: 0x{telem_struct_addr:08x}"),
                 BtWrapper::capture(),
             ));
         }
 
-        // Read the data block from the address in sctrach 13
-        // Parse out the version and entry count before reading the data block
+        let mut scratch_reg_12_value = [0u8; 4];
+        self.axi_read_field(&self.telemetry_data_addr, &mut scratch_reg_12_value)?;
+        let telem_data_addr = u32::from_le_bytes(scratch_reg_12_value);
+        if telem_data_addr == 0 {
+            return Err(PlatformError::ArcNotReady(
+                crate::error::ArcReadyError::BootIncomplete,
+                BtWrapper::capture(),
+            ));
+        }
+
         let _version = self.axi_read32(telem_struct_addr as u64)?;
-        let entry_count = self.axi_read32(telem_struct_addr as u64 + 4)?;
+        let entry_count = self.axi_read32(telem_struct_addr as u64 + 4)? as usize;
 
         // TODO: Implement version check and data block parsing based on version
         // For now, assume version 1 and parse data block as is
         // let version = u32::from_le_bytes(version);
 
-        // Get telemetry tags data block and telemetry data data block
-        let mut telemetry_tags_data_block: Vec<u8> = vec![0u8; (entry_count + 1) as usize * 4];
-        let mut telem_data_block: Vec<u8> = vec![0u8; (entry_count + 1) as usize * 4];
+        let tag_bytes = entry_count.checked_mul(size_of::<u32>()).ok_or_else(|| {
+            PlatformError::Generic(
+                format!("Invalid Telemetry entry count: {entry_count}"),
+                BtWrapper::capture(),
+            )
+        })?;
+        let tag_data_addr = telem_struct_addr.checked_add(8).ok_or_else(|| {
+            PlatformError::Generic(
+                format!("Invalid Telemetry struct address: 0x{telem_struct_addr:08x}"),
+                BtWrapper::capture(),
+            )
+        })?;
+        if !csm_contains_block(tag_data_addr, tag_bytes) {
+            return Err(PlatformError::Generic(
+                format!(
+                    "Telemetry tag table at 0x{tag_data_addr:08x} with {entry_count} entries exceeds CSM"
+                ),
+                BtWrapper::capture(),
+            ));
+        }
 
-        self.axi_read(
-            (telem_struct_addr + 8) as u64,
-            &mut telemetry_tags_data_block,
-        )?;
-        self.axi_read(
-            (telem_struct_addr + 8 + entry_count * 4) as u64,
-            &mut telem_data_block,
-        )?;
+        let mut telemetry_tags_data_block = vec![0u8; tag_bytes];
+        self.axi_read(tag_data_addr as u64, &mut telemetry_tags_data_block)?;
+
+        let data_words = required_telemetry_data_words(&telemetry_tags_data_block, entry_count)
+            .ok_or_else(|| {
+                PlatformError::Generic(
+                    "Invalid Telemetry tag table".to_string(),
+                    BtWrapper::capture(),
+                )
+            })?;
+        let data_bytes = data_words.checked_mul(size_of::<u32>()).ok_or_else(|| {
+            PlatformError::Generic(
+                format!("Invalid Telemetry data table size: {data_words} words"),
+                BtWrapper::capture(),
+            )
+        })?;
+        if !csm_contains_block(telem_data_addr, data_bytes) {
+            return Err(PlatformError::Generic(
+                format!(
+                    "Telemetry data table at 0x{telem_data_addr:08x} with {data_words} words exceeds CSM"
+                ),
+                BtWrapper::capture(),
+            ));
+        }
+
+        let mut telem_data_block = vec![0u8; data_bytes];
+        if data_bytes != 0 {
+            self.axi_read(telem_data_addr as u64, &mut telem_data_block)?;
+        }
 
         // Parse telemetry data
         let mut telemetry_data = super::Telemetry::default();
-        for i in 0..entry_count as u16 {
-            let entry = u32_from_slice(&telemetry_tags_data_block, i);
+        for i in 0..entry_count {
+            let entry = u32_from_slice(&telemetry_tags_data_block, i).ok_or_else(|| {
+                PlatformError::Generic(
+                    format!("Missing Telemetry tag table entry {i}"),
+                    BtWrapper::capture(),
+                )
+            })?;
             let tag = entry & 0xFFFF;
             let offset = (entry >> 16) & 0xFFFF;
-            let data = u32_from_slice(&telem_data_block, offset as u16);
+            let data = u32_from_slice(&telem_data_block, offset as usize).ok_or_else(|| {
+                PlatformError::Generic(
+                    format!("Invalid Telemetry data offset: {offset}"),
+                    BtWrapper::capture(),
+                )
+            })?;
             // print!("Tag: {} Data: {:#02x}\n", tag, data);
             if let Some(tag) = TelemetryTags::from_u32(tag) {
                 match tag {
