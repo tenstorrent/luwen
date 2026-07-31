@@ -644,6 +644,7 @@ impl<'a> Set<'a> {
                     .with_context(|| format!("unknown field path: {path}"))?
                     .clone();
                 set_value(&mut typed, path, raw)?;
+                crate::validate::field(path, &typed)?;
                 insert_at_path(&mut new_map, path, typed);
                 paths.push(path);
             }
