@@ -53,6 +53,23 @@ Fields use dot-notation matching the proto layout. The output of
 `bh-mod get` is self-documenting: any path it prints is a valid input to
 `set` or `res`.
 
+## Validated fields
+
+A few fields accept values the protobuf schema allows but the hardware
+cannot honour. `set` rejects those before writing anything, since the
+resulting config is applied at boot and published to the host as
+harvesting telemetry — and UMD refuses to enumerate a chip reporting more
+than one harvested DRAM bank, which takes `tt-smi`, `tt-flash` and
+`tt-metal` down with it.
+
+| Field | Accepted | Why |
+| --- | --- | --- |
+| `dram_table.soft_harvest_dram_mask` | `0`, or one bit in `0..=7` | One bit per GDDR instance, of which there are 8. Firmware soft-harvests at most one. |
+| `product_spec_harvesting.dram_disable_count` | `0` or `1` | Firmware clears a single GDDR for this field; a higher count cannot be honoured, and on a part with a fuse-harvested bank it pushes the total to two. |
+
+Rejections happen before any flash write and before the chip reset, so a
+refused `set` leaves the override exactly as it was. Values are decimal.
+
 ## How `ccfgovr` works
 
 Two 4 KiB banks (`ccfgovra` at `0x1F5000`, `ccfgovrb` at `0x1F6000`) each

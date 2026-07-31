@@ -11,6 +11,7 @@ use luwen::pci::detect_chips;
 
 mod reset;
 mod table;
+mod validate;
 
 fn main() -> std::process::ExitCode {
     let Err(err) = run() else {
