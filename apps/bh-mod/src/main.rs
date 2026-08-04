@@ -9,9 +9,9 @@ use clap::Parser as _;
 use luwen::api::ChipImpl as _;
 use luwen::pci::detect_chips;
 
+mod check;
 mod reset;
 mod table;
-mod validate;
 
 fn main() -> std::process::ExitCode {
     let Err(err) = run() else {
