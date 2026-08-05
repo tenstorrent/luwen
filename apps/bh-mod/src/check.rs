@@ -1,34 +1,77 @@
-//! Value constraints on `ccfgovr` fields that the protobuf schema cannot
-//! express.
+//! Value checks for `bh-mod set`.
 //!
-//! `fw_table_override.proto` types every harvesting field as a plain
-//! `uint32`, so the schema accepts values the hardware cannot honour and
-//! nothing between the keystroke and the next boot objects. Firmware
-//! applies whatever it finds to `tile_enable.gddr_enabled`, telemetry
-//! publishes that as `TAG_ENABLED_GDDR`, and UMD then refuses to build a
-//! coordinate manager for a chip reporting more than one harvested DRAM
-//! bank — aborting topology discovery for *every* device, so `tt-smi`,
-//! `tt-flash` and `tt-metal` all report no chips at all.
-//!
-//! These checks run before anything is staged for writing, so a rejected
-//! value leaves flash untouched and the chip un-reset.
+//! `fw_table_override.proto` types its fields as bare integers, so the
+//! schema alone permits values that leave the chip misconfigured or
+//! undetectable by the host. These checks run before anything is staged for
+//! writing, so a rejected value leaves flash and the chip untouched.
 
 use anyhow::Context as _;
 use serde_json::Value;
 
-/// Number of GDDR instances on a Blackhole chip. `soft_harvest_dram_mask`
-/// carries one bit per instance, so bits 8..=31 name nothing — firmware
-/// drops them silently when it ANDs the mask into the `uint8_t`
-/// `tile_enable.gddr_enabled`.
+/// Dot-path of the soft-harvest mask. `table::Set` matches on it to decide
+/// whether it needs to read the chip.
+pub const SOFT_HARVEST_DRAM_MASK: &str = "dram_table.soft_harvest_dram_mask";
+
+/// GDDR instances on a Blackhole chip; the mask carries one bit each.
 const NUM_GDDR: u32 = 8;
 
-/// Most DRAM banks that may end up harvested on Blackhole. Firmware
-/// soft-harvests at most one GDDR instance, and UMD refuses to enumerate a
-/// chip reporting more than one harvested bank. The messages below are
-/// worded for a value of 1; revisit them if this ever changes.
+/// Bits 0..`NUM_GDDR` — the window every GDDR bitmap is defined over.
+const GDDR_MASK: u32 = (1 << NUM_GDDR) - 1;
+
+/// DRAM banks that may be harvested at once. Messages below assume 1.
 const MAX_HARVESTED_DRAM: u32 = 1;
 
-/// Interpret a field's value as the `uint32` its protobuf type promises.
+/// Chip state the checks need. The default means "not read", which skips
+/// the checks that use it; `table::Set` reads the chip only when a field
+/// that needs it is being assigned.
+#[derive(Default)]
+pub struct State {
+    /// Harvested GDDR instances that the active mask does not account for.
+    /// `None` when not read.
+    pub unaccounted_harvest: Option<u32>,
+}
+
+impl State {
+    /// Build the state from a chip read, for passing to [`field`].
+    ///
+    /// `enabled_gddr` is telemetry tag 36, in which a set bit means the
+    /// instance survived; `soft_harvested` is the mask in effect right now.
+    /// Inverting the first gives every harvested instance, and removing the
+    /// second leaves the ones the user cannot undo — so replacing a mask you
+    /// set yourself stays allowed.
+    ///
+    /// A zero `enabled_gddr` means the chip never reported the tag, and
+    /// yields the default so the check is skipped.
+    pub fn from_telemetry(enabled_gddr: u32, soft_harvested: u32) -> Self {
+        if enabled_gddr & GDDR_MASK == 0 {
+            tracing::warn!("telemetry reports no enabled GDDR; skipping harvest cross-check");
+            return Self::default();
+        }
+        let harvested = !enabled_gddr & GDDR_MASK;
+        Self {
+            unaccounted_harvest: Some(harvested & !soft_harvested & GDDR_MASK),
+        }
+    }
+}
+
+/// Format a GDDR bitmap as instance numbers: `0b101` becomes `0, 2`.
+fn instance_list(mask: u32) -> String {
+    (0..NUM_GDDR)
+        .filter(|i| (mask >> i) & 1 == 1)
+        .map(|i| i.to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// The values a single-instance mask may take: `1, 2, 4, ...`.
+fn single_instance_values() -> String {
+    (0..NUM_GDDR)
+        .map(|i| (1u32 << i).to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Read a field's value as the unsigned integer its proto type promises.
 fn as_u32(path: &str, value: &Value) -> anyhow::Result<u32> {
     value
         .as_u64()
@@ -36,80 +79,77 @@ fn as_u32(path: &str, value: &Value) -> anyhow::Result<u32> {
         .with_context(|| format!("{path} must be a 32-bit non-negative integer"))
 }
 
-/// Check one `field=value` assignment against the constraints for that
-/// field. Paths without constraints are accepted unchanged.
-pub fn field(path: &str, value: &Value) -> anyhow::Result<()> {
-    match path {
-        "dram_table.soft_harvest_dram_mask" => {
-            let mask = as_u32(path, value)?;
+/// Check one `field=value` assignment, called by `table::Set` before the
+/// value is staged. Paths with no constraints pass unchanged.
+pub fn field(path: &str, value: &Value, state: &State) -> anyhow::Result<()> {
+    if path == SOFT_HARVEST_DRAM_MASK {
+        let mask = as_u32(path, value)?;
+        anyhow::ensure!(
+            mask & !GDDR_MASK == 0,
+            "{path}: {mask} is out of range; use 0 or one of {opts}",
+            opts = single_instance_values(),
+        );
+        anyhow::ensure!(
+            mask.count_ones() <= MAX_HARVESTED_DRAM,
+            "{path}: {mask} selects {n} GDDR instances but only one can be \
+             harvested; use 0 or one of {opts}",
+            n = mask.count_ones(),
+            opts = single_instance_values(),
+        );
+        // Only the union matters: naming an instance that is already down
+        // costs nothing, adding a second one does not work.
+        if let Some(already) = state.unaccounted_harvest {
             anyhow::ensure!(
-                (mask >> NUM_GDDR) == 0,
-                "{path}: 0x{mask:x} sets bits above bit {last}, but this chip has only \
-                 {NUM_GDDR} GDDR instances; valid bits are 0-{last}",
-                last = NUM_GDDR - 1,
+                (already | mask).count_ones() <= MAX_HARVESTED_DRAM,
+                "{path}: GDDR {have} is already harvested on this chip, so GDDR \
+                 {want} cannot be harvested as well; clear this override with \
+                 `bh-mod res {path}`",
+                have = instance_list(already),
+                want = instance_list(mask & !already),
             );
-            anyhow::ensure!(
-                mask.count_ones() <= MAX_HARVESTED_DRAM,
-                "{path}: 0x{mask:x} has {n} bits set, but only one GDDR instance can be \
-                 soft-harvested at a time; use 0 (harvest none) or a single bit \
-                 (1, 2, 4, 8, 16, 32, 64, 128)",
-                n = mask.count_ones(),
-            );
+            if mask & already != 0 {
+                tracing::warn!(
+                    "{path}: GDDR {list} is already harvested on this chip, so this \
+                     override has no effect",
+                    list = instance_list(mask & already),
+                );
+            }
         }
-        "product_spec_harvesting.dram_disable_count" => {
-            let count = as_u32(path, value)?;
-            // CalculateHarvesting computes `8 - count` into a uint8_t, so a
-            // count above NUM_GDDR underflows to a huge value, the
-            // POPCOUNT comparison never fires, and the product-spec harvest
-            // is silently skipped altogether.
-            anyhow::ensure!(
-                count <= NUM_GDDR,
-                "{path}: {count} exceeds the {NUM_GDDR} GDDR instances on this chip; \
-                the allowable range of values for dram_disable_count are 0 or 1",
-            );
-            // Firmware clears a single bit (GDDR3) for this field no matter
-            // how large the count is, so a count above 1 cannot do what it
-            // says; worse, on a chip that already has one bank harvested by
-            // fuses it pushes the total to two and UMD stops enumerating.
-            anyhow::ensure!(
-                count <= MAX_HARVESTED_DRAM,
-                "{path}: {count} asks for more than {MAX_HARVESTED_DRAM} harvested DRAM \
-                 bank, which firmware cannot honour; use 0 or 1 instead",
-            );
-        }
-        _ => {}
     }
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{field, Value};
+    use super::{field, State, Value, GDDR_MASK, SOFT_HARVEST_DRAM_MASK as MASK};
 
-    const MASK: &str = "dram_table.soft_harvest_dram_mask";
-    const COUNT: &str = "product_spec_harvesting.dram_disable_count";
+    /// Every instance enabled — a part with nothing harvested.
+    const ALL_ENABLED: u32 = GDDR_MASK;
 
     /// Check a raw CLI value the way `Set::run` does. `table::set_value`
-    /// parses numeric fields with this same `serde_json::Number` parse, so
-    /// the value handed to `field` here matches the real one.
-    fn check(path: &str, raw: &str) -> anyhow::Result<()> {
+    /// parses numeric fields with this same `serde_json::Number` parse.
+    fn check(path: &str, raw: &str, state: &State) -> anyhow::Result<()> {
         let num = raw.parse().expect("test input parses as a JSON number");
-        field(path, &Value::Number(num))
+        field(path, &Value::Number(num), state)
     }
 
     #[test]
     fn accepts_none_and_single_instance() {
         for raw in ["0", "1", "2", "4", "8", "16", "32", "64", "128"] {
-            assert!(check(MASK, raw).is_ok(), "{raw} should be accepted");
+            assert!(
+                check(MASK, raw, &State::default()).is_ok(),
+                "{raw} should be accepted"
+            );
         }
     }
 
     #[test]
     fn rejects_multiple_instances() {
         for raw in ["3", "5", "6", "9", "129", "255"] {
-            let err = check(MASK, raw).expect_err("multi-bit mask should be rejected");
+            let err =
+                check(MASK, raw, &State::default()).expect_err("multi-bit mask should be rejected");
             assert!(
-                err.to_string().contains("only one GDDR instance"),
+                err.to_string().contains("only one can be harvested"),
                 "unexpected error for {raw}: {err}"
             );
         }
@@ -118,38 +158,10 @@ mod tests {
     #[test]
     fn rejects_bits_above_the_last_instance() {
         for raw in ["256", "512", "2147483648"] {
-            let err = check(MASK, raw).expect_err("out-of-range mask should be rejected");
+            let err = check(MASK, raw, &State::default())
+                .expect_err("out-of-range mask should be rejected");
             assert!(
-                err.to_string().contains("only 8 GDDR instances"),
-                "unexpected error for {raw}: {err}"
-            );
-        }
-    }
-
-    #[test]
-    fn accepts_harvest_counts_firmware_can_honour() {
-        for raw in ["0", "1"] {
-            assert!(check(COUNT, raw).is_ok(), "{raw} should be accepted");
-        }
-    }
-
-    #[test]
-    fn rejects_harvest_counts_above_one() {
-        for raw in ["2", "3", "8"] {
-            let err = check(COUNT, raw).expect_err("count above 1 should be rejected");
-            assert!(
-                err.to_string().contains("use 0 or 1"),
-                "unexpected error for {raw}: {err}"
-            );
-        }
-    }
-
-    #[test]
-    fn rejects_harvest_counts_that_underflow_firmware() {
-        for raw in ["9", "100", "4294967295"] {
-            let err = check(COUNT, raw).expect_err("count above 8 should be rejected");
-            assert!(
-                err.to_string().contains("exceeds the 8 GDDR instances"),
+                err.to_string().contains("is out of range"),
                 "unexpected error for {raw}: {err}"
             );
         }
@@ -157,21 +169,74 @@ mod tests {
 
     #[test]
     fn rejects_non_integer_values() {
-        for path in [MASK, COUNT] {
-            for raw in ["-1", "1.5", "4294967296"] {
-                assert!(check(path, raw).is_err(), "{path}={raw} should be rejected");
-            }
+        for raw in ["-1", "1.5", "4294967296"] {
+            assert!(
+                check(MASK, raw, &State::default()).is_err(),
+                "{raw} should be rejected"
+            );
         }
     }
 
     #[test]
+    fn accepts_single_instance_on_an_unharvested_part() {
+        let state = State::from_telemetry(ALL_ENABLED, 0);
+        for raw in ["0", "1", "8", "128"] {
+            assert!(check(MASK, raw, &state).is_ok(), "{raw} should be accepted");
+        }
+    }
+
+    #[test]
+    fn rejects_harvesting_a_second_bank() {
+        let state = State::from_telemetry(ALL_ENABLED & !(1 << 2), 0);
+        for raw in ["1", "8", "128"] {
+            let err = check(MASK, raw, &state).expect_err("a second bank must not be harvested");
+            assert!(
+                err.to_string().contains("GDDR 2 is already harvested"),
+                "unexpected error for {raw}: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn accepts_a_mask_that_lands_on_the_harvested_instance() {
+        // Naming an instance that is already down is a no-op, not a second
+        // bank; clearing to 0 is likewise harmless.
+        let state = State::from_telemetry(ALL_ENABLED & !(1 << 2), 0);
+        assert_eq!(state.unaccounted_harvest, Some(1 << 2));
+        assert!(check(MASK, "4", &state).is_ok());
+        assert!(check(MASK, "0", &state).is_ok());
+    }
+
+    #[test]
+    fn replacing_an_existing_mask_stays_allowed() {
+        // GDDR3 is down only because the active mask asked for it.
+        let state = State::from_telemetry(ALL_ENABLED & !(1 << 3), 8);
+        assert!(check(MASK, "16", &state).is_ok());
+        assert!(check(MASK, "0", &state).is_ok());
+    }
+
+    #[test]
+    fn unreported_telemetry_does_not_block_writes() {
+        assert_eq!(State::from_telemetry(0, 0).unaccounted_harvest, None);
+        assert!(check(MASK, "8", &State::from_telemetry(0, 0)).is_ok());
+    }
+
+    #[test]
+    fn harvest_arithmetic_ignores_bits_above_the_last_instance() {
+        assert_eq!(
+            State::from_telemetry(ALL_ENABLED, 0).unaccounted_harvest,
+            Some(0)
+        );
+        assert_eq!(
+            State::from_telemetry(!0xf0, 0).unaccounted_harvest,
+            Some(0xf0)
+        );
+    }
+
+    #[test]
     fn leaves_other_fields_alone() {
-        // tdp_limit is the other numeric field exposed for override and has
-        // no bit-level constraint; dram_mask is the separate hard-disable
-        // mask, which is not restricted to a single bit either. A value that
-        // the harvesting fields would reject must pass for both.
         for path in ["chip_limits.tdp_limit", "dram_table.dram_mask"] {
-            assert!(field(path, &Value::Number(255.into())).is_ok());
+            assert!(field(path, &Value::Number(255.into()), &State::default()).is_ok());
         }
     }
 }

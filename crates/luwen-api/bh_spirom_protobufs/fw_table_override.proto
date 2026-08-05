@@ -19,12 +19,11 @@ message FwTableOverride {
    * (FwTable field 1) is deliberately reserved here so tt-mod cannot forge
    * a bundle version.
    */
-  reserved 1, 4, 6, 7, 8, 9;
+  reserved 1, 4, 6, 7, 8, 9, 10;
 
   optional ChipLimits chip_limits = 2;
   optional FeatureEnable feature_enable = 3;
   optional DramTable dram_table = 5;
-  optional ProductSpecHarvesting product_spec_harvesting = 10;
 
   message ChipLimits {
 
@@ -46,12 +45,5 @@ message FwTableOverride {
     reserved 1, 2;
 
     optional uint32 soft_harvest_dram_mask = 3;
-  }
-
-  message ProductSpecHarvesting {
-
-    reserved 2, 3;
-    
-    optional uint32 dram_disable_count = 1;
   }
 }

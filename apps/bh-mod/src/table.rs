@@ -633,6 +633,7 @@ impl<'a> Set<'a> {
                 .context("reading ccfgovr")?;
             let mut new_map = before_map.clone();
             let mut paths: Vec<&str> = Vec::new();
+            let state = harvest_state(*id, bh, &cmfwcfg, &before_map, &self.fields)?;
             for spec in &self.fields {
                 let (path, raw) = spec
                     .split_once('=')
@@ -644,7 +645,7 @@ impl<'a> Set<'a> {
                     .with_context(|| format!("unknown field path: {path}"))?
                     .clone();
                 set_value(&mut typed, path, raw)?;
-                crate::check::field(path, &typed)?;
+                crate::check::field(path, &typed, &state)?;
                 insert_at_path(&mut new_map, path, typed);
                 paths.push(path);
             }
@@ -676,6 +677,41 @@ impl<'a> Set<'a> {
         }
         Ok(())
     }
+}
+
+/// Read the chip state `check::field` needs, skipping the read unless a
+/// field that needs it is being assigned.
+fn harvest_state(
+    id: usize,
+    bh: &Blackhole,
+    cmfwcfg: &HashMap<String, Value>,
+    ovr: &HashMap<String, Value>,
+    specs: &[String],
+) -> anyhow::Result<crate::check::State> {
+    use luwen_api::ChipImpl as _;
+
+    let path = crate::check::SOFT_HARVEST_DRAM_MASK;
+    let assigning_mask = specs
+        .iter()
+        .any(|spec| spec.split_once('=').is_some_and(|(p, _)| p == path));
+    if !assigning_mask {
+        return Ok(crate::check::State::default());
+    }
+    // Mask already in effect: the override when set, else the cmfwcfg
+    // default. Zero reads as unset, as everywhere else here.
+    let active = [ovr, cmfwcfg]
+        .into_iter()
+        .filter_map(|m| get_value(m, path).and_then(Value::as_u64))
+        .find(|v| *v != 0)
+        .unwrap_or(0);
+    let telemetry = bh
+        .get_telemetry()
+        .map_err(|e| anyhow::anyhow!("{e}"))
+        .with_context(|| format!("reading telemetry for chip {id} to check DRAM harvesting"))?;
+    Ok(crate::check::State::from_telemetry(
+        telemetry.enabled_gddr,
+        u32::try_from(active).unwrap_or(u32::MAX),
+    ))
 }
 
 /// Fill empty `old`/`new` strings in diffs with the cmfwcfg default so

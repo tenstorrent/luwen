@@ -53,22 +53,23 @@ Fields use dot-notation matching the proto layout. The output of
 `bh-mod get` is self-documenting: any path it prints is a valid input to
 `set` or `res`.
 
-## Validated fields
+## Checked fields
 
-A few fields accept values the protobuf schema allows but the hardware
-cannot honour. `set` rejects those before writing anything, since the
-resulting config is applied at boot and published to the host as
-harvesting telemetry — and UMD refuses to enumerate a chip reporting more
-than one harvested DRAM bank, which takes `tt-smi`, `tt-flash` and
-`tt-metal` down with it.
+`dram_table.soft_harvest_dram_mask` accepts values the schema allows but
+the chip cannot use — at most one DRAM bank may be harvested, and a chip
+reporting more stops being detectable by `tt-smi`, `tt-flash` and
+`tt-metal`. `set` accepts only `0` or one of `1 2 4 8 16 32 64 128`.
 
-| Field | Accepted | Why |
-| --- | --- | --- |
-| `dram_table.soft_harvest_dram_mask` | `0`, or one bit in `0..=7` | One bit per GDDR instance, of which there are 8. Firmware soft-harvests at most one. |
-| `product_spec_harvesting.dram_disable_count` | `0` or `1` | Firmware clears a single GDDR for this field; a higher count cannot be honoured, and on a part with a fuse-harvested bank it pushes the total to two. |
+It is also checked against the chip in front of you:
+parts that left test with a GDDR instance already harvested cannot take
+another, so `set` reads the harvested instances from telemetry and refuses
+values that would add a second one. Naming the instance that is already
+harvested is allowed and warns that the override has no effect. That read
+happens only when this field is assigned, so other `set` commands do not
+depend on telemetry.
 
-Rejections happen before any flash write and before the chip reset, so a
-refused `set` leaves the override exactly as it was. Values are decimal.
+Rejections happen before any flash write or chip reset, so a refused `set`
+leaves the override exactly as it was. Values are decimal.
 
 ## How `ccfgovr` works
 
