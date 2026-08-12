@@ -192,12 +192,14 @@ impl PciDevice {
     pub fn write_no_dma<T>(&mut self, addr: u32, data: &[T]) -> Result<(), PciError> {
         unsafe {
             let ptr = match &self.pci_bar {
-                Some(bar) => bar.register_address_mut::<T>(addr),
+                Some(bar) => bar.register_address_mut::<u8>(addr),
                 None => {
                     return Err(PciError::BarUnmapped);
                 }
             };
-            ptr.copy_from_nonoverlapping(data.as_ptr(), data.len());
+            let data =
+                std::slice::from_raw_parts(data.as_ptr().cast::<u8>(), std::mem::size_of_val(data));
+            Self::memcpy_to_device(ptr, data);
         }
 
         Ok(())
@@ -389,7 +391,7 @@ impl PciDevice {
         }
 
         if data.len() >= std::mem::size_of::<u32>() {
-            self.detect_ffffffff_read(Some(unsafe { (data.as_ptr() as *const u32).read() }))?;
+            self.detect_ffffffff_read(Some(u32::from_le_bytes(data[..4].try_into().unwrap())))?;
         }
 
         Ok(())
@@ -421,7 +423,7 @@ impl PciDevice {
         }
 
         if data.len() >= std::mem::size_of::<u32>() {
-            self.detect_ffffffff_read(Some(unsafe { (data.as_ptr() as *const u32).read() }))?;
+            self.detect_ffffffff_read(Some(u32::from_le_bytes(data[..4].try_into().unwrap())))?;
         }
 
         Ok(())
@@ -439,82 +441,24 @@ impl PciDevice {
     /// This function requires that dest is a value returned by the self.register_address
     /// function.
     pub unsafe fn memcpy_to_device(dest: *mut u8, src: &[u8]) {
-        // Memcpy implementations on aarch64 systems seem to generate invalid code which does not
-        // properly respect alignment requirements of the aarch64 "memmove" instruction.
-        let align = if cfg!(target_arch = "aarch64") {
-            4 * core::mem::align_of::<u32>()
-        } else {
-            core::mem::align_of::<u32>()
-        };
-
         let mut offset = 0;
         while offset < src.len() {
-            let bytes_left = src.len() - offset;
+            let addr = dest.add(offset) as usize;
+            let byte_offset = addr & (core::mem::size_of::<u32>() - 1);
+            let write_count = (core::mem::size_of::<u32>() - byte_offset).min(src.len() - offset);
+            let aligned = (addr & !(core::mem::align_of::<u32>() - 1)) as *mut u32;
 
-            let block_write_length = bytes_left & !(align - 1);
-
-            let dest_misalign = ((dest as usize) + offset) % align;
-            let src_misalign = ((src.as_ptr() as usize) + offset) % align;
-
-            // Our device pcie controller requires that we write in a minimum of 4 byte chunks, and
-            // that those chunks are aligned to 4 byte boundaries.
-            if bytes_left < 4
-                || dest_misalign != 0
-                || src_misalign != 0
-                || block_write_length < align
-            {
-                let addr = (dest as usize) + offset;
-                let byte_offset = addr % core::mem::align_of::<u32>();
-
-                let src_size_bytes = (core::mem::size_of::<u32>() - byte_offset).min(bytes_left);
-
-                let mut src_data = 0u32;
-                for i in (offset..(offset + src_size_bytes)).rev() {
-                    src_data <<= 8;
-                    src_data |= src[i] as u32;
-                }
-
-                let to_write = if byte_offset != 0 || src_size_bytes != 4 {
-                    // cannot do an unaligned read
-                    let dest_data =
-                        ((addr & !(core::mem::align_of::<u32>() - 1)) as *mut u32).read();
-
-                    let shift = byte_offset * 8;
-                    let src_mask = ((1 << (src_size_bytes * 8)) - 1) << shift;
-
-                    /*
-                    println!(
-                        "{dest_data:x} & {:x} = {:x}",
-                        !src_mask,
-                        dest_data & !src_mask
-                    );
-
-                    println!(
-                        "({src_data:x} << {}) & {:x} = {:x}",
-                        shift,
-                        src_mask,
-                        (src_data << shift) & src_mask
-                    );
-                    */
-
-                    (dest_data & !src_mask) | ((src_data << shift) & src_mask)
-                } else {
-                    src_data
-                };
-
-                // println!("{to_write:x}");
-
-                ((addr & !(core::mem::align_of::<u32>() - 1)) as *mut u32).write_volatile(to_write);
-
-                offset += src_size_bytes;
+            let value = if byte_offset == 0 && write_count == core::mem::size_of::<u32>() {
+                u32::from_le_bytes(src[offset..offset + 4].try_into().unwrap())
             } else {
-                // Everything is aligned!
-                ((dest as usize + offset) as *mut u32).copy_from_nonoverlapping(
-                    (src.as_ptr() as usize + offset) as *const u32,
-                    block_write_length / core::mem::size_of::<u32>(),
-                );
-                offset += block_write_length;
-            }
+                let mut bytes = aligned.read_volatile().to_le_bytes();
+                bytes[byte_offset..byte_offset + write_count]
+                    .copy_from_slice(&src[offset..offset + write_count]);
+                u32::from_le_bytes(bytes)
+            };
+
+            aligned.write_volatile(value);
+            offset += write_count;
         }
     }
 
@@ -525,52 +469,20 @@ impl PciDevice {
     /// in hangs, or system reboots.
     ///
     /// # Safety
-    /// This function requires that dest is a value returned by the self.register_address
+    /// This function requires that src is a value returned by the self.register_address
     /// function.
     pub unsafe fn memcpy_from_device(dest: &mut [u8], src: *const u8) {
-        let align = if cfg!(target_arch = "aarch64") {
-            4 * core::mem::align_of::<u32>()
-        } else {
-            core::mem::align_of::<u32>()
-        };
-
         let mut offset = 0;
         while offset < dest.len() {
-            let bytes_left = dest.len() - offset;
+            let addr = src.add(offset) as usize;
+            let byte_offset = addr & (core::mem::size_of::<u32>() - 1);
+            let read_count = (core::mem::size_of::<u32>() - byte_offset).min(dest.len() - offset);
+            let aligned = (addr & !(core::mem::align_of::<u32>() - 1)) as *const u32;
+            let bytes = aligned.read_volatile().to_le_bytes();
 
-            let block_write_length = bytes_left & !(core::mem::align_of::<u32>() - 1);
-
-            let dest_misalign = ((dest.as_ptr() as usize) + offset) % align;
-            let src_misalign = ((src as usize) + offset) % align;
-
-            // Our device pcie controller requires that we read in a minimum of 4 byte chunks, and
-            // that those chunks are aligned to 4 byte boundaries.
-            if bytes_left < 4
-                || dest_misalign != 0
-                || src_misalign != 0
-                || block_write_length < align
-            {
-                let addr = (src as usize) + offset;
-                let byte_offset = addr % core::mem::align_of::<u32>();
-                let shift = byte_offset * 8;
-
-                let src_data = ((addr & !(core::mem::align_of::<u32>() - 1)) as *mut u32).read();
-                let read = src_data >> shift;
-
-                let read_count = (core::mem::size_of::<u32>() - byte_offset).min(bytes_left);
-
-                let read = read.to_le_bytes();
-                dest[offset..(read_count + offset)].copy_from_slice(&read[..read_count]);
-
-                offset += read_count
-            } else {
-                // Everything is aligned!
-                ((dest.as_ptr() as usize + offset) as *mut u32).copy_from_nonoverlapping(
-                    (src as usize + offset) as *const u32,
-                    block_write_length / core::mem::size_of::<u32>(),
-                );
-                offset += block_write_length;
-            }
+            dest[offset..offset + read_count]
+                .copy_from_slice(&bytes[byte_offset..byte_offset + read_count]);
+            offset += read_count;
         }
     }
 }
