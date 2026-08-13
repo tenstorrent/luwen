@@ -12,6 +12,16 @@ use serde_json::Value;
 /// whether it needs to read the chip.
 pub const SOFT_HARVEST_DRAM_MASK: &str = "dram_table.soft_harvest_dram_mask";
 
+/// Dot-path of the ETH link speed.
+const ETH_SPEED_OVERRIDE: &str = "eth_property_table.eth_speed_override";
+
+/// Speeds the ERISC firmware implements today, in Gbps. 0 is auto-train,
+/// which the firmware hands to ERISC when the fw table names it. Adding a
+/// speed here means shipping a new bh-mod alongside the ERISC firmware
+/// that adds it; the tradeoff is that a typo fails at `bh-mod set` rather
+/// than after a reset with a log line nobody reads.
+const ETH_SPEEDS: &[u32] = &[0, 40, 100, 200, 330, 350, 370, 400];
+
 /// GDDR instances on a Blackhole chip; the mask carries one bit each.
 const NUM_GDDR: u32 = 8;
 
@@ -82,6 +92,22 @@ fn as_u32(path: &str, value: &Value) -> anyhow::Result<u32> {
 /// Check one `field=value` assignment, called by `table::Set` before the
 /// value is staged. Paths with no constraints pass unchanged.
 pub fn field(path: &str, value: &Value, state: &State) -> anyhow::Result<()> {
+    // Reject speeds the ERISC firmware does not implement, so a typo fails
+    // here rather than after a reset. 0 is a real value that asks ERISC to
+    // auto-train, distinct from `bh-mod res`, which clears the override.
+    if path == ETH_SPEED_OVERRIDE {
+        let speed = as_u32(path, value)?;
+        anyhow::ensure!(
+            ETH_SPEEDS.contains(&speed),
+            "{path}: {speed}G is not a speed the ETH firmware implements; \
+             use one of {opts} (0 asks the ETH firmware to auto-train)",
+            opts = ETH_SPEEDS
+                .iter()
+                .map(u32::to_string)
+                .collect::<Vec<_>>()
+                .join(", "),
+        );
+    }
     if path == SOFT_HARVEST_DRAM_MASK {
         let mask = as_u32(path, value)?;
         anyhow::ensure!(

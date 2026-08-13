@@ -19,11 +19,12 @@ message FwTableOverride {
    * (FwTable field 1) is deliberately reserved here so tt-mod cannot forge
    * a bundle version.
    */
-  reserved 1, 4, 6, 7, 8, 9, 10;
+  reserved 1, 4, 6, 7, 8, 10;
 
   optional ChipLimits chip_limits = 2;
   optional FeatureEnable feature_enable = 3;
   optional DramTable dram_table = 5;
+  optional EthPropertyTable eth_property_table = 9;
 
   message ChipLimits {
 
@@ -46,5 +47,18 @@ message FwTableOverride {
     reserved 1, 2;
 
     optional uint32 soft_harvest_dram_mask = 3;
+  }
+
+  message EthPropertyTable {
+
+    reserved 1, 2;
+
+    /*
+     * Link speed in Gbps. The base fw table is `optional` too, so an
+     * explicit 0 survives the merge and reaches ERISC as its auto-train
+     * sentinel (which is not the image default; that ships as 400G).
+     * Distinct from `bh-mod res`, which clears the override entirely.
+     */
+    optional uint32 eth_speed_override = 3;
   }
 }
