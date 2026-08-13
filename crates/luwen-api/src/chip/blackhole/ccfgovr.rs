@@ -379,6 +379,30 @@ mod tests {
         assert_eq!(proto_prefix_len(&body).unwrap(), proto.len());
     }
 
+    // Cover the whole write/read cycle for the ETH link speed with the
+    // trickiest value: 0 is the proto3 default for `uint32`, so it only
+    // survives because the field is `optional`. Walk the JSON map bh-mod
+    // edits, the encode and framing `write` applies, and the prefix
+    // recovery `read_bank` does.
+    #[test]
+    fn eth_speed_override_of_zero_survives_a_write_read_cycle() {
+        use spirom_tables::fw_table_override::fw_table_override::EthPropertyTable;
+
+        let map = spirom_tables::to_hash_map(FwTableOverride {
+            eth_property_table: Some(EthPropertyTable {
+                eth_speed_override: Some(0),
+            }),
+            ..Default::default()
+        });
+        let body = frame(&spirom_tables::from_hash_map::<FwTableOverride>(map).encode_to_vec());
+
+        let decoded = FwTableOverride::decode(&body[..proto_prefix_len(&body).unwrap()]).unwrap();
+        assert_eq!(
+            decoded.eth_property_table.unwrap().eth_speed_override,
+            Some(0)
+        );
+    }
+
     #[test]
     fn prefix_len_len_delimited_containing_zero() {
         // chip_limits{tdp_limit=0} then feature_enable{...=false}: exercises a

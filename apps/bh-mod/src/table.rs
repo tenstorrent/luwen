@@ -1006,6 +1006,14 @@ fn split(path: &str) -> (&str, Option<&str>) {
 mod tests {
     use super::*;
 
+    /// Build the map `Set::run` hands to `ccfgovr_write` for a single
+    /// assignment onto an empty override.
+    fn set_one(path: &str, value: Value) -> HashMap<String, Value> {
+        let mut map = HashMap::new();
+        insert_at_path(&mut map, path, value);
+        map
+    }
+
     /// A field the cmfwcfg leaves unset serializes as null, so it carries no
     /// type to copy. Setting it still has to work, or every `optional` field
     /// absent from a given board's table would be unreachable.
@@ -1025,5 +1033,29 @@ mod tests {
         assert_eq!(infer_value("0"), Value::from(0));
         assert_eq!(infer_value("true"), Value::Bool(true));
         assert_eq!(infer_value("auto"), Value::String("auto".into()));
+    }
+
+    /// 0 is included on purpose: it asks the ETH FW to auto-train and has
+    /// to reach the chip like any other value, even though it is the proto3
+    /// default for `uint32`. The `optional` in the override schema is what
+    /// keeps the encoder from dropping it.
+    #[test]
+    fn eth_speed_override_survives_the_override_schema() {
+        let path = "eth_property_table.eth_speed_override";
+        for speed in [0u32, 40, 100, 200, 330, 350, 370, 400] {
+            let map = set_one(path, Value::from(speed));
+            assert_eq!(
+                get_value(&override_round_trip(&map), path),
+                get_value(&map, path),
+                "eth_speed_override={speed} must survive the override schema",
+            );
+        }
+    }
+
+    #[test]
+    fn other_eth_fields_stay_gated() {
+        let path = "eth_property_table.eth_disable_mask";
+        let map = set_one(path, Value::from(0x3fff));
+        assert_eq!(get_value(&override_round_trip(&map), path), None);
     }
 }

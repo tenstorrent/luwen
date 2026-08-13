@@ -147,7 +147,10 @@ pub fn field(path: &str, value: &Value, state: &State) -> anyhow::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{field, State, Value, GDDR_MASK, SOFT_HARVEST_DRAM_MASK as MASK};
+    use super::{
+        field, State, Value, ETH_SPEED_OVERRIDE as ETH_SPEED, GDDR_MASK,
+        SOFT_HARVEST_DRAM_MASK as MASK,
+    };
 
     /// Every instance enabled — a part with nothing harvested.
     const ALL_ENABLED: u32 = GDDR_MASK;
@@ -257,6 +260,29 @@ mod tests {
             State::from_telemetry(!0xf0, 0).unaccounted_harvest,
             Some(0xf0)
         );
+    }
+
+    /// Includes 0, which asks the ETH firmware to auto-train.
+    #[test]
+    fn accepts_any_supported_eth_speed() {
+        for raw in ["0", "40", "100", "200", "330", "350", "370", "400"] {
+            assert!(
+                check(ETH_SPEED, raw, &State::default()).is_ok(),
+                "{raw} should be accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_an_unsupported_eth_speed() {
+        for raw in ["1", "50", "800"] {
+            let err = check(ETH_SPEED, raw, &State::default())
+                .expect_err("unsupported eth speed should be rejected");
+            assert!(
+                err.to_string().contains("not a speed the ETH firmware"),
+                "unexpected error for {raw}: {err}"
+            );
+        }
     }
 
     #[test]
