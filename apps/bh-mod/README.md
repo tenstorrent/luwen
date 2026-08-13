@@ -115,6 +115,15 @@ bh-mod set chip_limits.asic_fmax=1350
 # are exposed in fw_table_override.proto)
 bh-mod set chip_limits.tdp_limit=160
 
+# Raise the ETH link speed above what cmfwcfg pins it to. bh-mod validates
+# against the speeds the ERISC firmware implements (0, 40, 100, 200, 330,
+# 350, 370, 400), so a typo fails here rather than after a reset. 0 is a
+# real value that asks the ETH firmware to auto-train.
+bh-mod set eth_property_table.eth_speed_override=400
+
+# Go back to the cmfwcfg speed
+bh-mod res eth_property_table.eth_speed_override
+
 # Remove one override (cmfwcfg value re-emerges)
 bh-mod res chip_limits.tdp_limit
 
