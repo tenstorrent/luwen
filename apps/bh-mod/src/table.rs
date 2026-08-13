@@ -972,14 +972,58 @@ fn set_value(val: &mut Value, path: &str, raw: &str) -> anyhow::Result<()> {
             .map(Value::Bool)
             .with_context(|| format!("cannot parse {raw:?} for field {path}"))?,
         Value::String(_) => Value::String(raw.to_string()),
+        // An `optional` field the cmfwcfg leaves unset serializes as null, so
+        // it carries no type to copy. The path is real -- a bogus one is
+        // already rejected by the get_value above -- so infer the type from
+        // the value instead. A wrong guess cannot reach the chip: the
+        // FwTableOverride round-trip below drops anything the schema does
+        // not accept at that path.
+        Value::Null => infer_value(raw),
         _ => anyhow::bail!("unknown field path: {path}"),
     };
     Ok(())
+}
+
+/// Parse `raw` without a type to copy, preferring the narrowest match.
+fn infer_value(raw: &str) -> Value {
+    if let Ok(n) = serde_json::from_str::<serde_json::Number>(raw) {
+        return Value::Number(n);
+    }
+    if let Ok(b) = raw.parse::<bool>() {
+        return Value::Bool(b);
+    }
+    Value::String(raw.to_string())
 }
 
 fn split(path: &str) -> (&str, Option<&str>) {
     match path.find('.') {
         Some(i) => (&path[..i], Some(&path[i + 1..])),
         None => (path, None),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A field the cmfwcfg leaves unset serializes as null, so it carries no
+    /// type to copy. Setting it still has to work, or every `optional` field
+    /// absent from a given board's table would be unreachable.
+    #[test]
+    fn a_null_typed_field_can_still_be_set() {
+        let path = "eth_property_table.eth_speed_override";
+        for (raw, want) in [("400", Value::from(400)), ("0", Value::from(0))] {
+            let mut val = Value::Null;
+            set_value(&mut val, path, raw).expect("null-typed field should be settable");
+            assert_eq!(val, want, "{raw} should parse to {want}");
+        }
+    }
+
+    #[test]
+    fn infer_value_prefers_the_narrowest_type() {
+        assert_eq!(infer_value("400"), Value::from(400));
+        assert_eq!(infer_value("0"), Value::from(0));
+        assert_eq!(infer_value("true"), Value::Bool(true));
+        assert_eq!(infer_value("auto"), Value::String("auto".into()));
     }
 }
