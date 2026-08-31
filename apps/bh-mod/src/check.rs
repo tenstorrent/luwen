@@ -22,6 +22,14 @@ const ETH_SPEED_OVERRIDE: &str = "eth_property_table.eth_speed_override";
 /// than after a reset with a log line nobody reads.
 const ETH_SPEEDS: &[u32] = &[0, 40, 100, 200, 330, 350, 370, 400];
 
+/// Dot-paths of the PCIe generation cap on each instance.
+const PCI0_MAX_PCIE_SPEED: &str = "pci0_property_table.max_pcie_speed";
+const PCI1_MAX_PCIE_SPEED: &str = "pci1_property_table.max_pcie_speed";
+
+/// PCIe generation numbers firmware accepts. 0 is unconstrained
+/// (Gen 5 default), distinct from `bh-mod res`.
+const PCIE_GENS: &[u32] = &[0, 1, 2, 3, 4, 5];
+
 /// GDDR instances on a Blackhole chip; the mask carries one bit each.
 const NUM_GDDR: u32 = 8;
 
@@ -102,6 +110,19 @@ pub fn field(path: &str, value: &Value, state: &State) -> anyhow::Result<()> {
             "{path}: {speed}G is not a speed the ETH firmware implements; \
              use one of {opts} (0 asks the ETH firmware to auto-train)",
             opts = ETH_SPEEDS
+                .iter()
+                .map(u32::to_string)
+                .collect::<Vec<_>>()
+                .join(", "),
+        );
+    }
+    if path == PCI0_MAX_PCIE_SPEED || path == PCI1_MAX_PCIE_SPEED {
+        let gen = as_u32(path, value)?;
+        anyhow::ensure!(
+            PCIE_GENS.contains(&gen),
+            "{path}: {gen} is not a PCIe generation the SerDes firmware accepts; \
+             use one of {opts} (0 is unconstrained, the Gen 5 blob default)",
+            opts = PCIE_GENS
                 .iter()
                 .map(u32::to_string)
                 .collect::<Vec<_>>()
