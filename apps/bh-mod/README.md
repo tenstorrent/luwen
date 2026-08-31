@@ -68,6 +68,12 @@ harvested is allowed and warns that the override has no effect. That read
 happens only when this field is assigned, so other `set` commands do not
 depend on telemetry.
 
+`pci0_property_table.max_pcie_speed` and
+`pci1_property_table.max_pcie_speed` accept `{0, 1, 2, 3, 4, 5}`. `0` is
+unconstrained (Gen 5 default). Set the instance whose
+`pcie_mode` is `EP` (`bh-mod get` prints this from cmfwcfg): typically
+pci0 on P150, pci1 on Galaxy, and swapped left/right on P300.
+
 Rejections happen before any flash write or chip reset, so a refused `set`
 leaves the override exactly as it was. Values are decimal.
 
@@ -123,6 +129,13 @@ bh-mod set eth_property_table.eth_speed_override=400
 
 # Go back to the cmfwcfg speed
 bh-mod res eth_property_table.eth_speed_override
+
+# Cap the endpoint at Gen 4. Use the instance whose pcie_mode is EP
+# (`bh-mod get` shows this). 0 is unconstrained (Gen 5 default).
+bh-mod set pci0_property_table.max_pcie_speed=4
+
+# Go back to the cmfwcfg generation
+bh-mod res pci0_property_table.max_pcie_speed
 
 # Remove one override (cmfwcfg value re-emerges)
 bh-mod res chip_limits.tdp_limit
