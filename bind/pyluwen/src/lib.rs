@@ -17,8 +17,8 @@ use luwen::def::Arch;
 use luwen::kmd::PossibleTlbAllocation;
 use luwen::pci::{DmaConfig, ExtendedPciDeviceWrapper};
 use pyo3::exceptions::PyException;
-use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
+use pyo3::{prelude::*, IntoPyObjectExt as _};
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -398,7 +398,7 @@ macro_rules! common_chip_comms_impls {
                 addr: u64,
                 data: pyo3::buffer::PyBuffer<u8>,
             ) -> PyResult<()> {
-                Python::with_gil(|_py| {
+                Python::attach(|_py| {
                     let ptr: *mut u8 = data.buf_ptr().cast();
                     let len = data.len_bytes();
 
@@ -426,7 +426,7 @@ macro_rules! common_chip_comms_impls {
                 addr: u64,
                 data: pyo3::buffer::PyBuffer<u8>,
             ) -> PyResult<()> {
-                Python::with_gil(|_py| {
+                Python::attach(|_py| {
                     let ptr: *mut u8 = data.buf_ptr().cast();
                     let len = data.len_bytes();
 
@@ -458,7 +458,7 @@ macro_rules! common_chip_comms_impls {
                 addr: u64,
                 data: pyo3::buffer::PyBuffer<u8>,
             ) -> PyResult<()> {
-                Python::with_gil(|_py| {
+                Python::attach(|_py| {
                     let ptr: *mut u8 = data.buf_ptr().cast();
                     let len = data.len_bytes();
 
@@ -523,7 +523,7 @@ macro_rules! common_chip_comms_impls {
                 addr: u64,
                 data: pyo3::buffer::PyBuffer<u8>,
             ) -> PyResult<()> {
-                Python::with_gil(|_py| {
+                Python::attach(|_py| {
                     let ptr: *mut u8 = data.buf_ptr().cast();
                     let len = data.len_bytes();
 
@@ -544,7 +544,7 @@ macro_rules! common_chip_comms_impls {
             }
 
             pub fn axi_read(&self, addr: u64, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
-                Python::with_gil(|_py| {
+                Python::attach(|_py| {
                     let ptr: *mut u8 = data.buf_ptr().cast();
                     let len = data.len_bytes();
 
@@ -565,7 +565,7 @@ macro_rules! common_chip_comms_impls {
             }
 
             pub fn axi_write(&self, addr: u64, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
-                Python::with_gil(|_py| {
+                Python::attach(|_py| {
                     let ptr: *mut u8 = data.buf_ptr().cast();
                     let len = data.len_bytes();
 
@@ -682,6 +682,7 @@ impl PciChip {
     }
 
     #[new]
+    #[pyo3(signature = (pci_interface = None))]
     pub fn new(pci_interface: Option<usize>) -> PyResult<Self> {
         let pci_interface = pci_interface.unwrap_or(0);
 
@@ -706,7 +707,7 @@ impl PciChip {
     }
 
     #[pyo3(signature = (callback = None))]
-    pub fn init(&mut self, callback: Option<PyObject>) -> PyResult<()> {
+    pub fn init(&mut self, callback: Option<Py<PyAny>>) -> PyResult<()> {
         #[allow(clippy::type_complexity)]
         let mut callback: Box<
             dyn FnMut(luwen::api::chip::ChipDetectState) -> Result<(), PyErr>,
@@ -721,7 +722,7 @@ impl PciChip {
                     >(status)
                 };
                 if let Err(err) =
-                    Python::with_gil(|py| callback.call1(py, (PyChipDetectState(status),)))
+                    Python::attach(|py| callback.call1(py, (PyChipDetectState(status),)))
                 {
                     Err(err)
                 } else {
@@ -729,7 +730,7 @@ impl PciChip {
                 }
             })
         } else {
-            Box::new(|_| Python::with_gil(|py| py.check_signals()))
+            Box::new(|_| Python::attach(|py| py.check_signals()))
         };
 
         match wait_for_init(&mut self.0, &mut callback, false, false) {
@@ -1037,6 +1038,7 @@ impl From<luwen::api::EthAddr> for EthAddr {
 
 #[pymethods]
 impl PciWormhole {
+    #[pyo3(signature = (rack_x=None, rack_y=None, shelf_x=None, shelf_y=None))]
     pub fn open_remote(
         &self,
         rack_x: Option<u8>,
@@ -1183,7 +1185,7 @@ impl PciWormhole {
     }
 
     pub fn spi_read(&self, addr: u32, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
-        Python::with_gil(|_py| {
+        Python::attach(|_py| {
             let ptr: *mut u8 = data.buf_ptr().cast();
             let len = data.len_bytes();
 
@@ -1195,7 +1197,7 @@ impl PciWormhole {
     }
 
     pub fn spi_write(&self, addr: u32, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
-        Python::with_gil(|_py| {
+        Python::attach(|_py| {
             let ptr: *mut u8 = data.buf_ptr().cast();
             let len = data.len_bytes();
 
@@ -1255,7 +1257,7 @@ common_chip_comms_impls!(RemoteWormhole);
 
 impl RemoteWormhole {
     pub fn spi_read(&self, addr: u32, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
-        Python::with_gil(|_py| {
+        Python::attach(|_py| {
             let ptr: *mut u8 = data.buf_ptr().cast();
             let len = data.len_bytes();
 
@@ -1267,7 +1269,7 @@ impl RemoteWormhole {
     }
 
     pub fn spi_write(&self, addr: u32, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
-        Python::with_gil(|_py| {
+        Python::attach(|_py| {
             let ptr: *mut u8 = data.buf_ptr().cast();
             let len = data.len_bytes();
 
@@ -1420,7 +1422,7 @@ impl PciBlackhole {
     }
 
     pub fn spi_read(&self, addr: u32, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
-        Python::with_gil(|_py| {
+        Python::attach(|_py| {
             let ptr: *mut u8 = data.buf_ptr().cast();
             let len = data.len_bytes();
 
@@ -1432,7 +1434,7 @@ impl PciBlackhole {
     }
 
     pub fn spi_write(&self, addr: u32, data: pyo3::buffer::PyBuffer<u8>) -> PyResult<()> {
-        Python::with_gil(|_py| {
+        Python::attach(|_py| {
             let ptr: *mut u8 = data.buf_ptr().cast();
             let len = data.len_bytes();
 
@@ -1452,7 +1454,7 @@ impl PciBlackhole {
 
     pub fn decode_boot_fs_table(&self, tag_name: &str) -> PyResult<Py<PyDict>> {
         // Deserialize the boot fs table given the tag name and return it as a pydict with the correct types
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let result = self
                 .0
                 .decode_boot_fs_table(tag_name)
@@ -1460,8 +1462,8 @@ impl PciBlackhole {
             let py_dict = PyDict::new(py);
             // Convert the HashMap<String, Value> to a pydict
             for (key, value) in result {
-                let py_key: PyObject = key.into_py(py);
-                let py_value: PyObject = serde_json_value_to_pyobject(py, &value)?;
+                let py_key = key.into_pyobject(py)?;
+                let py_value: Py<PyAny> = serde_json_value_to_pyobject(py, &value)?;
                 py_dict.set_item(py_key, py_value)?;
             }
             Ok(py_dict.into())
@@ -1475,7 +1477,7 @@ impl PciBlackhole {
         tag_name: &str,
     ) -> PyResult<()> {
         // Convert the pydict to a HashMap<String, Value>
-        let py_dict = message.as_ref(py);
+        let py_dict = message.bind(py);
         let mut result: HashMap<String, Value> = HashMap::new();
 
         for (key, value) in py_dict.iter() {
@@ -1608,7 +1610,7 @@ impl UninitPciChip {
         let chip = self
             .chip
             .clone()
-            .init(&mut |_| Python::with_gil(|py| py.check_signals()));
+            .init(&mut |_| Python::attach(|py| py.check_signals()));
         match chip {
             Ok(chip) => Ok(PciChip(chip)),
             Err(InitError::PlatformError(err)) => Err(PyException::new_err(err.to_string())),
@@ -1656,7 +1658,7 @@ pub fn detect_chips_fallible(
     continue_on_failure: bool,
     chip_filter: Option<Vec<String>>,
     noc_safe: bool,
-    callback: Option<PyObject>,
+    callback: Option<Py<PyAny>>,
 ) -> PyResult<Vec<UninitPciChip>> {
     let interfaces = interfaces.unwrap_or_default();
 
@@ -1730,7 +1732,7 @@ pub fn detect_chips_fallible(
                     >(status)
                 };
                 if let Err(err) =
-                    Python::with_gil(|py| callback.call1(py, (PyChipDetectState(status),)))
+                    Python::attach(|py| callback.call1(py, (PyChipDetectState(status),)))
                 {
                     Err(err)
                 } else {
@@ -1738,7 +1740,7 @@ pub fn detect_chips_fallible(
                 }
             })
         } else {
-            Box::new(|_| Python::with_gil(|py| py.check_signals()))
+            Box::new(|_| Python::attach(|py| py.check_signals()))
         };
     let mut chips = match luwen::api::detect_chips(root_chips, &mut callback, options) {
         Ok(chips) => chips,
@@ -1776,7 +1778,7 @@ pub fn detect_chips(
     continue_on_failure: bool,
     chip_filter: Option<Vec<String>>,
     noc_safe: bool,
-    callback: Option<PyObject>,
+    callback: Option<Py<PyAny>>,
 ) -> PyResult<Vec<PciChip>> {
     let chips = detect_chips_fallible(
         interfaces,
@@ -1815,7 +1817,7 @@ pub fn run_ubb_wait_for_driver_load() {
 }
 
 #[pymodule]
-fn pyluwen(_py: Python, m: &PyModule) -> PyResult<()> {
+fn pyluwen(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PciChip>()?;
     m.add_class::<UninitPciChip>()?;
     m.add_class::<PciWormhole>()?;
@@ -1835,47 +1837,47 @@ fn pyluwen(_py: Python, m: &PyModule) -> PyResult<()> {
     Ok(())
 }
 
-/// Helper function to convert serde_json::Value to PyObject
-fn serde_json_value_to_pyobject(py: Python, value: &Value) -> PyResult<PyObject> {
+/// Helper function to convert serde_json::Value to Py<PyAny>
+fn serde_json_value_to_pyobject(py: Python, value: &Value) -> PyResult<Py<PyAny>> {
     match value {
         Value::Null => Ok(py.None()),
-        Value::Bool(b) => Ok(b.into_py(py)),
+        Value::Bool(b) => b.into_py_any(py),
         Value::Number(n) => {
             if let Some(value) = n.as_i64() {
-                Ok(value.into_py(py))
+                value.into_py_any(py)
             } else if let Some(value) = n.as_u64() {
-                Ok(value.into_py(py))
+                value.into_py_any(py)
             } else if let Some(value) = n.as_f64() {
-                Ok(value.into_py(py))
+                value.into_py_any(py)
             } else {
                 unimplemented!("No support for number of type {n}")
             }
         }
-        Value::String(s) => Ok(s.into_py(py)),
+        Value::String(s) => s.into_py_any(py),
         Value::Array(arr) => {
             // For the list we need to recursively convert each item
-            let py_list: &PyList = PyList::empty(py);
+            let py_list = PyList::empty(py);
             for item in arr {
-                let py_item: PyObject = serde_json_value_to_pyobject(py, item)?;
+                let py_item: Py<PyAny> = serde_json_value_to_pyobject(py, item)?;
                 py_list.append(py_item)?;
             }
-            Ok(py_list.into_py(py))
+            py_list.into_py_any(py)
         }
         Value::Object(obj) => {
             // For the dict we need to recursively convert each key and value
-            let py_dict: &PyDict = PyDict::new(py);
+            let py_dict = PyDict::new(py);
             for (key, value) in obj {
-                let py_key: PyObject = key.into_py(py);
-                let py_value: PyObject = serde_json_value_to_pyobject(py, value)?;
+                let py_key = key.into_pyobject(py)?;
+                let py_value: Py<PyAny> = serde_json_value_to_pyobject(py, value)?;
                 py_dict.set_item(py_key, py_value)?;
             }
-            Ok(py_dict.into_py(py))
+            py_dict.into_py_any(py)
         }
     }
 }
 
-/// Helper function to convert PyObject to serde_json::Value
-fn pyobject_to_serde_json_value(_py: Python, obj: &PyAny) -> PyResult<Value> {
+/// Helper function to convert Py<PyAny> to serde_json::Value
+fn pyobject_to_serde_json_value(_py: Python, obj: Bound<'_, PyAny>) -> PyResult<Value> {
     if obj.is_none() {
         Ok(Value::Null)
     } else if let Ok(b) = obj.extract::<bool>() {
@@ -1890,13 +1892,13 @@ fn pyobject_to_serde_json_value(_py: Python, obj: &PyAny) -> PyResult<Value> {
         )?))
     } else if let Ok(s) = obj.extract::<String>() {
         Ok(Value::String(s))
-    } else if let Ok(list) = obj.downcast::<PyList>() {
+    } else if let Ok(list) = obj.cast::<PyList>() {
         let mut array = Vec::new();
         for item in list {
             array.push(pyobject_to_serde_json_value(_py, item)?);
         }
         Ok(Value::Array(array))
-    } else if let Ok(dict) = obj.downcast::<PyDict>() {
+    } else if let Ok(dict) = obj.cast::<PyDict>() {
         let mut map = serde_json::Map::new();
         for (key, value) in dict {
             let key: String = key.extract()?;
