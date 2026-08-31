@@ -1058,4 +1058,30 @@ mod tests {
         let map = set_one(path, Value::from(0x3fff));
         assert_eq!(get_value(&override_round_trip(&map), path), None);
     }
+
+    /// 0 is unconstrained (Gen 5 blob default) and must survive like any
+    /// other generation, even though it is the proto3 default for `uint32`.
+    #[test]
+    fn max_pcie_speed_survives_the_override_schema() {
+        for path in [
+            "pci0_property_table.max_pcie_speed",
+            "pci1_property_table.max_pcie_speed",
+        ] {
+            for gen in [0u32, 1, 2, 3, 4, 5] {
+                let map = set_one(path, Value::from(gen));
+                assert_eq!(
+                    get_value(&override_round_trip(&map), path),
+                    get_value(&map, path),
+                    "{path}={gen} must survive the override schema",
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn other_pci_fields_stay_gated() {
+        let path = "pci0_property_table.pcie_mode";
+        let map = set_one(path, Value::from(1));
+        assert_eq!(get_value(&override_round_trip(&map), path), None);
+    }
 }
