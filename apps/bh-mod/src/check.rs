@@ -170,7 +170,7 @@ pub fn field(path: &str, value: &Value, state: &State) -> anyhow::Result<()> {
 mod tests {
     use super::{
         field, State, Value, ETH_SPEED_OVERRIDE as ETH_SPEED, GDDR_MASK,
-        SOFT_HARVEST_DRAM_MASK as MASK,
+        PCI0_MAX_PCIE_SPEED as PCI0, PCI1_MAX_PCIE_SPEED as PCI1, SOFT_HARVEST_DRAM_MASK as MASK,
     };
 
     /// Every instance enabled — a part with nothing harvested.
@@ -303,6 +303,32 @@ mod tests {
                 err.to_string().contains("not a speed the ETH firmware"),
                 "unexpected error for {raw}: {err}"
             );
+        }
+    }
+
+    #[test]
+    fn accepts_any_supported_pcie_gen() {
+        for path in [PCI0, PCI1] {
+            for raw in ["0", "1", "2", "3", "4", "5"] {
+                assert!(
+                    check(path, raw, &State::default()).is_ok(),
+                    "{path}={raw} should be accepted"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn rejects_an_unsupported_pcie_gen() {
+        for path in [PCI0, PCI1] {
+            for raw in ["6", "7", "32"] {
+                let err = check(path, raw, &State::default())
+                    .expect_err("unsupported pcie gen should be rejected");
+                assert!(
+                    err.to_string().contains("not a PCIe generation"),
+                    "unexpected error for {path}={raw}: {err}"
+                );
+            }
         }
     }
 
