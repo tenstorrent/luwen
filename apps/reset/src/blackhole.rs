@@ -70,11 +70,25 @@ impl Reset for ResetTracker {
     }
 
     fn restore(&mut self) {
-        let fd = std::fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(format!("/dev/tenstorrent/{}", self.interface))
-            .unwrap();
+        // The config-write reset makes the KMD destroy and re-create the char
+        // device node, while wait() polls the sysfs config (which persists), so
+        // the node can still be missing here. Wait for the re-enumeration
+        // instead of racing it.
+        let path = format!("/dev/tenstorrent/{}", self.interface);
+        let mut file = None;
+        for attempt in 0..150 {
+            match OpenOptions::new().read(true).write(true).open(&path) {
+                Ok(f) => {
+                    file = Some(f);
+                    break;
+                }
+                Err(e) if attempt == 149 => {
+                    panic!("device node {path} did not reappear within 15s of reset completion: {e}");
+                }
+                Err(_) => std::thread::sleep(std::time::Duration::from_millis(100)),
+            }
+        }
+        let fd = file.unwrap();
         let mut reset_device = luwen::kmd::ioctl::ResetDevice {
             input: luwen::kmd::ioctl::ResetDeviceIn {
                 flags: luwen::kmd::ioctl::RESET_DEVICE_RESTORE_STATE,
