@@ -243,11 +243,7 @@ mod tests {
         fn get_device_info(&self) -> Result<Option<DeviceInfo>, Box<dyn std::error::Error>> {
             Ok(None)
         }
-        fn axi_read(
-            &self,
-            _addr: u32,
-            _data: &mut [u8],
-        ) -> Result<(), Box<dyn std::error::Error>> {
+        fn axi_read(&self, _addr: u32, _data: &mut [u8]) -> Result<(), Box<dyn std::error::Error>> {
             Err("unused".into())
         }
         fn axi_write(&self, _addr: u32, _data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
@@ -480,7 +476,10 @@ mod tests {
     fn wait_for_init_fails_on_gddr_error_by_default() {
         let mut chip = GddrFailedChip::new(true);
         let result = wait_for_init::<Infallible>(&mut chip, &mut |_| Ok(()), false, false);
-        assert!(result.is_err(), "strict init must fail when GDDR/FW is borked");
+        assert!(
+            result.is_err(),
+            "strict init must fail when GDDR/FW is borked"
+        );
     }
 
     #[test]

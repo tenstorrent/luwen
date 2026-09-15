@@ -64,12 +64,12 @@ pub fn evaluate_flash_arc(
 fn flash_warning(fw: FwBoot, error_status0: Option<u32>) -> Option<String> {
     match fw {
         FwBoot::Error => Some(gddr_warning(error_status0)),
-        FwBoot::Started => Some(
-            "BH FW boot not complete; ARC mailbox is up so flash can proceed".to_string(),
-        ),
-        FwBoot::Unknown => Some(
-            "BH FW boot status unknown; ARC mailbox is up so flash can proceed".to_string(),
-        ),
+        FwBoot::Started => {
+            Some("BH FW boot not complete; ARC mailbox is up so flash can proceed".to_string())
+        }
+        FwBoot::Unknown => {
+            Some("BH FW boot status unknown; ARC mailbox is up so flash can proceed".to_string())
+        }
         FwBoot::NotStarted | FwBoot::Done | FwBoot::Unreadable => None,
     }
 }
@@ -90,11 +90,7 @@ mod tests {
 
     #[test]
     fn gddr_train_error_is_ready_when_mailbox_safe() {
-        let outcome = evaluate_flash_arc(
-            FwBoot::Error,
-            true,
-            Some(INIT_STAGE_GDDR_TRAIN),
-        );
+        let outcome = evaluate_flash_arc(FwBoot::Error, true, Some(INIT_STAGE_GDDR_TRAIN));
         match outcome {
             FlashArcOutcome::Ready { warning } => {
                 let warning = warning.expect("GDDR train error should warn");
@@ -114,10 +110,7 @@ mod tests {
     #[test]
     fn done_and_safe_is_ready_without_warning() {
         let outcome = evaluate_flash_arc(FwBoot::Done, true, None);
-        assert_eq!(
-            outcome,
-            FlashArcOutcome::Ready { warning: None }
-        );
+        assert_eq!(outcome, FlashArcOutcome::Ready { warning: None });
     }
 
     #[test]

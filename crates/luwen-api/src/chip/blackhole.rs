@@ -678,7 +678,8 @@ impl ChipImpl for Blackhole {
                                         *status_string = Some("BH FW boot not started".to_string());
                                     }
                                     ArcFwInitStatus::Started => {
-                                        *status_string = Some("BH FW boot not complete".to_string());
+                                        *status_string =
+                                            Some("BH FW boot not complete".to_string());
                                     }
                                     ArcFwInitStatus::Done => {
                                         if !msg_safe {

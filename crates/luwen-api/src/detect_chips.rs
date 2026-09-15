@@ -6,9 +6,7 @@ use std::collections::HashSet;
 use luwen_def::Arch;
 
 use crate::{
-    chip::{
-        wait_for_init, wait_for_init_with_options, Chip, InitError, InitOptions, InitStatus,
-    },
+    chip::{wait_for_init, wait_for_init_with_options, Chip, InitError, InitOptions, InitStatus},
     error::{BtWrapper, PlatformError},
     ChipImpl, EthAddr,
 };

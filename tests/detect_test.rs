@@ -170,7 +170,10 @@ mod tests {
         assert!(hardware_available(), "Test requires hardware");
 
         let chips = luwen::pci::detect_chips_for_flash().unwrap();
-        assert!(!chips.is_empty(), "flash detect should find at least one chip");
+        assert!(
+            !chips.is_empty(),
+            "flash detect should find at least one chip"
+        );
         for chip in chips {
             assert!(
                 chip.as_wh().is_some() || chip.as_bh().is_some(),
