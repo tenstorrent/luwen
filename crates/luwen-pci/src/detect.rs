@@ -342,6 +342,28 @@ pub fn detect_chips() -> Result<Vec<Chip>, LuwenError> {
     Ok(output)
 }
 
+pub fn detect_chips_for_flash() -> Result<Vec<Chip>, LuwenError> {
+    let detect = start_detect(ChipDetectOptions {
+        continue_on_failure: true,
+        local_only: true,
+        noc_safe: true,
+        flash_safe: true,
+        ..Default::default()
+    })?;
+    match detect.detect(|_state| Ok::<(), Infallible>(())) {
+        Ok(chips) => Ok(chips
+            .into_iter()
+            .filter(|chip| match chip.status() {
+                None => true,
+                Some(status) => status.can_communicate(),
+            })
+            .map(UninitChip::upgrade)
+            .collect()),
+        Err(InitError::CallbackError(_)) => unreachable!("Somehow got an infallible error"),
+        Err(InitError::PlatformError(err)) => Err(err.into()),
+    }
+}
+
 pub fn detect_local_chips() -> Result<Vec<Chip>, LuwenError> {
     let chips = detect_chips_options(ChipDetectOptions {
         local_only: true,
