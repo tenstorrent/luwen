@@ -353,7 +353,8 @@ fn default_status() -> InitStatus {
         ),
         cpu_status: ComponentStatusInfo::not_present("CPU".to_string()),
 
-        init_options: InitOptions { noc_safe: false },
+        init_options: InitOptions::default(),
+        warnings: Vec::new(),
 
         unknown_state: false,
     }

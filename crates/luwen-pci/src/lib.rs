@@ -18,7 +18,8 @@ mod wormhole;
 use wormhole::ethernet::{self, EthCommCoord};
 
 pub use detect::{
-    detect_chips, detect_chips_fallible, detect_chips_silent, detect_local_chips, start_detect,
+    detect_chips, detect_chips_fallible, detect_chips_for_flash, detect_chips_silent,
+    detect_local_chips, start_detect,
 };
 pub use luwen_kmd::{DmaBuffer, DmaConfig, PciDevice, Tlb};
 

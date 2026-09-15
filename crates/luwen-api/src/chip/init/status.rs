@@ -342,6 +342,9 @@ impl<P, E> ComponentStatusInfo<P, E> {
 pub struct InitOptions {
     /// If false, then we will not try to initialize anything that would require talking on the NOC
     pub noc_safe: bool,
+    /// If true, GDDR train/BIST (and similar non-fatal FW boot errors) do not
+    /// block init. Used by tt-flash: SPI only needs PCIe + an ARC mailbox.
+    pub flash_safe: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -377,6 +380,10 @@ pub struct InitStatus {
     pub eth_status: ComponentStatusInfo<EthernetPartialInitError, EthernetInitError>,
 
     pub init_options: InitOptions,
+
+    /// Non-fatal problems noticed during init (for example GDDR train/BIST
+    /// failure while flashing). Empty on a clean boot.
+    pub warnings: Vec<String>,
 
     /// We cannot communicate with the chip prior to the initialization process. Therefore we start
     /// with the chip in an unknown state (all status is marked as not present).
@@ -436,6 +443,10 @@ impl fmt::Display for InitStatus {
             write_component_status(&self.eth_status)
         )?;
         writeln!(f, "   Noc Safe: {:?}", self.init_options.noc_safe)?;
+        writeln!(f, "   Flash Safe: {:?}", self.init_options.flash_safe)?;
+        if !self.warnings.is_empty() {
+            writeln!(f, "   Warnings: {}", self.warnings.join("; "))?;
+        }
         writeln!(f, "   Unknown State: {}", self.unknown_state)
     }
 }
@@ -449,6 +460,7 @@ impl InitStatus {
             arc_status: ComponentStatusInfo::not_present("ARC".to_string()),
             eth_status: ComponentStatusInfo::not_present("ETH".to_string()),
             init_options: InitOptions::default(),
+            warnings: Vec::new(),
             unknown_state: true,
         }
     }
