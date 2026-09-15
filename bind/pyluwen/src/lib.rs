@@ -1803,15 +1803,7 @@ pub fn detect_chips_for_flash(
     chip_filter: Option<Vec<String>>,
     callback: Option<PyObject>,
 ) -> PyResult<Vec<PciChip>> {
-    let chips = detect_chips_fallible(
-        interfaces,
-        true,
-        true,
-        chip_filter,
-        true,
-        true,
-        callback,
-    )?;
+    let chips = detect_chips_fallible(interfaces, true, true, chip_filter, true, true, callback)?;
     Ok(chips
         .into_iter()
         .filter(|chip| chip.have_comms())
