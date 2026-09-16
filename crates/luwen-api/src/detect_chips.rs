@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use luwen_def::Arch;
 
 use crate::{
-    chip::{wait_for_init, Chip, InitError, InitStatus},
+    chip::{wait_for_init, wait_for_init_with_options, Chip, InitError, InitOptions, InitStatus},
     error::{BtWrapper, PlatformError},
     ChipImpl, EthAddr,
 };
@@ -181,6 +181,8 @@ pub struct ChipDetectOptions {
     pub chip_filter: Vec<Arch>,
     /// If true, then we will not initialize anything that might cause a problem (i.e. a noc hang).
     pub noc_safe: bool,
+    /// If true, GDDR train/BIST failures do not fail detect. SPI flash can proceed.
+    pub flash_safe: bool,
 }
 
 impl Default for ChipDetectOptions {
@@ -190,6 +192,7 @@ impl Default for ChipDetectOptions {
             local_only: false,
             chip_filter: Vec::new(),
             noc_safe: false,
+            flash_safe: false,
         }
     }
 }
@@ -211,6 +214,11 @@ impl ChipDetectOptions {
 
     pub fn noc_safe(mut self, noc_safe: bool) -> Self {
         self.noc_safe = noc_safe;
+        self
+    }
+
+    pub fn flash_safe(mut self, flash_safe: bool) -> Self {
+        self.flash_safe = flash_safe;
         self
     }
 }
@@ -256,6 +264,7 @@ pub fn detect_chips<E>(
         local_only,
         chip_filter,
         noc_safe,
+        flash_safe,
     } = options;
 
     let mut remotes_to_investigate = Vec::new();
@@ -271,7 +280,15 @@ pub fn detect_chips<E>(
             })?;
         }
 
-        let status = wait_for_init(root_chip, init_callback, continue_on_failure, noc_safe)?;
+        let status = wait_for_init_with_options(
+            root_chip,
+            init_callback,
+            continue_on_failure,
+            InitOptions {
+                noc_safe,
+                flash_safe,
+            },
+        )?;
 
         // We now want to convert to the uninitialized chip type.
         let chip = UninitChip::new(status, root_chip);
@@ -344,7 +361,15 @@ pub fn detect_chips<E>(
             if let Some(wh) = root_chip.as_wh() {
                 let mut wh = wh.open_remote(nchip.eth_addr)?;
 
-                let status = wait_for_init(&mut wh, init_callback, continue_on_failure, noc_safe)?;
+                let status = wait_for_init_with_options(
+                    &mut wh,
+                    init_callback,
+                    continue_on_failure,
+                    InitOptions {
+                        noc_safe,
+                        flash_safe,
+                    },
+                )?;
 
                 let local_coord = wh.get_local_chip_coord()?;
 
@@ -388,6 +413,25 @@ pub fn detect_chips<E>(
     }
 
     Ok(output)
+}
+
+/// Detect chips for SPI flash: wait for PCIe + ARC mailbox, ignore GDDR train/BIST.
+///
+/// Unlike [`detect_chips`], this always upgrades the chip so the caller can
+/// `spi_read` / `spi_write` even when firmware reports a GDDR error.
+pub fn detect_chips_for_flash<E>(
+    root_chips: Vec<Chip>,
+    init_callback: &mut impl FnMut(crate::chip::ChipDetectState) -> Result<(), E>,
+) -> Result<Vec<Chip>, InitError<E>> {
+    let options = ChipDetectOptions {
+        continue_on_failure: true,
+        local_only: true,
+        chip_filter: Vec::new(),
+        noc_safe: true,
+        flash_safe: true,
+    };
+    let chips = detect_chips(root_chips, init_callback, options)?;
+    Ok(chips.into_iter().map(UninitChip::upgrade).collect())
 }
 
 pub fn detect_initialized_chips<E>(

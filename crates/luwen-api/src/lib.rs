@@ -18,5 +18,7 @@ pub use arc_msg::{
 };
 pub use chip::eth_addr::{EthAddr, IntoChip};
 pub use chip::ChipImpl;
-pub use detect_chips::{detect_chips, detect_chips_silent, ChipDetectOptions, UninitChip};
+pub use detect_chips::{
+    detect_chips, detect_chips_for_flash, detect_chips_silent, ChipDetectOptions, UninitChip,
+};
 pub use interface::{CallbackStorage, DeviceInfo, FnAxi, FnDriver, FnNoc, FnOptions, FnRemote};

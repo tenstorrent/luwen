@@ -1649,13 +1649,14 @@ impl UninitPciChip {
 //from luwen, multiple points to different callback functions
 
 #[pyfunction]
-#[pyo3(signature = (interfaces = None, local_only = false, continue_on_failure = false, chip_filter = None, noc_safe = false, callback = None))]
+#[pyo3(signature = (interfaces = None, local_only = false, continue_on_failure = false, chip_filter = None, noc_safe = false, flash_safe = false, callback = None))]
 pub fn detect_chips_fallible(
     interfaces: Option<Vec<usize>>,
     local_only: bool,
     continue_on_failure: bool,
     chip_filter: Option<Vec<String>>,
     noc_safe: bool,
+    flash_safe: bool,
     callback: Option<PyObject>,
 ) -> PyResult<Vec<UninitPciChip>> {
     let interfaces = interfaces.unwrap_or_default();
@@ -1715,6 +1716,7 @@ pub fn detect_chips_fallible(
         local_only,
         chip_filter: converted_chip_filter,
         noc_safe,
+        flash_safe,
     };
 
     #[allow(clippy::type_complexity)]
@@ -1784,6 +1786,7 @@ pub fn detect_chips(
         continue_on_failure,
         chip_filter,
         noc_safe,
+        false,
         callback,
     )?;
     let mut output = Vec::with_capacity(chips.len());
@@ -1791,6 +1794,21 @@ pub fn detect_chips(
         output.push(chip.init()?);
     }
     Ok(output)
+}
+
+#[pyfunction]
+#[pyo3(signature = (interfaces = None, chip_filter = None, callback = None))]
+pub fn detect_chips_for_flash(
+    interfaces: Option<Vec<usize>>,
+    chip_filter: Option<Vec<String>>,
+    callback: Option<PyObject>,
+) -> PyResult<Vec<PciChip>> {
+    let chips = detect_chips_fallible(interfaces, true, true, chip_filter, true, true, callback)?;
+    Ok(chips
+        .into_iter()
+        .filter(|chip| chip.have_comms())
+        .map(|chip| PciChip(chip.chip.upgrade()))
+        .collect())
 }
 
 #[pyfunction]
@@ -1828,6 +1846,7 @@ fn pyluwen(_py: Python, m: &PyModule) -> PyResult<()> {
 
     m.add_wrapped(wrap_pyfunction!(detect_chips))?;
     m.add_wrapped(wrap_pyfunction!(detect_chips_fallible))?;
+    m.add_wrapped(wrap_pyfunction!(detect_chips_for_flash))?;
     m.add_wrapped(wrap_pyfunction!(pci_scan))?;
     m.add_wrapped(wrap_pyfunction!(run_wh_ubb_ipmi_reset))?;
     m.add_wrapped(wrap_pyfunction!(run_ubb_wait_for_driver_load))?;

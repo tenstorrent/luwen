@@ -21,8 +21,8 @@ pub use communication::chip_interface::{ChipInterface, NocInterface};
 pub use hl_comms::{HlComms, HlCommsInterface};
 pub use init::status::InitStatus;
 pub use init::{
-    status::{CommsStatus, ComponentStatusInfo},
-    wait_for_init, CallReason, ChipDetectState, InitError,
+    status::{CommsStatus, ComponentStatusInfo, InitOptions},
+    wait_for_init, wait_for_init_with_options, CallReason, ChipDetectState, InitError,
 };
 use luwen_def::Arch;
 pub use wormhole::Wormhole;

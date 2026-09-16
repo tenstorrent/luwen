@@ -163,4 +163,22 @@ mod tests {
         // Fail test if no Blackhole chip found
         assert!(found_bh, "Test failed: No Blackhole chip found");
     }
+
+    #[test]
+    #[cfg_attr(not(feature = "test_hardware"), ignore = "Requires hardware")]
+    fn detect_chips_for_flash_returns_usable_chips() {
+        assert!(hardware_available(), "Test requires hardware");
+
+        let chips = luwen::pci::detect_chips_for_flash().unwrap();
+        assert!(
+            !chips.is_empty(),
+            "flash detect should find at least one chip"
+        );
+        for chip in chips {
+            assert!(
+                chip.as_wh().is_some() || chip.as_bh().is_some(),
+                "flash detect should return a concrete chip"
+            );
+        }
+    }
 }

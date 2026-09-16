@@ -120,6 +120,17 @@ impl From<u8> for ArcFwInitStatus {
     }
 }
 
+fn fw_boot_from_status(status: Option<ArcFwInitStatus>) -> super::init::flash::FwBoot {
+    match status {
+        None => super::init::flash::FwBoot::Unreadable,
+        Some(ArcFwInitStatus::NotStarted) => super::init::flash::FwBoot::NotStarted,
+        Some(ArcFwInitStatus::Started) => super::init::flash::FwBoot::Started,
+        Some(ArcFwInitStatus::Done) => super::init::flash::FwBoot::Done,
+        Some(ArcFwInitStatus::Error) => super::init::flash::FwBoot::Error,
+        Some(ArcFwInitStatus::Unknown(_)) => super::init::flash::FwBoot::Unknown,
+    }
+}
+
 impl Blackhole {
     pub(crate) fn init<
         CC: ChipComms + Send + Sync + 'static,
@@ -251,6 +262,11 @@ impl Blackhole {
         } else {
             false
         }
+    }
+
+    /// `reset_unit.SCRATCH_RAM[4]` / `error_status0` — one bit per `init_stage_id`.
+    pub fn error_status0(&self) -> Option<u32> {
+        self.axi_read32(self.scratch_ram_base.addr + (4 * 4)).ok()
     }
 
     /// Sends a blackhole ARC message.
@@ -578,7 +594,8 @@ fn default_status() -> InitStatus {
             4,
         ),
 
-        init_options: InitOptions { noc_safe: false },
+        init_options: InitOptions::default(),
+        warnings: Vec::new(),
 
         unknown_state: false,
     }
@@ -606,68 +623,117 @@ impl ChipImpl for Blackhole {
         }
 
         {
-            let status = &mut status.arc_status;
-            for s in status.wait_status.iter_mut() {
-                match s {
-                    WaitStatus::Waiting(status_string) => {
-                        let msg_safe = self.check_arc_msg_safe();
-                        let fw_status = self.arc_fw_init_status();
+            let flash_safe = status.init_options.flash_safe;
+            let error_status0 = if flash_safe {
+                self.error_status0()
+            } else {
+                None
+            };
+            let mut new_warnings = Vec::new();
+            {
+                let status = &mut status.arc_status;
+                for s in status.wait_status.iter_mut() {
+                    match s {
+                        WaitStatus::Waiting(status_string) => {
+                            let msg_safe = self.check_arc_msg_safe();
+                            let fw_status = self.arc_fw_init_status();
 
-                        if let Some(fw_status) = fw_status {
-                            match fw_status {
-                                ArcFwInitStatus::NotStarted => {
-                                    *status_string = Some("BH FW boot not started".to_string());
-                                }
-                                ArcFwInitStatus::Started => {
-                                    *status_string = Some("BH FW boot not complete".to_string());
-                                }
-                                ArcFwInitStatus::Done => {
-                                    if !msg_safe {
-                                        *status_string = Some(
-                                            "BH FW arc msg queue init not complete".to_string(),
-                                        );
-                                    } else {
+                            if flash_safe {
+                                match super::init::flash::evaluate_flash_arc(
+                                    fw_boot_from_status(fw_status),
+                                    msg_safe,
+                                    error_status0,
+                                ) {
+                                    super::init::flash::FlashArcOutcome::Ready { warning } => {
+                                        if let Some(warning) = warning {
+                                            new_warnings.push(warning);
+                                        }
                                         *s = WaitStatus::JustFinished;
                                     }
+                                    super::init::flash::FlashArcOutcome::Waiting(msg) => {
+                                        *status_string = msg;
+                                        if status.start_time.elapsed() > status.timeout {
+                                            *s = WaitStatus::Error(
+                                                super::init::status::ArcInitError::WaitingForInit(
+                                                    crate::error::ArcReadyError::BootIncomplete,
+                                                ),
+                                            );
+                                        }
+                                    }
+                                    super::init::flash::FlashArcOutcome::Fatal(msg) => {
+                                        *status_string = Some(msg);
+                                        *s = WaitStatus::Error(
+                                            super::init::status::ArcInitError::WaitingForInit(
+                                                crate::error::ArcReadyError::NoAccess,
+                                            ),
+                                        );
+                                    }
                                 }
-                                ArcFwInitStatus::Error => {
-                                    *status_string = Some("BH FW Boot error".to_string());
-                                    *s = WaitStatus::Error(
-                                        super::init::status::ArcInitError::WaitingForInit(
-                                            crate::error::ArcReadyError::BootError,
-                                        ),
-                                    );
-                                }
-                                ArcFwInitStatus::Unknown(status) => {
-                                    *status_string = Some(format!("BH FW Boot status unknown {status} (will wait to see if it becomes known)"));
-                                }
+                                continue;
                             }
 
-                            // If we are still waiting after changing status and (potentially) reassigning to a hard error
-                            if let WaitStatus::Waiting(_) = s {
-                                // and we timed out, then raise a boot incomplete error
-                                if status.start_time.elapsed() > status.timeout {
-                                    *s = WaitStatus::Error(
-                                        super::init::status::ArcInitError::WaitingForInit(
-                                            crate::error::ArcReadyError::BootIncomplete,
-                                        ),
-                                    );
+                            if let Some(fw_status) = fw_status {
+                                match fw_status {
+                                    ArcFwInitStatus::NotStarted => {
+                                        *status_string = Some("BH FW boot not started".to_string());
+                                    }
+                                    ArcFwInitStatus::Started => {
+                                        *status_string =
+                                            Some("BH FW boot not complete".to_string());
+                                    }
+                                    ArcFwInitStatus::Done => {
+                                        if !msg_safe {
+                                            *status_string = Some(
+                                                "BH FW arc msg queue init not complete".to_string(),
+                                            );
+                                        } else {
+                                            *s = WaitStatus::JustFinished;
+                                        }
+                                    }
+                                    ArcFwInitStatus::Error => {
+                                        *status_string = Some("BH FW Boot error".to_string());
+                                        *s = WaitStatus::Error(
+                                            super::init::status::ArcInitError::WaitingForInit(
+                                                crate::error::ArcReadyError::BootError,
+                                            ),
+                                        );
+                                    }
+                                    ArcFwInitStatus::Unknown(status) => {
+                                        *status_string = Some(format!("BH FW Boot status unknown {status} (will wait to see if it becomes known)"));
+                                    }
                                 }
+
+                                // If we are still waiting after changing status and (potentially) reassigning to a hard error
+                                if let WaitStatus::Waiting(_) = s {
+                                    // and we timed out, then raise a boot incomplete error
+                                    if status.start_time.elapsed() > status.timeout {
+                                        *s = WaitStatus::Error(
+                                            super::init::status::ArcInitError::WaitingForInit(
+                                                crate::error::ArcReadyError::BootIncomplete,
+                                            ),
+                                        );
+                                    }
+                                }
+                            } else {
+                                *status_string =
+                                    Some("Failed to access fw to read init status".to_string());
+                                *s = WaitStatus::Error(
+                                    super::init::status::ArcInitError::WaitingForInit(
+                                        crate::error::ArcReadyError::NoAccess,
+                                    ),
+                                );
                             }
-                        } else {
-                            *status_string =
-                                Some("Failed to access fw to read init status".to_string());
-                            *s = WaitStatus::Error(
-                                super::init::status::ArcInitError::WaitingForInit(
-                                    crate::error::ArcReadyError::NoAccess,
-                                ),
-                            );
                         }
+                        WaitStatus::JustFinished => {
+                            *s = WaitStatus::Done;
+                        }
+                        _ => {}
                     }
-                    WaitStatus::JustFinished => {
-                        *s = WaitStatus::Done;
-                    }
-                    _ => {}
+                }
+            }
+            for warning in new_warnings {
+                if !status.warnings.contains(&warning) {
+                    status.warnings.push(warning);
                 }
             }
         }
