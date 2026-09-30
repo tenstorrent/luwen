@@ -16,6 +16,11 @@ pre-compiled binary to your `$PATH` or by using your package manager. See the
 
 [protoc.install]: https://protobuf.dev/installation
 
+Note: the Cargo build itself uses the protoc bundled by the `protoc-bin-vendored`
+crate rather than the system one. On riscv64 hosts, for which no official protoc
+release binary exists, it instead builds protoc from source via the `protobuf-src`
+crate, which additionally requires `cmake` and a C++17 compiler.
+
 ## Libraries
 
 ### Rust
