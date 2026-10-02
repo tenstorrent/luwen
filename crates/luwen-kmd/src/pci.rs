@@ -441,7 +441,9 @@ impl PciDevice {
     pub unsafe fn memcpy_to_device(dest: *mut u8, src: &[u8]) {
         // Memcpy implementations on aarch64 systems seem to generate invalid code which does not
         // properly respect alignment requirements of the aarch64 "memmove" instruction.
-        let align = if cfg!(target_arch = "aarch64") {
+        // riscv64 libc memcpy may likewise use 8-byte accesses, so apply the same wider
+        // alignment there to keep MMIO accesses to the device BAR aligned.
+        let align = if cfg!(any(target_arch = "aarch64", target_arch = "riscv64")) {
             4 * core::mem::align_of::<u32>()
         } else {
             core::mem::align_of::<u32>()
@@ -528,7 +530,7 @@ impl PciDevice {
     /// This function requires that dest is a value returned by the self.register_address
     /// function.
     pub unsafe fn memcpy_from_device(dest: &mut [u8], src: *const u8) {
-        let align = if cfg!(target_arch = "aarch64") {
+        let align = if cfg!(any(target_arch = "aarch64", target_arch = "riscv64")) {
             4 * core::mem::align_of::<u32>()
         } else {
             core::mem::align_of::<u32>()

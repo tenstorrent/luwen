@@ -32,4 +32,12 @@ tracing.workspace = true
 [build-dependencies]
 home = { version = "=0.5.5", default-features = false }
 prost-build = "0.13.5"
+
+# protoc-bin-vendored repackages Google's official protoc release binaries, which exist for
+# x86_64/aarch64/ppc64le/s390x but not riscv64. On riscv64 hosts build protoc from source
+# (protobuf-src, needs cmake and a C++17 compiler) so the build stays self-contained.
+[target.'cfg(not(target_arch = "riscv64"))'.build-dependencies]
 protoc-bin-vendored = "3.2.0"
+
+[target.'cfg(target_arch = "riscv64")'.build-dependencies]
+protobuf-src = "2.1"
