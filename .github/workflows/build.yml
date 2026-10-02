@@ -48,39 +48,34 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        # python-version is a bit misleading. ABI is what we actually care about
+        # so these are really cp310 and abi3.
+        python-version: ["3.10", "3.11"]
+        target: ["x86_64", "riscv64"]
+
         include:
+          # Set abi parameters from python-version.
           - python-version: "3.10"
-            target: x86_64
+            abi-args: "--interpreter 3.10"
+            wheel-abi-name: cp310
+          - python-version: "3.11"
+            abi-args: "--features abi3-py311"
+            wheel-abi-name: abi3
+
+          # Set manylinux from target.
+          - target: x86_64
             manylinux: 2_28
-            args: >-
-              --release --out dist
-              -m bind/pyluwen/Cargo.toml
-              --interpreter python3.10
-            artifact: wheels-cp310
+          - target: riscv64
+            manylinux: 2_31 # see https://github.com/PyO3/maturin-action#manylinux-docker-container
+
+          # Set wheel target suffix based on target.
+          - target: riscv64
+            wheel-target-suffix: -riscv64
+
+          # Use x86-64/3.11 build to build source dist once.
           - python-version: "3.11"
             target: x86_64
-            manylinux: 2_28
-            args: >-
-              --release --sdist --out dist
-              -m bind/pyluwen/Cargo.toml
-              --features abi3-py311
-            artifact: wheels-abi3
-          - python-version: "3.10"
-            target: riscv64
-            manylinux: 2_31
-            args: >-
-              --release --out dist
-              -m bind/pyluwen/Cargo.toml
-              --interpreter python3.10
-            artifact: wheels-cp310-riscv64
-          - python-version: "3.11"
-            target: riscv64
-            manylinux: 2_31
-            args: >-
-              --release --out dist
-              -m bind/pyluwen/Cargo.toml
-              --features abi3-py311
-            artifact: wheels-abi3-riscv64
+            sdist: --sdist
     steps:
       - uses: actions/checkout@v6
         with:
@@ -93,7 +88,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux }}
-          args: ${{ matrix.args }}
+          args: --release --out dist -m bind/pyluwen/Cargo.toml ${{ matrix.abi-args }}
           before-script-linux: |
             # manylinux_2_28 images are dnf based, the rust-cross images are apt based.
             if command -v dnf >/dev/null; then
@@ -105,5 +100,5 @@ jobs:
         if: inputs.upload
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.artifact }}
+          name: wheels-${{ matrix.wheel-abi-name }}${{ matrix.wheel-target-suffix }}
           path: dist
