@@ -47,7 +47,7 @@ jobs:
         # python-version is a bit misleading. ABI is what we actually care about
         # so these are really cp310 and abi3.
         python-version: ["3.10", "3.11"]
-        target: ["x86_64", "riscv64"]
+        target: ["x86_64", "riscv64", "aarch64"]
 
         include:
           # Set abi parameters from python-version.
@@ -63,10 +63,14 @@ jobs:
             manylinux: 2_28
           - target: riscv64
             manylinux: 2_31 # see https://github.com/PyO3/maturin-action#manylinux-docker-container
+          - target: aarch64
+            manylinux: 2_28
 
           # Set wheel target suffix based on target.
           - target: riscv64
             wheel-target-suffix: -riscv64
+          - target: aarch64
+            wheel-target-suffix: -aarch64
 
           # Use x86-64/3.11 build to build source dist once.
           - python-version: "3.11"
