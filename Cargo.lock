@@ -967,7 +967,7 @@ checksum = "68ab91017fe16c622486840e4c83c9a37afeff978bd239b5293d61ece587de66"
 
 [[package]]
 name = "libluwen"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "cbindgen",
  "cc",
@@ -1021,7 +1021,7 @@ checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 
 [[package]]
 name = "luwen"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "luwen-api",
  "luwen-def",
@@ -1033,7 +1033,7 @@ dependencies = [
 
 [[package]]
 name = "luwen-api"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "bincode",
  "bitfield-struct",
@@ -1056,11 +1056,11 @@ dependencies = [
 
 [[package]]
 name = "luwen-def"
-version = "0.9.0"
+version = "0.10.0"
 
 [[package]]
 name = "luwen-kmd"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "bitfield-struct",
  "luwen-def",
@@ -1072,7 +1072,7 @@ dependencies = [
 
 [[package]]
 name = "luwen-pci"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "indicatif 0.17.11",
  "luwen-api",
@@ -1576,7 +1576,7 @@ checksum = "95067976aca6421a523e491fce939a3e65249bac4b977adee0ee9771568e8aa3"
 
 [[package]]
 name = "pyluwen"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "luwen",
  "pyo3",
