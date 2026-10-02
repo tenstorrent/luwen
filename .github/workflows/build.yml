@@ -31,8 +31,6 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.ref }}
-      - name: Install protoc
-        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Build workspace
@@ -87,13 +85,6 @@ jobs:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux }}
           args: --release --out dist -m bind/pyluwen/Cargo.toml ${{ matrix.abi-args }}
-          before-script-linux: |
-            # manylinux_2_28 images are dnf based, the rust-cross images are apt based.
-            if command -v dnf >/dev/null; then
-              dnf install -y protobuf-compiler
-            else
-              apt-get update && apt-get install -y protobuf-compiler
-            fi
       - name: Store wheel
         if: inputs.upload
         uses: actions/upload-artifact@v7
