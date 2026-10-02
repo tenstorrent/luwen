@@ -41,9 +41,7 @@ jobs:
   # Build Python wheels.
   #
   # x86_64 wheels are built natively in the manylinux_2_28 image. riscv64 wheels are
-  # cross-compiled from the x86_64 runner with maturin's manylinux_2_31 cross image;
-  # the build script (and therefore protoc-bin-vendored) runs on the x86_64 host, so no
-  # riscv64 protoc is needed.
+  # cross-compiled from the x86_64 runner with maturin's manylinux_2_31 cross image.
   py:
     runs-on: ubuntu-latest
     strategy:
