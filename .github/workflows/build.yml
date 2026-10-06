@@ -87,7 +87,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          manylinux: ${{ matrix.manylinux }}
+          manylinux: auto
           args: --release --out dist -m bind/pyluwen/Cargo.toml ${{ matrix.abi-args }}
       - name: Store wheel
         if: inputs.upload
