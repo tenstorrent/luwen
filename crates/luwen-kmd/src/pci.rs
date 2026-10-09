@@ -540,7 +540,7 @@ impl PciDevice {
         while offset < dest.len() {
             let bytes_left = dest.len() - offset;
 
-            let block_write_length = bytes_left & !(core::mem::align_of::<u32>() - 1);
+            let block_write_length = bytes_left & !(align - 1);
 
             let dest_misalign = ((dest.as_ptr() as usize) + offset) % align;
             let src_misalign = ((src as usize) + offset) % align;
