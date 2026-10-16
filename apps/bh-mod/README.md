@@ -137,6 +137,15 @@ bh-mod set pci0_property_table.max_pcie_speed=4
 # Go back to the cmfwcfg generation
 bh-mod res pci0_property_table.max_pcie_speed
 
+# Skip the boot-time cable fault check, so a 0 W 12V-2x6 power limit from
+# the DMC no longer puts the chip into low-power cable fault mode. For
+# bring-up and debug only; the board runs without that protection until
+# the override is cleared.
+bh-mod set feature_enable.bypass_cable_fault_detection=true
+
+# Re-arm cable fault detection
+bh-mod res feature_enable.bypass_cable_fault_detection
+
 # Remove one override (cmfwcfg value re-emerges)
 bh-mod res chip_limits.tdp_limit
 
