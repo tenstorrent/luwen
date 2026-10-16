@@ -1084,4 +1084,34 @@ mod tests {
         let map = set_one(path, Value::from(1));
         assert_eq!(get_value(&override_round_trip(&map), path), None);
     }
+
+    /// false is the proto3 default for `bool` and must survive like true:
+    /// it is how a bypass baked into cmfwcfg gets re-armed, and only the
+    /// `optional` in the override schema keeps the encoder from dropping it.
+    #[test]
+    fn bypass_cable_fault_detection_survives_the_override_schema() {
+        let path = "feature_enable.bypass_cable_fault_detection";
+        for bypass in [true, false] {
+            let map = set_one(path, Value::Bool(bypass));
+            assert_eq!(
+                get_value(&override_round_trip(&map), path),
+                get_value(&map, path),
+                "bypass_cable_fault_detection={bypass} must survive the override schema",
+            );
+        }
+    }
+
+    /// The rest of FeatureEnable stays reserved; cg_en in particular is
+    /// not something a host tool should flip.
+    #[test]
+    fn other_feature_enable_fields_stay_gated() {
+        for path in ["feature_enable.cg_en", "feature_enable.harvesting_en"] {
+            let map = set_one(path, Value::Bool(false));
+            assert_eq!(
+                get_value(&override_round_trip(&map), path),
+                None,
+                "{path} must stay gated by the override schema",
+            );
+        }
+    }
 }
