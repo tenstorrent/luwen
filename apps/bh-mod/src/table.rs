@@ -646,6 +646,7 @@ impl<'a> Set<'a> {
                     .clone();
                 set_value(&mut typed, path, raw)?;
                 crate::check::field(path, &typed, &state)?;
+                check_range(path, &typed)?;
                 insert_at_path(&mut new_map, path, typed);
                 paths.push(path);
             }
@@ -995,6 +996,23 @@ fn infer_value(raw: &str) -> Value {
     Value::String(raw.to_string())
 }
 
+/// Inclusive `(path, min, max, unit)` bounds for fields whose legal range is
+/// narrower than their protobuf type.
+const FIELD_RANGES: &[(&str, u64, u64, &str)] = &[("chip_limits.max_tdp_limit", 50, 200, "W")];
+
+/// Reject a value outside its field's range in `FIELD_RANGES`, warning
+/// first so the refusal is visible even when the error is not.
+fn check_range(path: &str, val: &Value) -> anyhow::Result<()> {
+    let Some(&(_, min, max, unit)) = FIELD_RANGES.iter().find(|(p, ..)| *p == path) else {
+        return Ok(());
+    };
+    if val.as_u64().is_some_and(|v| (min..=max).contains(&v)) {
+        return Ok(());
+    }
+    tracing::warn!("{path}={val} is out of range ({min}..={max} {unit})");
+    anyhow::bail!("refusing to set {path}={val}: must be between {min} and {max} {unit}");
+}
+
 fn split(path: &str) -> (&str, Option<&str>) {
     match path.find('.') {
         Some(i) => (&path[..i], Some(&path[i + 1..])),
@@ -1113,5 +1131,28 @@ mod tests {
                 "{path} must stay gated by the override schema",
             );
         }
+    }
+
+    fn check(path: &str, raw: &str) -> anyhow::Result<()> {
+        check_range(path, &serde_json::from_str(raw).unwrap())
+    }
+
+    #[test]
+    fn max_tdp_limit_accepts_bounds() {
+        for raw in ["50", "120", "200"] {
+            assert!(check("chip_limits.max_tdp_limit", raw).is_ok(), "{raw}");
+        }
+    }
+
+    #[test]
+    fn max_tdp_limit_rejects_out_of_range() {
+        for raw in ["0", "49", "201", "-1", "150.5"] {
+            assert!(check("chip_limits.max_tdp_limit", raw).is_err(), "{raw}");
+        }
+    }
+
+    #[test]
+    fn unranged_field_is_unchecked() {
+        assert!(check("chip_limits.tdp_limit", "1000").is_ok());
     }
 }
