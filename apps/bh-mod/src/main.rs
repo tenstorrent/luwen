@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use anyhow::Context as _;
 use clap::Parser as _;
 use luwen::api::ChipImpl as _;
-use luwen::pci::detect_chips;
+use luwen::pci::detect_chips_for_flash;
 
 mod check;
 mod reset;
@@ -35,7 +35,11 @@ fn main() -> std::process::ExitCode {
 fn run() -> anyhow::Result<()> {
     let args = Args::parse();
     init_tracing(args.verbose.tracing_level_filter());
-    let chips = detect_chips().map_err(|e| anyhow::anyhow!("{e}"))?;
+    // Flash-safe detection only needs the ARC mailbox, so a chip whose boot
+    // ended in an init error (e.g. cable fault mode) can still have its
+    // overrides read and written. Full `detect_chips()` would refuse it, which
+    // would make the cable fault bypass impossible to set exactly when needed.
+    let chips = detect_chips_for_flash().map_err(|e| anyhow::anyhow!("{e}"))?;
     anyhow::ensure!(!chips.is_empty(), "no chips detected");
     let filter: Vec<u32> = args
         .dev
