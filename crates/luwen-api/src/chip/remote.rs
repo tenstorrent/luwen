@@ -87,6 +87,7 @@ impl ChipComms for RemoteArcIf {
 
 #[derive(Clone, Default)]
 pub struct EthAddresses {
+    pub fw_version: u32,
     pub masked_version: u32,
 
     pub version: u64,
@@ -165,6 +166,7 @@ impl EthAddresses {
 
         EthAddresses {
             version,
+            fw_version,
             masked_version,
             boot_params,
             node_info,
@@ -258,9 +260,8 @@ impl Wormhole {
         let mut valid_fw_version = Vec::with_capacity(self.eth_locations.len());
         for core in &self.eth_locations {
             let eth_fw_version = self.eth_addrs.masked_version;
-            let msbyte = (eth_fw_version >> 24) & 0xFF;
-            if msbyte != 0x0
-                || msbyte != 0x6
+            let msbyte = (self.eth_addrs.fw_version >> 24) & 0xFF;
+            if (msbyte != 0x0 && msbyte != 0x6)
                 || self.noc_read32(0, core.x, core.y, self.eth_addrs.version)? & 0x00FFFFFF
                     != eth_fw_version
             {
