@@ -6,8 +6,10 @@ firmware.
 Writes go to the `ccfgovr` override banks: two 4 KiB SPI partitions
 (`ccfgovra`, `ccfgovrb`) the firmware merges on top of `cmfwcfg` at boot.
 The original `cmfwcfg` partition is never touched, so reverting an
-override is just a matter of removing it. Any write is followed by a chip
-reset so the new config takes effect.
+override is just a matter of removing it. The firmware only reads the
+override banks at boot, so after any write you must reset the device with
+`tt-smi` for the new config to take effect. `bh-mod` does not reset
+the chip itself.
 
 ## Build
 
@@ -33,12 +35,11 @@ bh-mod [-d <PATH>]... <COMMAND>
        -t read-only / -t flash-info read boardcfg / flshinfo.
 
   set [-n] FIELD=VALUE...
-       merge fields into the override, write to the inactive bank,
-       reset the chip.
+       merge fields into the override and write to the inactive bank.
 
   res [-n] [-a] [FIELDS...]
-       remove fields from the override (cmfwcfg values re-emerge),
-       write to the inactive bank, reset the chip.
+       remove fields from the override (cmfwcfg values re-emerge) and
+       write to the inactive bank.
        -a, --all clears the entire override.
 ```
 
@@ -46,8 +47,10 @@ Aliases: `set` → `s`, `res` → `r` / `reset`.
 
 - `-d, --dev <PATH>`: target a specific device under `/dev/tenstorrent`.
   Repeatable. Omit to target all detected Blackhole chips.
-- `-n, --dry-run`: show what would change without touching flash or
-  resetting.
+- `-n, --dry-run`: show what would change without touching flash.
+
+After `set` or `res`, run `tt-smi -r` to reset the device and load the
+new override.
 
 Fields use dot-notation matching the proto layout. The output of
 `bh-mod get` is self-documenting: any path it prints is a valid input to
@@ -113,13 +116,15 @@ bh-mod get -f json chip_limits.tdp_limit
 # Board config for a specific device
 bh-mod -d /dev/tenstorrent/0 get -t read-only
 
-# Set a field (dry-run first)
+# Set a field (dry-run first), then reset to apply
 bh-mod set -n chip_limits.asic_fmax=1350
 bh-mod set chip_limits.asic_fmax=1350
+tt-smi -r
 
 # Stack a second override; both apply on next boot (when more fields
 # are exposed in fw_table_override.proto)
 bh-mod set chip_limits.tdp_limit=160
+tt-smi -r
 
 # Raise the ETH link speed above what cmfwcfg pins it to. bh-mod validates
 # against the speeds the ERISC firmware implements (0, 40, 100, 200, 330,
@@ -148,9 +153,11 @@ bh-mod res feature_enable.bypass_cable_fault_detection
 
 # Remove one override (cmfwcfg value re-emerges)
 bh-mod res chip_limits.tdp_limit
+tt-smi -r
 
 # Clear the entire override
 bh-mod res --all
+tt-smi -r
 ```
 
 ## Multi-chip output

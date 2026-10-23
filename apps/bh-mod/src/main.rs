@@ -10,7 +10,6 @@ use luwen::api::ChipImpl as _;
 use luwen::pci::detect_chips_for_flash;
 
 mod check;
-mod reset;
 mod table;
 
 fn main() -> std::process::ExitCode {
@@ -103,45 +102,8 @@ fn run() -> anyhow::Result<()> {
         }
     };
     if wrote {
-        let verbose_logging =
-            args.verbose.tracing_level_filter() > tracing::level_filters::LevelFilter::WARN;
-        reset_chips(&selected, verbose_logging, args.reset_timeout)?;
+        eprintln!("Config written. Reset with `tt-smi` to apply the new config.");
     }
-    Ok(())
-}
-
-/// Reset every selected chip in sequence, showing a progress bar that
-/// ticks as each chip finishes.
-///
-/// `verbose_logging` hides the bar — its stderr redraws collide with the
-/// tracing-subscriber's log lines, so the logs are the status indicator
-/// when the user has asked for them.
-fn reset_chips(
-    selected: &[(usize, &luwen_api::chip::Blackhole)],
-    verbose_logging: bool,
-    timeout: std::time::Duration,
-) -> anyhow::Result<()> {
-    use indicatif::{ProgressBar, ProgressStyle};
-
-    let pb = if verbose_logging {
-        ProgressBar::hidden()
-    } else {
-        ProgressBar::new(selected.len() as u64)
-    };
-    pb.set_style(
-        ProgressStyle::with_template("  resetting {bar:30.cyan/blue} {percent:>3}% ETA {eta}")
-            .expect("static template")
-            .progress_chars("█░"),
-    );
-    pb.enable_steady_tick(std::time::Duration::from_millis(120));
-
-    for (id, _) in selected {
-        reset::chip_reset(*id, timeout)
-            .map_err(|e| anyhow::anyhow!("{e}"))
-            .context("chip reset")?;
-        pb.inc(1);
-    }
-    pb.finish_and_clear();
     Ok(())
 }
 
@@ -149,23 +111,14 @@ fn reset_chips(
 ///
 /// `set` and `res` operate on the `ccfgovr` override banks, which the
 /// firmware merges on top of `cmfwcfg` at boot. The original `cmfwcfg`
-/// partition is never written. Any write operation performs a chip reset
-/// so the new config takes effect.
+/// partition is never written. Writes take effect on the next chip
+/// reset.
 #[derive(clap::Parser)]
 #[command(version)]
 struct Args {
     /// Path under /dev/tenstorrent to operate on. Repeatable. Omit to target all available devices.
     #[arg(short = 'd', long = "dev", value_name = "PATH", global = true)]
     dev: Vec<PathBuf>,
-    /// Per-chip ASIC reset timeout (e.g. `30s`, `2m`, `500ms`).
-    #[arg(
-        long,
-        value_name = "DURATION",
-        default_value = "30s",
-        value_parser = humantime::parse_duration,
-        global = true,
-    )]
-    reset_timeout: std::time::Duration,
     #[command(flatten)]
     verbose: clap_verbosity_flag::Verbosity<clap_verbosity_flag::WarnLevel>,
     #[command(subcommand)]
@@ -212,7 +165,7 @@ enum Cmd {
     /// Merge fields into the `ccfgovr` override.
     #[command(visible_alias = "s")]
     Set {
-        /// Print what would change without writing to flash or resetting.
+        /// Print what would change without writing to flash.
         #[arg(short = 'n', long)]
         dry_run: bool,
         /// Field assignments in `field=value` form (dot-notation path).
@@ -221,7 +174,7 @@ enum Cmd {
     /// Remove fields from the `ccfgovr` override (cmfwcfg value re-emerges).
     #[command(visible_aliases = ["r", "reset"])]
     Res {
-        /// Print what would change without writing to flash or resetting.
+        /// Print what would change without writing to flash.
         #[arg(short = 'n', long)]
         dry_run: bool,
         /// Clear all override fields.

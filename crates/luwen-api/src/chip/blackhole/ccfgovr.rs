@@ -189,10 +189,7 @@ pub fn write(
         .into());
     }
 
-    let new_seq = match active_seq {
-        Some(s) if s != SEQ_ERASED => s.wrapping_add(1),
-        _ => 0,
-    };
+    let new_seq = next_seq(active_seq);
     let body_len = body.len() as u32;
     let mut hdr = BankHeader {
         magic: MAGIC,
@@ -338,6 +335,16 @@ fn seq_is_newer(a: u32, b: u32) -> bool {
     (a.wrapping_sub(b) as i32) > 0
 }
 
+/// Sequence number for the next write. `SEQ_ERASED` marks an erased bank,
+/// so a write that lands on it would be ignored; skip from 0xFFFF_FFFE to 0,
+/// which `seq_is_newer` still orders after it.
+fn next_seq(active_seq: Option<u32>) -> u32 {
+    match active_seq.map(|s| s.wrapping_add(1)) {
+        Some(s) if s != SEQ_ERASED => s,
+        _ => 0,
+    }
+}
+
 fn compute_cksum(hdr: &BankHeader, body: &[u8]) -> u32 {
     let mut hasher = crc32fast::Hasher::new();
     hasher.update(&bytes_of(hdr)[..CKSUM_HDR_LEN]);
@@ -369,6 +376,15 @@ mod tests {
         assert_eq!(proto_prefix_len(&body).unwrap(), proto.len());
         // The recovered prefix must round-trip through the decoder.
         FwTableOverride::decode(&body[..proto_prefix_len(&body).unwrap()]).unwrap();
+    }
+
+    #[test]
+    fn next_seq_never_writes_the_erased_marker() {
+        assert_eq!(next_seq(None), 0);
+        assert_eq!(next_seq(Some(7)), 8);
+        assert_eq!(next_seq(Some(0xFFFF_FFFD)), 0xFFFF_FFFE);
+        assert_eq!(next_seq(Some(0xFFFF_FFFE)), 0);
+        assert!(seq_is_newer(0, 0xFFFF_FFFE));
     }
 
     #[test]
