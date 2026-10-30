@@ -928,30 +928,26 @@ fn collect_diffs(
     }
 }
 
-/// Returns true if a value is the proto3 default (and would be omitted
-/// from the encoded wire form).
-fn is_empty_value(v: &Value) -> bool {
+/// Returns true if a value is absent from the override. Every override
+/// field is `optional`, so an unset one decodes as null, while 0 or false
+/// is a value the firmware applies.
+fn is_unset(v: &Value) -> bool {
     match v {
         Value::Null => true,
-        Value::Bool(b) => !b,
-        Value::Number(n) => {
-            n.as_u64() == Some(0) || n.as_i64() == Some(0) || n.as_f64() == Some(0.0)
-        }
-        Value::String(s) => s.is_empty(),
-        Value::Array(a) => a.is_empty(),
-        Value::Object(m) => m.is_empty() || m.values().all(is_empty_value),
+        Value::Object(m) => m.values().all(is_unset),
+        _ => false,
     }
 }
 
-/// Strip empty/default values from a `HashMap` so the override view shows
-/// only fields that are actually overridden on the wire.
+/// Strip unset fields from a `HashMap` so the override view shows only
+/// fields that are actually overridden on the wire.
 fn prune_for_display(map: &mut HashMap<String, Value>) {
     for v in map.values_mut() {
         if let Value::Object(obj) = v {
             prune_object(obj);
         }
     }
-    map.retain(|_, v| !is_empty_value(v));
+    map.retain(|_, v| !is_unset(v));
 }
 
 fn prune_object(obj: &mut serde_json::Map<String, Value>) {
@@ -960,7 +956,7 @@ fn prune_object(obj: &mut serde_json::Map<String, Value>) {
             prune_object(child);
         }
     }
-    obj.retain(|_, v| !is_empty_value(v));
+    obj.retain(|_, v| !is_unset(v));
 }
 
 fn set_value(val: &mut Value, path: &str, raw: &str) -> anyhow::Result<()> {
@@ -1131,6 +1127,29 @@ mod tests {
                 "{path} must stay gated by the override schema",
             );
         }
+    }
+
+    /// An override of 0 or false is applied by the firmware like any other
+    /// value, so `get` has to show it; only fields left unset are hidden.
+    #[test]
+    fn zero_and_false_overrides_are_shown() {
+        let mut map: HashMap<String, Value> = serde_json::from_value(serde_json::json!({
+            "chip_limits": {"tdp_limit": 0, "max_tdp_limit": null},
+            "feature_enable": {"kernel_throttler_at_floor_en": false},
+            "dram_table": {"soft_harvest_dram_mask": null},
+        }))
+        .unwrap();
+        prune_for_display(&mut map);
+        assert_eq!(
+            get_value(&map, "chip_limits.tdp_limit"),
+            Some(&Value::from(0))
+        );
+        assert_eq!(get_value(&map, "chip_limits.max_tdp_limit"), None);
+        assert_eq!(
+            get_value(&map, "feature_enable.kernel_throttler_at_floor_en"),
+            Some(&Value::Bool(false)),
+        );
+        assert!(!map.contains_key("dram_table"));
     }
 
     fn check(path: &str, raw: &str) -> anyhow::Result<()> {
