@@ -1,0 +1,71 @@
+name: Docker Alpine CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Git tag to build and attach wheels to (e.g., v1.2.3)'
+        required: false
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag != '' && inputs.release_tag || github.ref }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image from dockerfile-alpine
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./ci/dockerfiles/Dockerfile-alpine
+          push: false
+          load: true
+          tags: |
+            local/luwen:ci
+            ${{ inputs.release_tag != '' && format('local/luwen:{0}', inputs.release_tag) || '' }}
+
+      - name: Extract artifacts
+        run: |
+          set -euo pipefail
+          cid=$(docker create local/luwen:ci)
+          mkdir -p target/wheels
+          docker cp "$cid":/home/builder/luwen/target/wheels/. ./target/wheels 2>/dev/null || true
+          docker rm "$cid"
+
+      - name: Upload wheels (if present)
+        if: ${{ hashFiles('target/wheels/**') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels
+          path: target/wheels/
+
+      - name: Create or update GitHub Release
+        if: ${{ inputs.release_tag != '' && hashFiles('target/wheels/*.whl') != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          name: ${{ inputs.release_tag }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload wheels to Release
+        if: ${{ inputs.release_tag != '' && hashFiles('target/wheels/*.whl') != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          files: |
+            target/wheels/*.whl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
