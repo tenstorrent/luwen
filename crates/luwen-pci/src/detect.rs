@@ -16,6 +16,18 @@ use luwen_kmd::PciDevice;
 
 use crate::{comms_callback, error::LuwenError, ExtendedPciDevice};
 
+
+fn format_chip_ident(chip: &Chip) -> String {
+    let arch = chip.get_arch();
+    if let Ok(Some(info)) = chip.get_device_info() {
+        return format!(
+            "chip {} ({arch:?}, {:04x}:{:02x}:{:02x}.{:01x})",
+            info.interface_id, info.domain, info.bus, info.slot, info.function
+        );
+    }
+    format!("chip ({arch:?})")
+}
+
 pub struct InProgressDetect {
     /// Options passed into the start of the detect function
     pub options: ChipDetectOptions,
@@ -103,14 +115,15 @@ pub fn detect_chips_options_notui(
     let mut last_output = String::new();
 
     let init_callback = |status: ChipDetectState| {
+        let chip_ident = format_chip_ident(status.chip);
         match status.call {
             luwen_api::chip::CallReason::NotNew => {
                 total_chips = total_chips.saturating_sub(1);
-                eprintln!("Ok I was wrong we actually have {total_chips} chips");
+                eprintln!("Ok I was wrong we actually have {total_chips} chips ({chip_ident})");
             }
             luwen_api::chip::CallReason::NewChip => {
                 total_chips += 1;
-                eprintln!("New chip! We now have {total_chips} chips");
+                eprintln!("New {chip_ident}! We now have {total_chips} chips");
             }
             luwen_api::chip::CallReason::InitWait(status) => {
                 let mut output = String::new();
@@ -123,12 +136,12 @@ pub fn detect_chips_options_notui(
                 output.push_str(&status.cpu_status.to_string());
 
                 if last_output != output {
-                    eprintln!("Initializing chip...\n{output}");
+                    eprintln!("Initializing {chip_ident}...\n{output}");
                     last_output = output;
                 }
             }
             luwen_api::chip::CallReason::ChipInitCompleted(status) => {
-                eprintln!("Chip initialization complete (found {last_output})");
+                eprintln!("Chip initialization complete for {chip_ident} (found {last_output})");
 
                 let mut output = String::new();
                 output.push_str(&status.arc_status.to_string());
@@ -140,9 +153,9 @@ pub fn detect_chips_options_notui(
                 output.push_str(&status.cpu_status.to_string());
 
                 if status.has_error() {
-                    eprintln!("Chip initializing failed...\n{output}");
+                    eprintln!("Chip initializing failed for {chip_ident}...\n{output}");
                 } else {
-                    eprintln!("Chip initializing complete...\n{output}");
+                    eprintln!("Chip initializing complete for {chip_ident}...\n{output}");
                 }
             }
         };
@@ -259,20 +272,26 @@ pub fn detect_chips_options_tui(options: ChipDetectOptions) -> Result<Vec<Uninit
                 update_bar_with_status(&bars, &mut cpu_init_bar, &status.cpu_status);
 
                 if let Some(bar) = chip_init_bar.as_ref() {
-                    bar.set_message("Waiting chip to initialize".to_string());
+                    bar.set_message(format!(
+                        "Waiting for {} to initialize",
+                        format_chip_ident(status.chip)
+                    ));
                 }
             }
-            luwen_api::chip::CallReason::ChipInitCompleted(status) => {
+            luwen_api::chip::CallReason::ChipInitCompleted(init_status) => {
+                let chip_ident = format_chip_ident(status.chip);
                 chip_detect_bar.set_message("Chip initialization complete (found {pos})");
 
-                maybe_remove_bar(&bars, &mut arc_init_bar, &status.arc_status);
-                maybe_remove_bar(&bars, &mut dram_init_bar, &status.dram_status);
-                maybe_remove_bar(&bars, &mut eth_init_bar, &status.eth_status);
-                maybe_remove_bar(&bars, &mut cpu_init_bar, &status.cpu_status);
+                maybe_remove_bar(&bars, &mut arc_init_bar, &init_status.arc_status);
+                maybe_remove_bar(&bars, &mut dram_init_bar, &init_status.dram_status);
+                maybe_remove_bar(&bars, &mut eth_init_bar, &init_status.eth_status);
+                maybe_remove_bar(&bars, &mut cpu_init_bar, &init_status.cpu_status);
 
                 if let Some(bar) = chip_init_bar.take() {
-                    if status.has_error() {
-                        bar.finish_with_message("Chip initialization failed");
+                    if init_status.has_error() {
+                        bar.finish_with_message(format!(
+                            "Chip initialization failed for {chip_ident}"
+                        ));
                     } else {
                         bar.finish_and_clear();
                         bars.remove(&bar);
@@ -350,7 +369,24 @@ pub fn detect_chips_for_flash() -> Result<Vec<Chip>, LuwenError> {
         flash_safe: true,
         ..Default::default()
     })?;
-    match detect.detect(|_state| Ok::<(), Infallible>(())) {
+    for (id, chip, err) in &detect.failed_chips {
+        eprintln!(
+            "Failed to communicate over pcie with chip {id} ({:?}): {err}",
+            chip.get_arch()
+        );
+    }
+    match detect.detect(|state| {
+        if let luwen_api::chip::CallReason::ChipInitCompleted(status) = state.call {
+            let chip_ident = format_chip_ident(state.chip);
+            for warning in &status.warnings {
+                eprintln!("Flash init warning on {chip_ident}: {warning}");
+            }
+            if status.has_error() && !status.can_communicate() {
+                eprintln!("Flash init failed on {chip_ident}:\n{status}");
+            }
+        }
+        Ok::<(), Infallible>(())
+    }) {
         Ok(chips) => Ok(chips
             .into_iter()
             .filter(|chip| match chip.status() {
