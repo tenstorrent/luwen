@@ -789,6 +789,15 @@ impl PciChip {
         Ok(info.interface_id)
     }
 
+    /// Request a power level ("low" or "high") for this chip's device handle.
+    ///
+    /// This replaces the handle's previous request, including power domains Luwen
+    /// added on its own. Before a NoC access to any tile not known to be always on
+    /// (ARC, PCIe, Ethernet, security, router-only), and before every broadcast,
+    /// multicast or NoC1 access, Luwen adds MRISC, Tensix and L2CPU back if they
+    /// are missing. The request lasts until the handle is closed. Telemetry, ARC
+    /// messages and SPI access never raise power; neither do raw BAR or DMA
+    /// accesses through a TLB window configured earlier.
     pub fn set_power_state(&self, level: String) -> PyResult<()> {
         if let Some(bh) = self.as_bh() {
             bh.set_power_state(level)
@@ -799,6 +808,9 @@ impl PciChip {
         }
     }
 
+    /// Request individual power domains for this chip's device handle.
+    ///
+    /// Replaces the handle's previous request in the same way as `set_power_state`.
     #[pyo3(signature = (*, aiclk, mrisc, tensix, l2cpu, pcie))]
     pub fn set_power(
         &self,
@@ -1213,6 +1225,15 @@ impl PciWormhole {
             .map_err(|v| PyException::new_err(v.to_string()))
     }
 
+    /// Request a power level ("low" or "high") for this chip's device handle.
+    ///
+    /// This replaces the handle's previous request, including power domains Luwen
+    /// added on its own. Before a NoC access to any tile not known to be always on
+    /// (ARC, PCIe, Ethernet, security, router-only), and before every broadcast,
+    /// multicast or NoC1 access, Luwen adds MRISC, Tensix and L2CPU back if they
+    /// are missing. The request lasts until the handle is closed. Telemetry, ARC
+    /// messages and SPI access never raise power; neither do raw BAR or DMA
+    /// accesses through a TLB window configured earlier.
     pub fn set_power_state(&self, level: String) -> PyResult<()> {
         let value = PciInterface::from_wh(self);
 
@@ -1225,6 +1246,9 @@ impl PciWormhole {
         }
     }
 
+    /// Request individual power domains for this chip's device handle.
+    ///
+    /// Replaces the handle's previous request in the same way as `set_power_state`.
     #[pyo3(signature = (*, aiclk, mrisc, tensix, l2cpu, pcie))]
     pub fn set_power(
         &self,
@@ -1521,6 +1545,15 @@ impl PciBlackhole {
         }
     }
 
+    /// Request a power level ("low" or "high") for this chip's device handle.
+    ///
+    /// This replaces the handle's previous request, including power domains Luwen
+    /// added on its own. Before a NoC access to any tile not known to be always on
+    /// (ARC, PCIe, Ethernet, security, router-only), and before every broadcast,
+    /// multicast or NoC1 access, Luwen adds MRISC, Tensix and L2CPU back if they
+    /// are missing. The request lasts until the handle is closed. Telemetry, ARC
+    /// messages and SPI access never raise power; neither do raw BAR or DMA
+    /// accesses through a TLB window configured earlier.
     pub fn set_power_state(&self, level: String) -> PyResult<()> {
         let value = PciInterface::from_bh(self);
 
@@ -1533,6 +1566,9 @@ impl PciBlackhole {
         }
     }
 
+    /// Request individual power domains for this chip's device handle.
+    ///
+    /// Replaces the handle's previous request in the same way as `set_power_state`.
     #[pyo3(signature = (*, aiclk, mrisc, tensix, l2cpu, pcie))]
     pub fn set_power(
         &self,

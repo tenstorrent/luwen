@@ -6,13 +6,14 @@ use std::{
         fd::{AsRawFd, RawFd},
         unix::prelude::FileTypeExt,
     },
-    sync::Arc,
+    sync::{Arc, Mutex, PoisonError},
 };
 
 mod error;
 pub mod ioctl;
 mod kmdif;
 mod pci;
+mod power;
 pub mod tlb;
 
 pub use error::{PciError, PciOpenError};
@@ -119,6 +120,11 @@ pub struct PciDevice {
 
     pub dma_config: Option<DmaConfig>,
     pub pci_bar: Option<BarMapping>,
+
+    /// Power flags (bits 0..=4) this handle has asked the KMD for. The KMD
+    /// keeps one request per handle and replaces it on each request, so every
+    /// request carries the full set. 0 means nothing has been requested.
+    power_request: Mutex<u8>,
 }
 
 fn allocate_dma_buffer(
@@ -337,6 +343,8 @@ impl PciDevice {
             transfer_buffer: None,
 
             pci_bar: None,
+
+            power_request: Mutex::new(0),
         };
 
         // To avoid needing a warmup when performing the first dma access, try to allocate the
@@ -464,6 +472,8 @@ impl PciDevice {
         }
     }
 
+    /// Programs a TLB window directly, without the power request that
+    /// [`PciDevice::setup_tlb`] makes.
     pub fn configure_tlb(
         &self,
         alloc: &TlbAllocation,
@@ -520,11 +530,22 @@ impl PciDevice {
         output
     }
 
+    /// Points a TLB window at `tlb`'s NoC target.
+    ///
+    /// Unless this handle's power request already covers it, a target that may
+    /// be clock-gated (anything but a NoC0 unicast to an ARC, PCIe, Ethernet,
+    /// security or router-only tile) first gets a synchronous request for MRISC,
+    /// Tensix and L2CPU, which takes one ARC message. On Blackhole, if firmware
+    /// that manages power does not confirm it, this fails with
+    /// [`PciError::IoctlError`] instead of risking an access that hangs the PCIe
+    /// link. The `noc_*` methods go through here.
     pub fn setup_tlb(
         &mut self,
         index: &PossibleTlbAllocation,
         tlb: Tlb,
     ) -> Result<(u64, u64), PciError> {
+        self.ensure_power_for(&tlb)?;
+
         match index {
             PossibleTlbAllocation::Allocation(tlb_allocation) => {
                 let config = ioctl::NocTlbConfig {
@@ -571,41 +592,34 @@ impl PciDevice {
         tlb::get_tlb(self, index)
     }
 
-    #[allow(clippy::erasing_op)]
-    #[allow(clippy::identity_op)]
-    pub fn set_power_state(&self, level: Power) -> Result<(), PciError> {
-        let mut state = match level {
-            Power::Low => ioctl::SetPowerState {
-                validity: (0 & 0xF) << 4 | (5 & 0xF),
-                power_flags: 0xffe0 | 0b00000,
-                ..Default::default()
-            },
-            Power::High => ioctl::SetPowerState {
-                validity: (0 & 0xF) << 4 | (5 & 0xF),
-                power_flags: 0xffe0 | 0b11111,
-                ..Default::default()
-            },
-            Power::Raw {
-                aiclk,
-                mrisc,
-                tensix,
-                l2cpu,
-                pcie,
-            } => ioctl::SetPowerState {
-                validity: (0 & 0xF) << 4 | (5 & 0xF),
-                power_flags: 0xffe0
-                    | (u16::from(aiclk)
-                        | u16::from(mrisc) << 1
-                        | u16::from(tensix) << 2
-                        | u16::from(l2cpu) << 3
-                        | u16::from(pcie) << 4),
-                ..Default::default()
-            },
-        };
+    fn send_power_request(&self, bits: u8) -> Result<(), nix::errno::Errno> {
+        let mut state = power_state_request(bits);
 
         // SAFETY: State is defined as a stack-allocated struct, and will never be null.
-        match unsafe { ioctl::set_power_state(self.device_fd.as_raw_fd(), &mut state) } {
-            Ok(_) => Ok(()),
+        unsafe { ioctl::set_power_state(self.device_fd.as_raw_fd(), &mut state) }.map(|_| ())
+    }
+
+    /// Requests a power level for this handle.
+    ///
+    /// This replaces the handle's previous request, including any power domains
+    /// Luwen added on its own. Before the next NoC access to a tile that may be
+    /// clock-gated (see [`PciDevice::setup_tlb`]), Luwen adds MRISC, Tensix and
+    /// L2CPU back on top of this request, because such an access to a gated tile
+    /// hangs the PCIe link. The request lasts until the handle is closed; after a
+    /// chip reset, reopen the device.
+    pub fn set_power_state(&self, level: Power) -> Result<(), PciError> {
+        let mut requested = self
+            .power_request
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let bits = level.bits();
+        let result = self.send_power_request(bits);
+        // tt-kmd replaces this handle's request before it messages firmware. If
+        // firmware that manages power did not confirm it, the next access to a
+        // gateable tile sends it again.
+        *requested = power::cache_after_send(self.arch, bits, result);
+        match result {
+            Ok(()) => Ok(()),
             Err(nix::errno::Errno::EINVAL) => {
                 // EINVAL is returned when the firmware or kernel module driver (KMD) is too old
                 // to support power management features. Silently ignore this error to maintain
@@ -613,6 +627,55 @@ impl PciDevice {
                 Ok(())
             }
             Err(err) => Err(PciError::IoctlError(err)),
+        }
+    }
+
+    /// Requests the power domains a NoC access through `tlb` needs, unless this
+    /// handle's request already covers them.
+    fn ensure_power_for(&self, tlb: &Tlb) -> Result<(), PciError> {
+        if !power::tlb_needs_power(self.arch, tlb) {
+            return Ok(());
+        }
+
+        let mut requested = self
+            .power_request
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let previous = *requested;
+        let Some((bits, result)) = power::request_for_access(self.arch, &mut requested, |bits| {
+            self.send_power_request(bits)
+        }) else {
+            return Ok(());
+        };
+
+        let (id, x, y, noc) = (self.id, tlb.x_end, tlb.y_end, tlb.noc_sel);
+        match result {
+            Ok(()) => {
+                tracing::debug!(
+                    "Device {id}: raised power request {previous:#x} to {bits:#x} before NoC access to ({x}, {y}) on noc{noc}"
+                );
+                Ok(())
+            }
+            Err(nix::errno::Errno::EINVAL) => {
+                tracing::debug!(
+                    "Device {id}: KMD or firmware does not support power requests; {bits:#x} not requested"
+                );
+                Ok(())
+            }
+            Err(errno) => match power::on_request_error(self.arch, errno) {
+                power::OnRequestError::Proceed => {
+                    tracing::warn!(
+                        "Device {id}: power request {bits:#x} failed ({errno}); continuing, since firmware without power management does not gate tiles"
+                    );
+                    Ok(())
+                }
+                power::OnRequestError::Fail => {
+                    tracing::error!(
+                        "Device {id}: power request {bits:#x} failed ({errno}); refusing NoC access to ({x}, {y}) on noc{noc}, which may be clock-gated"
+                    );
+                    Err(PciError::IoctlError(errno))
+                }
+            },
         }
     }
 
@@ -735,6 +798,9 @@ impl PciDevice {
 }
 
 /// Device power level.
+///
+/// See [`PciDevice::set_power_state`] for how a request interacts with the
+/// power domains Luwen requests on its own.
 pub enum Power {
     Low,
     High,
@@ -764,6 +830,38 @@ pub enum Power {
         /// maximum speed supported by the device.
         pcie: bool,
     },
+}
+
+impl Power {
+    fn bits(&self) -> u8 {
+        match *self {
+            Power::Low => 0,
+            Power::High => power::AICLK | power::MRISC | power::TENSIX | power::L2CPU | power::PCIE,
+            Power::Raw {
+                aiclk,
+                mrisc,
+                tensix,
+                l2cpu,
+                pcie,
+            } => {
+                let flag = |set: bool, bit: u8| if set { bit } else { 0 };
+                flag(aiclk, power::AICLK)
+                    | flag(mrisc, power::MRISC)
+                    | flag(tensix, power::TENSIX)
+                    | flag(l2cpu, power::L2CPU)
+                    | flag(pcie, power::PCIE)
+            }
+        }
+    }
+}
+
+/// Encodes a power request: 5 valid flags, no settings.
+fn power_state_request(bits: u8) -> ioctl::SetPowerState {
+    ioctl::SetPowerState {
+        validity: 5,
+        power_flags: 0xffe0 | u16::from(bits & 0x1f),
+        ..Default::default()
+    }
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -900,6 +998,35 @@ mod test {
             }
         );
         assert_eq!(driver_version_parse("bad"), DriverVersion::default());
+    }
+
+    #[test]
+    fn power_bits_and_encoding_unchanged() {
+        assert_eq!(Power::Low.bits(), 0);
+        assert_eq!(Power::High.bits(), 0x1f);
+        let raw = |aiclk, mrisc, tensix, l2cpu, pcie| {
+            Power::Raw {
+                aiclk,
+                mrisc,
+                tensix,
+                l2cpu,
+                pcie,
+            }
+            .bits()
+        };
+        assert_eq!(raw(true, false, false, false, false), 0x01);
+        assert_eq!(raw(false, true, false, false, false), 0x02);
+        assert_eq!(raw(false, false, true, false, false), 0x04);
+        assert_eq!(raw(false, false, false, true, false), 0x08);
+        assert_eq!(raw(false, false, false, false, true), 0x10);
+        assert_eq!(raw(false, true, true, true, false), power::NOC_ACCESS);
+
+        let low = power_state_request(Power::Low.bits());
+        assert_eq!((low.validity, low.power_flags), (5, 0xffe0));
+        let high = power_state_request(Power::High.bits());
+        assert_eq!((high.validity, high.power_flags), (5, 0xffff));
+        let noc = power_state_request(power::NOC_ACCESS);
+        assert_eq!((noc.validity, noc.power_flags), (5, 0xffee));
     }
 
     fn verify_noc(device: &mut PciDevice, tlb: PossibleTlbAllocation) {
