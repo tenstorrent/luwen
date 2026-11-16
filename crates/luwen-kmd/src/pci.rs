@@ -197,7 +197,14 @@ impl PciDevice {
                     return Err(PciError::BarUnmapped);
                 }
             };
-            ptr.copy_from_nonoverlapping(data.as_ptr(), data.len());
+            if cfg!(target_arch = "riscv64") {
+                // See `mmio_copy_u32`: keep each element a single device access of its own width.
+                for i in 0..data.len() {
+                    ptr.add(i).write_volatile(data.as_ptr().add(i).read());
+                }
+            } else {
+                ptr.copy_from_nonoverlapping(data.as_ptr(), data.len());
+            }
         }
 
         Ok(())
@@ -441,8 +448,10 @@ impl PciDevice {
     pub unsafe fn memcpy_to_device(dest: *mut u8, src: &[u8]) {
         // Memcpy implementations on aarch64 systems seem to generate invalid code which does not
         // properly respect alignment requirements of the aarch64 "memmove" instruction.
-        // riscv64 libc memcpy may likewise use 8-byte accesses, so apply the same wider
-        // alignment there to keep MMIO accesses to the device BAR aligned.
+        // On riscv64 alignment alone is not enough: glibc memcpy may use 8-byte or vector
+        // (byte-element) accesses on the BAR, which fault on 4-byte-aligned tails or reach the
+        // ARC CSM as byte accesses and read back wrong. The aligned path below therefore copies
+        // one volatile u32 at a time on riscv64.
         let align = if cfg!(any(target_arch = "aarch64", target_arch = "riscv64")) {
             4 * core::mem::align_of::<u32>()
         } else {
@@ -511,10 +520,16 @@ impl PciDevice {
                 offset += src_size_bytes;
             } else {
                 // Everything is aligned!
-                ((dest as usize + offset) as *mut u32).copy_from_nonoverlapping(
-                    (src.as_ptr() as usize + offset) as *const u32,
-                    block_write_length / core::mem::size_of::<u32>(),
-                );
+                let words = block_write_length / core::mem::size_of::<u32>();
+                let s = (src.as_ptr() as usize + offset) as *const u32;
+                let d = (dest as usize + offset) as *mut u32;
+                if cfg!(target_arch = "riscv64") {
+                    for i in 0..words {
+                        d.add(i).write_volatile(s.add(i).read_unaligned());
+                    }
+                } else {
+                    d.copy_from_nonoverlapping(s, words);
+                }
                 offset += block_write_length;
             }
         }
@@ -567,10 +582,16 @@ impl PciDevice {
                 offset += read_count
             } else {
                 // Everything is aligned!
-                ((dest.as_ptr() as usize + offset) as *mut u32).copy_from_nonoverlapping(
-                    (src as usize + offset) as *const u32,
-                    block_write_length / core::mem::size_of::<u32>(),
-                );
+                let words = block_write_length / core::mem::size_of::<u32>();
+                let s = (src as usize + offset) as *const u32;
+                let d = (dest.as_ptr() as usize + offset) as *mut u32;
+                if cfg!(target_arch = "riscv64") {
+                    for i in 0..words {
+                        d.add(i).write_unaligned(s.add(i).read_volatile());
+                    }
+                } else {
+                    d.copy_from_nonoverlapping(s, words);
+                }
                 offset += block_write_length;
             }
         }
