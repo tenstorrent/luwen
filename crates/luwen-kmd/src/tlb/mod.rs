@@ -104,6 +104,8 @@ pub fn get_tlb(device: &PciDevice, index: u32) -> Result<Tlb, PciError> {
     }
 }
 
+/// Programs a hardcoded TLB window, without the power request that
+/// [`PciDevice::setup_tlb`] makes.
 pub fn setup_tlb(device: &mut PciDevice, index: u32, tlb: Tlb) -> Result<(u64, u64), PciError> {
     match device.arch {
         #[allow(deprecated)]
