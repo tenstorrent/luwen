@@ -27,7 +27,7 @@ pub fn hang_arc(method: ArcHangMethod, chip: Chip) -> Result<(), Box<dyn std::er
             })?;
         }
         ArcHangMethod::CoreHault => {
-            // Need to go into arc a3 before haulting the core, otherwise we can interrupt
+            // Need to go into arc a3 before halting the core, otherwise we can interrupt
             // communication with the voltage regulator.
             chip.arc_msg(ArcMsgOptions {
                 msg: TypedArcMsg::SetArcState {
@@ -38,7 +38,7 @@ pub fn hang_arc(method: ArcHangMethod, chip: Chip) -> Result<(), Box<dyn std::er
             })?;
 
             let rmw = chip.axi_sread32("ARC_RESET.ARC_MISC_CNTL")?;
-            // the core hault bits are in 7:4 we only care about core 0 here (aka bit 4)
+            // the core halt bits are in 7:4 we only care about core 0 here (aka bit 4)
             chip.axi_swrite32("ARC_RESET.ARC_MISC_CNTL", rmw | (1 << 4))?;
         }
     }

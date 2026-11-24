@@ -11,7 +11,7 @@ trait Reset {
     fn restore(&mut self);
 }
 
-/// Returns true if the link was okay if false link was not good
+/// Returns true if the link was okay; if false, the link was not good
 fn link_reset(interface: usize) -> bool {
     let fd = if let Ok(fd) = std::fs::OpenOptions::new()
         .read(true)
