@@ -8,18 +8,14 @@ various distributions.
 The following are required dependencies and must be installed on your system to
 build Luwen.
 
-### [`protoc`](https://protobuf.dev)
+### ['cmake'](https://cmake.org/)
 
-The protocol buffer compiler can be installed either by downloading a
-pre-compiled binary to your `$PATH` or by using your package manager. See the
-[installation instructions][protoc.install] for more details.
+The cmake software build system is used to build protobuf. Version 3.16 or later
+is required.
 
-[protoc.install]: https://protobuf.dev/installation
+### C++14 compiler
 
-Note: the Cargo build itself uses the protoc bundled by the `protoc-bin-vendored`
-crate rather than the system one. On riscv64 hosts, for which no official protoc
-release binary exists, it instead builds protoc from source via the `protobuf-src`
-crate, which additionally requires `cmake` and a C++17 compiler.
+A C++14 compiler such as g++ 7.3 or clang++ 6.0 is needed to build protobuf.
 
 ## Libraries
 
